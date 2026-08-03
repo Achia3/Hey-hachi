@@ -1,0 +1,519 @@
+2026-08-03 12:51:19,346 - INFO - HTTP Request: GET http://127.0.0.1:11434/api/tags "HTTP/1.1 200 OK"
+2026-08-03 12:51:19,455 - INFO - Could not import comtypes.gen, trying to create it.
+2026-08-03 12:51:19,456 - INFO - Created comtypes.gen directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 12:51:19,456 - INFO - Writing __init__.py file: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen\__init__.py'
+2026-08-03 12:51:19,468 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 12:51:19,489 - INFO - Could not import comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4: No module named 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4'
+2026-08-03 12:51:19,494 - INFO - # Generating comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4
+2026-08-03 12:51:19,573 - INFO - # Generating comtypes.gen.SpeechLib
+2026-08-03 12:51:19,580 - INFO - Could not import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0: No module named 'comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0'
+2026-08-03 12:51:19,581 - INFO - # Generating comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
+2026-08-03 12:51:19,587 - INFO - # Generating comtypes.gen.stdole
+2026-08-03 12:51:39,458 - INFO - Could not understand audio input
+2026-08-03 12:52:29,555 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 12:52:32,410 - INFO - User: what's 9 + 10
+2026-08-03 12:52:32,410 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 12:52:37,911 - INFO - Could not understand audio input
+2026-08-03 12:56:19,632 - INFO - HTTP Request: GET http://127.0.0.1:11434/api/tags "HTTP/1.1 200 OK"
+2026-08-03 12:56:19,763 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 12:56:19,764 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 12:56:36,949 - INFO - Recognized: hey hach
+2026-08-03 12:56:44,825 - INFO - Recognized: what's 9 + 10
+2026-08-03 12:56:53,125 - INFO - Recognized: hey hachi
+2026-08-03 12:57:01,831 - INFO - Recognized: what's the best build for morte ka
+2026-08-03 12:57:04,772 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 12:58:47,842 - INFO - HTTP Request: GET http://127.0.0.1:11434/api/tags "HTTP/1.1 200 OK"
+2026-08-03 12:58:48,041 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 12:58:48,041 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:03:12,796 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:03:12,797 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:03:13,273 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:03:13,273 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:03:25,161 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:25] "GET / HTTP/1.1" 200 -
+2026-08-03 13:03:25,480 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:25] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:03:41,517 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:41] "GET / HTTP/1.1" 200 -
+2026-08-03 13:03:41,758 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:41] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:03:44,806 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:44] "GET / HTTP/1.1" 200 -
+2026-08-03 13:03:50,265 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:50] "GET / HTTP/1.1" 200 -
+2026-08-03 13:03:50,632 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:50] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:03:58,940 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:03:58,941 - INFO - User: hello
+2026-08-03 13:03:58,941 - INFO - Hachi: Hello! How can I assist you today?
+2026-08-03 13:03:58,941 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:58] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:03:59,257 - INFO - 127.0.0.1 - - [03/Aug/2026 13:03:59] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:04:11,207 - INFO - 127.0.0.1 - - [03/Aug/2026 13:04:11] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:04:12,077 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:04:12,078 - INFO - User: what's 9 + 10
+2026-08-03 13:04:12,078 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:04:12,078 - INFO - 127.0.0.1 - - [03/Aug/2026 13:04:12] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:04:12,082 - ERROR - TTS error: run loop already started
+2026-08-03 13:04:12,082 - INFO - 127.0.0.1 - - [03/Aug/2026 13:04:12] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:04:40,054 - INFO - 127.0.0.1 - - [03/Aug/2026 13:04:40] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:04:40,062 - INFO - 127.0.0.1 - - [03/Aug/2026 13:04:40] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:07:24,155 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:07:24,155 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:07:24,608 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:07:24,608 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:07:30,810 - INFO - 127.0.0.1 - - [03/Aug/2026 13:07:30] "GET / HTTP/1.1" 200 -
+2026-08-03 13:07:44,533 - INFO - 127.0.0.1 - - [03/Aug/2026 13:07:44] "GET / HTTP/1.1" 200 -
+2026-08-03 13:07:48,324 - INFO - 127.0.0.1 - - [03/Aug/2026 13:07:48] "GET / HTTP/1.1" 200 -
+2026-08-03 13:08:53,757 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:08:53,757 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:08:54,207 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:08:54,207 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:08:58,806 - INFO - 127.0.0.1 - - [03/Aug/2026 13:08:58] "GET / HTTP/1.1" 200 -
+2026-08-03 13:09:17,314 - INFO - 127.0.0.1 - - [03/Aug/2026 13:09:17] "GET / HTTP/1.1" 200 -
+2026-08-03 13:09:34,598 - INFO - 127.0.0.1 - - [03/Aug/2026 13:09:34] "GET / HTTP/1.1" 200 -
+2026-08-03 13:09:54,690 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:09:54,690 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:09:55,099 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:09:55,099 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:10:00,674 - INFO - 127.0.0.1 - - [03/Aug/2026 13:10:00] "GET / HTTP/1.1" 200 -
+2026-08-03 13:11:03,523 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:11:03,523 - INFO - User: hey hachi
+2026-08-03 13:11:03,523 - INFO - Hachi: Hello! It seems there might have been a typo in your greeting. Did you mean to say "Hey Hachi"? If so, do you have any specific questions or topics you'd like to discuss? If not, how can I assist you today?
+2026-08-03 13:11:03,523 - INFO - 127.0.0.1 - - [03/Aug/2026 13:11:03] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:11:03,528 - ERROR - TTS error: run loop already started
+2026-08-03 13:11:03,529 - INFO - 127.0.0.1 - - [03/Aug/2026 13:11:03] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:11:31,602 - INFO - 127.0.0.1 - - [03/Aug/2026 13:11:31] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:13:50,139 - INFO - HTTP Request: GET http://127.0.0.1:11434/api/tags "HTTP/1.1 200 OK"
+2026-08-03 13:13:50,275 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:13:50,275 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:14:10,005 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:14:10,005 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:14:10,430 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:14:10,430 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:14:14,250 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:14] "GET / HTTP/1.1" 200 -
+2026-08-03 13:14:20,889 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:20] "GET / HTTP/1.1" 200 -
+2026-08-03 13:14:29,582 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:29] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:14:39,105 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:39] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:14:41,605 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:41] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:14:42,430 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:14:42,430 - INFO - User: what's 9 + 10
+2026-08-03 13:14:42,430 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:14:42,431 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:42] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:14:42,435 - ERROR - TTS error: run loop already started
+2026-08-03 13:14:42,435 - INFO - 127.0.0.1 - - [03/Aug/2026 13:14:42] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:18:22,315 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:18:22,316 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:18:22,754 - INFO - Starting Flask server...
+2026-08-03 13:18:22,765 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:18:22,765 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:18:26,589 - INFO - 127.0.0.1 - - [03/Aug/2026 13:18:26] "GET / HTTP/1.1" 200 -
+2026-08-03 13:18:28,212 - INFO - 127.0.0.1 - - [03/Aug/2026 13:18:28] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:18:47,258 - INFO - 127.0.0.1 - - [03/Aug/2026 13:18:47] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:18:48,124 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:18:48,125 - INFO - User: hey hot
+2026-08-03 13:18:48,125 - INFO - Hachi: Hello! It seems like there might have been a mix-up with your greeting. Did you mean to say hello? How can I assist you today?
+2026-08-03 13:18:48,125 - INFO - 127.0.0.1 - - [03/Aug/2026 13:18:48] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:18:48,130 - ERROR - TTS error: run loop already started
+2026-08-03 13:18:48,130 - INFO - 127.0.0.1 - - [03/Aug/2026 13:18:48] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:19:00,376 - INFO - 127.0.0.1 - - [03/Aug/2026 13:19:00] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:19:00,907 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:19:00,907 - INFO - User: what's 9 + 10
+2026-08-03 13:19:00,907 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:19:00,907 - INFO - 127.0.0.1 - - [03/Aug/2026 13:19:00] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:19:00,913 - ERROR - TTS error: run loop already started
+2026-08-03 13:19:00,913 - INFO - 127.0.0.1 - - [03/Aug/2026 13:19:00] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:22:27,298 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:22:27,298 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:22:27,740 - INFO - Starting Flask server...
+2026-08-03 13:22:27,751 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:22:27,751 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:22:30,636 - INFO - 127.0.0.1 - - [03/Aug/2026 13:22:30] "GET / HTTP/1.1" 200 -
+2026-08-03 13:22:30,968 - INFO - 127.0.0.1 - - [03/Aug/2026 13:22:30] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:22:38,782 - INFO - 127.0.0.1 - - [03/Aug/2026 13:22:38] "GET / HTTP/1.1" 200 -
+2026-08-03 13:22:44,959 - INFO - 127.0.0.1 - - [03/Aug/2026 13:22:44] "GET / HTTP/1.1" 200 -
+2026-08-03 13:23:05,464 - INFO - 127.0.0.1 - - [03/Aug/2026 13:23:05] "GET / HTTP/1.1" 200 -
+2026-08-03 13:26:00,983 - INFO - HTTP Request: GET http://127.0.0.1:11434/api/tags "HTTP/1.1 200 OK"
+2026-08-03 13:26:01,087 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:26:01,088 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:26:22,415 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:26:22,415 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:26:22,817 - INFO - Starting Flask server...
+2026-08-03 13:26:22,822 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:26:22,822 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:26:25,670 - INFO - 127.0.0.1 - - [03/Aug/2026 13:26:25] "GET / HTTP/1.1" 200 -
+2026-08-03 13:26:27,111 - INFO - 127.0.0.1 - - [03/Aug/2026 13:26:27] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:26:46,759 - INFO - 127.0.0.1 - - [03/Aug/2026 13:26:46] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:26:46,911 - INFO - 127.0.0.1 - - [03/Aug/2026 13:26:46] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:26:49,706 - INFO - 127.0.0.1 - - [03/Aug/2026 13:26:49] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:28:01,996 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:28:01,996 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\AppData\Local\Programs\Python\Python311\Lib\site-packages\comtypes\gen'
+2026-08-03 13:28:02,399 - INFO - Starting Flask server...
+2026-08-03 13:28:02,410 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:28:02,410 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:28:05,135 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:05] "GET / HTTP/1.1" 200 -
+2026-08-03 13:28:08,451 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:08] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:28:18,491 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:28:18,492 - INFO - User: whats 9 + 10?
+2026-08-03 13:28:18,492 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:28:18,492 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:18] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:28:18,500 - ERROR - TTS error: run loop already started
+2026-08-03 13:28:18,500 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:18] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:28:24,559 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:24] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:28:25,190 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:28:25,191 - INFO - User: what's 35 + 80
+2026-08-03 13:28:25,191 - INFO - Hachi: The sum of 35 and 80 is 115.
+2026-08-03 13:28:25,191 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:25] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:28:25,195 - ERROR - TTS error: run loop already started
+2026-08-03 13:28:25,196 - INFO - 127.0.0.1 - - [03/Aug/2026 13:28:25] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:37:52,273 - INFO - Could not import comtypes.gen, trying to create it.
+2026-08-03 13:37:52,273 - INFO - Created comtypes.gen directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:37:52,273 - INFO - Writing __init__.py file: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen\__init__.py'
+2026-08-03 13:37:52,276 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:37:52,286 - INFO - Could not import comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4: No module named 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4'
+2026-08-03 13:37:52,289 - INFO - # Generating comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4
+2026-08-03 13:37:52,335 - INFO - # Generating comtypes.gen.SpeechLib
+2026-08-03 13:37:52,339 - INFO - Could not import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0: No module named 'comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0'
+2026-08-03 13:37:52,340 - INFO - # Generating comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
+2026-08-03 13:37:52,343 - INFO - # Generating comtypes.gen.stdole
+2026-08-03 13:37:52,986 - INFO - Starting Flask server...
+2026-08-03 13:37:52,998 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:37:52,998 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:37:56,321 - INFO - 127.0.0.1 - - [03/Aug/2026 13:37:56] "GET / HTTP/1.1" 200 -
+2026-08-03 13:37:57,695 - INFO - 127.0.0.1 - - [03/Aug/2026 13:37:57] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:46:16,819 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:46:16,820 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:46:17,271 - INFO - Starting Flask server...
+2026-08-03 13:46:17,289 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:46:17,289 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:46:20,531 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:20] "GET / HTTP/1.1" 200 -
+2026-08-03 13:46:20,741 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:20] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:20,873 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:20] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:46:21,632 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:21] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:23,348 - INFO - Microphone changed to: 23
+2026-08-03 13:46:23,348 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:23] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:23,400 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:23] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:24,019 - INFO - Microphone changed to: 22
+2026-08-03 13:46:24,019 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:24] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:24,069 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:24] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:24,784 - INFO - Microphone changed to: 11
+2026-08-03 13:46:24,784 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:24] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:24,833 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:24] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:25,145 - INFO - Microphone changed to: 10
+2026-08-03 13:46:25,145 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:25,202 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:25,473 - INFO - Microphone changed to: 9
+2026-08-03 13:46:25,473 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:25,513 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:25,914 - INFO - Microphone changed to: 2
+2026-08-03 13:46:25,914 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:25,962 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:25] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:26,329 - INFO - Microphone changed to: 0
+2026-08-03 13:46:26,329 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:26] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:26,375 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:26] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:27,641 - INFO - Microphone changed to: 1
+2026-08-03 13:46:27,641 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:27] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:27,687 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:27] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:28,591 - INFO - Microphone changed to: 43
+2026-08-03 13:46:28,591 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:28] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:46:28,635 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:28] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:36,421 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:46:36,421 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:46:36,843 - INFO - Starting Flask server...
+2026-08-03 13:46:36,849 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:46:36,849 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:46:39,804 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:39] "GET / HTTP/1.1" 200 -
+2026-08-03 13:46:40,258 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:40] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:46:40,310 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:40] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:46:55,394 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:46:55,394 - INFO - User: whats good
+2026-08-03 13:46:55,394 - INFO - Hachi: There are many things that can be considered "good," depending on the context and perspective. Here are a few general areas where something might be considered positive or beneficial:
+
+1. **Health**: Good health is widely recognized as one of life's greatest blessings.
+2. **Personal Growth**: Learning new skills, developing hobbies, or pursuing interests can be seen as good for personal development.
+3. **Relationships**: Strong relationships with family and friends are often viewed positively.
+4. **Environment**: Maintaining a clean and healthy environment is generally considered beneficial.
+5. **Academic Achievement**: Progress in studies or education can lead to better opportunities.
+6. **Financial Stability**: Having financial stability provides security and peace of mind.
+7. **Social Contributions**: Helping others, giving back to the community, and making positive contributions can be very good.
+
+Of course, what is "good" varies greatly from person to person based on their values, beliefs, and circumstances.
+2026-08-03 13:46:55,394 - INFO - 127.0.0.1 - - [03/Aug/2026 13:46:55] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:47:03,200 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:47:03,201 - INFO - User: whats 9 + 10
+2026-08-03 13:47:03,201 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:47:03,201 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:03] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:47:08,212 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:08] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:13,776 - INFO - Microphone changed to: 2
+2026-08-03 13:47:13,776 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:13] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:13,827 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:13] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:14,359 - INFO - Microphone changed to: 1
+2026-08-03 13:47:14,360 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:14] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:14,409 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:14] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:19,448 - INFO - Microphone changed to: 0
+2026-08-03 13:47:19,448 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:19] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:19,498 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:19] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:21,669 - INFO - Microphone changed to: 41
+2026-08-03 13:47:21,669 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:21] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:21,714 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:21] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:22,766 - ERROR - Listen error: 'NoneType' object has no attribute 'close'
+2026-08-03 13:47:22,767 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:22] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:47:25,896 - ERROR - Listen error: 'NoneType' object has no attribute 'close'
+2026-08-03 13:47:25,896 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:25] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:47:27,756 - INFO - Microphone changed to: 2
+2026-08-03 13:47:27,757 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:27] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:27,803 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:27] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:47:32,229 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:32] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:47:33,481 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:47:33,482 - INFO - User: miss 9 + 10
+2026-08-03 13:47:33,482 - INFO - Hachi: Miss 9 + 10 equals 19. Please note that "Miss" is not a number and in this context, I've treated it as a separate entity without further mathematical interpretation. If you meant something different or have another question, feel free to ask!
+2026-08-03 13:47:33,482 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:33] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:47:33,487 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:33] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:47:40,621 - INFO - Microphone changed to: 0
+2026-08-03 13:47:40,621 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:40] "POST /api/set-microphone HTTP/1.1" 200 -
+2026-08-03 13:47:40,869 - INFO - 127.0.0.1 - - [03/Aug/2026 13:47:40] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:48:52,601 - INFO - 127.0.0.1 - - [03/Aug/2026 13:48:52] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:48:54,232 - INFO - 127.0.0.1 - - [03/Aug/2026 13:48:54] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:48:58,011 - INFO - 127.0.0.1 - - [03/Aug/2026 13:48:58] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:52:45,450 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:52:45,450 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:52:45,904 - INFO - Starting Flask server...
+2026-08-03 13:52:45,914 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:52:45,914 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:52:48,881 - INFO - 127.0.0.1 - - [03/Aug/2026 13:52:48] "GET / HTTP/1.1" 200 -
+2026-08-03 13:52:49,105 - INFO - 127.0.0.1 - - [03/Aug/2026 13:52:49] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:52:50,249 - INFO - 127.0.0.1 - - [03/Aug/2026 13:52:50] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:52:58,090 - INFO - 127.0.0.1 - - [03/Aug/2026 13:52:58] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:53:02,060 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:53:02,060 - INFO - User: what's 9 + 10
+2026-08-03 13:53:02,061 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:53:02,061 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:02] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:53:02,066 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:02] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:53:05,623 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:05] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:53:29,890 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:53:29,890 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:53:30,155 - INFO - Starting Flask server...
+2026-08-03 13:53:30,163 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:53:30,164 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:53:33,043 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:33] "GET / HTTP/1.1" 200 -
+2026-08-03 13:53:33,229 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:33] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:53:33,372 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:33] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:53:38,801 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:38] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:53:51,192 - INFO - 127.0.0.1 - - [03/Aug/2026 13:53:51] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:54:59,180 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:54:59,180 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:54:59,406 - INFO - Starting Flask server...
+2026-08-03 13:54:59,414 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:54:59,414 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:55:02,200 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:02] "GET / HTTP/1.1" 200 -
+2026-08-03 13:55:02,434 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:02] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:55:02,535 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:02] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:55:07,048 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:07] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:55:11,552 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:11] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:55:11,566 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:11] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 13:55:12,091 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:55:12,092 - INFO - User: what's 9 + 10
+2026-08-03 13:55:12,092 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:55:12,092 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:12] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:55:12,098 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:12] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:55:12,365 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:55:12,365 - INFO - User: what's 9 + 10
+2026-08-03 13:55:12,365 - INFO - Hachi: The sum of 9 and 10 is 19.
+2026-08-03 13:55:12,365 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:12] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:55:12,370 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:12] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 13:55:12,715 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:12] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:55:15,702 - INFO - 127.0.0.1 - - [03/Aug/2026 13:55:15] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:56:12,157 - INFO - 127.0.0.1 - - [03/Aug/2026 13:56:12] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 13:57:11,948 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 13:57:11,948 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 13:57:12,415 - INFO - Starting Flask server...
+2026-08-03 13:57:12,424 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 13:57:12,424 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 13:57:15,533 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:15] "GET / HTTP/1.1" 200 -
+2026-08-03 13:57:16,745 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:16] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 13:57:16,861 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:16] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 13:57:26,605 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:57:26,605 - INFO - User: whats 9 + 10
+2026-08-03 13:57:26,605 - INFO - Hachi: 9 + 10 equals 19.
+2026-08-03 13:57:26,605 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:26] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:57:32,471 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:57:32,471 - INFO - User: what is the date today
+2026-08-03 13:57:32,471 - INFO - Hachi: I'm sorry, as an AI, I don't have real-time capabilities to tell you the current date. Please check your device for the current date and time.
+2026-08-03 13:57:32,471 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:32] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 13:57:49,014 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 13:57:49,014 - INFO - User: ok whats the ingredients for an omellette egg
+2026-08-03 13:57:49,014 - INFO - Hachi: An omelette typically consists of just one primary ingredient: eggs. However, there are several ways to prepare it and additional ingredients can be added based on personal preference:
+
+### Basic Omelette Ingredients:
+- **Eggs**: The main ingredient is usually at least 4 large eggs (though you can use more or less depending on the desired thickness). For a richer flavor, you might add a little salt and pepper.
+  
+### Additional Ingredients for Flavoring:
+- **Salt**: A pinch of table salt to taste
+- **Pepper**: A dash of black pepper
+- **Butter** or Oil: To cook the omelette. You can also use olive oil if preferred over butter.
+
+### Garnishes and Fillings (Optional):
+- **Cheese**: Cheddar, mozzarella, or any other cheese you prefer.
+- **Vegetables**: Spinach, mushrooms, bell peppers, onions, tomatoes.
+- **Proteins**: Ham, bacon, cooked ground beef or poultry.
+
+### Steps to Make an Omelette:
+1. Crack the eggs into a bowl and beat them lightly with a fork or whisk until just combined (no need for overbeaten batter).
+2. Season the beaten eggs with salt and pepper.
+3. Heat a non-stick skillet or frying pan over medium heat, add your chosen fat (butter or oil). Once hot but not smoking, pour in the egg mixture.
+4. Let the omelette cook until it sets slightly on top and forms an even layer.
+5. For cheese-filled omelettes: Sprinkle shredded cheese evenly across half of the omelette before folding up to create a neat triangle or fold with one side down.
+6. Slide the skillet off the heat, then lift one corner to release the edges so it can be folded over the filling and gently placed on a plate.
+7. Serve hot.
+
+Feel free to customize according to your tastes!
+2026-08-03 13:57:49,015 - INFO - 127.0.0.1 - - [03/Aug/2026 13:57:49] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:00:12,296 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 14:00:12,297 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 14:00:12,695 - INFO - Starting Flask server...
+2026-08-03 14:00:12,703 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 14:00:12,703 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 14:00:15,573 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:15] "GET / HTTP/1.1" 200 -
+2026-08-03 14:00:16,798 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:16] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 14:00:16,880 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:16] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 14:00:25,056 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:00:25,057 - INFO - User: whats the recipe for an omellette
+2026-08-03 14:00:25,057 - INFO - Hachi: 1. Crack eggs into a bowl.
+2. Add salt and pepper to taste.
+3. Mix in milk or cream (optional).
+4. Heat butter in a non-stick skillet over medium heat.
+5. Pour egg mixture evenly into pan.
+6. Cook until set, flipping once if needed.
+2026-08-03 14:00:25,057 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:25] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:00:34,640 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:00:34,640 - INFO - User: what about a caldereta
+2026-08-03 14:00:34,640 - INFO - Hachi: To make Caldereta:
+1. Gather beef chunks, tomatoes, onions, garlic.
+2. Heat oil in a pot over medium heat.
+3. Add onions and sauté until translucent.
+4. Stir in minced garlic and cook for another minute.
+5. Incorporate beef chunks, season with salt, pepper.
+6. Pour in enough water to cover the meat.
+7. Simmer covered for 2 hours or until tender.
+2026-08-03 14:00:34,640 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:34] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:00:43,302 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:00:43,302 - INFO - User: what do you think about the philippines
+2026-08-03 14:00:43,302 - INFO - Hachi: The Philippines is an interesting country with diverse cultures and cuisines, known for its delicious food like halo-halo and lechon. It's also famous for its beaches and vibrant festivals.
+2026-08-03 14:00:43,302 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:43] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:00:58,486 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:58] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:00:59,663 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:00:59,664 - INFO - User: what do you think about the philippines
+2026-08-03 14:00:59,664 - INFO - Hachi: The Philippines is an interesting country with diverse cultures and landscapes. It's known for its beautiful beaches, vibrant cities like Manila, and rich cultural heritage including festivals and traditional arts. The cuisine varies widely across different regions but includes iconic dishes like Adobo and Lechon.
+2026-08-03 14:00:59,664 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:59] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:00:59,670 - INFO - 127.0.0.1 - - [03/Aug/2026 14:00:59] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:01:11,307 - INFO - 127.0.0.1 - - [03/Aug/2026 14:01:11] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:01:15,391 - INFO - 127.0.0.1 - - [03/Aug/2026 14:01:15] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:01:15,858 - INFO - 127.0.0.1 - - [03/Aug/2026 14:01:15] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:01:26,276 - INFO - 127.0.0.1 - - [03/Aug/2026 14:01:26] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:06:57,252 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 14:06:57,252 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 14:06:57,682 - INFO - Starting Flask server...
+2026-08-03 14:06:57,693 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 14:06:57,693 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 14:07:00,610 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:00] "GET / HTTP/1.1" 200 -
+2026-08-03 14:07:00,847 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:00] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 14:07:01,953 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:01] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 14:07:19,402 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:19] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:07:19,427 - INFO - Launched: discord
+2026-08-03 14:07:19,433 - INFO - Launched: steam
+2026-08-03 14:07:19,434 - INFO - Mode activated: gaming mode, Apps launched: ['discord', 'steam']
+2026-08-03 14:07:19,434 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:19] "POST /api/activate-mode HTTP/1.1" 200 -
+2026-08-03 14:07:19,453 - INFO - 127.0.0.1 - - [03/Aug/2026 14:07:19] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:08:20,476 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:20] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:08:24,934 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:24] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:08:24,947 - INFO - Launched: discord
+2026-08-03 14:08:24,950 - INFO - Launched: steam
+2026-08-03 14:08:24,950 - INFO - Mode activated: gaming mode, Apps launched: ['discord', 'steam']
+2026-08-03 14:08:24,951 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:24] "POST /api/activate-mode HTTP/1.1" 200 -
+2026-08-03 14:08:24,957 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:24] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:08:43,665 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:43] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:08:51,381 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 14:08:51,381 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 14:08:51,854 - INFO - Starting Flask server...
+2026-08-03 14:08:51,864 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 14:08:51,865 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 14:08:54,886 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:54] "GET / HTTP/1.1" 200 -
+2026-08-03 14:08:55,164 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:55] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 14:08:55,309 - INFO - 127.0.0.1 - - [03/Aug/2026 14:08:55] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 14:09:06,968 - INFO - 127.0.0.1 - - [03/Aug/2026 14:09:06] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:09:06,992 - INFO - Launched: discord
+2026-08-03 14:09:06,996 - INFO - Launched: steam
+2026-08-03 14:09:06,996 - INFO - Mode activated: gaming mode, Apps launched: ['discord', 'steam']
+2026-08-03 14:09:06,996 - INFO - 127.0.0.1 - - [03/Aug/2026 14:09:06] "POST /api/activate-mode HTTP/1.1" 200 -
+2026-08-03 14:09:07,009 - INFO - 127.0.0.1 - - [03/Aug/2026 14:09:07] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:10:59,542 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 14:10:59,542 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 14:10:59,836 - INFO - Starting Flask server...
+2026-08-03 14:10:59,850 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 14:10:59,850 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 14:11:02,992 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:02] "GET / HTTP/1.1" 200 -
+2026-08-03 14:11:03,184 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:03] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 14:11:03,287 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:03] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 14:11:18,164 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:18] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:11:23,290 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:11:23,291 - INFO - User: tart office mode
+2026-08-03 14:11:23,292 - INFO - Hachi: 1. Press Alt + F1 to switch to the desktop.
+2. Click on your taskbar icon for a quick access menu.
+3. Use Ctrl + Tab to cycle through open applications.
+4. Open an application from the start menu if needed.
+5. To return to full screen, press Alt + F9 or use Task Manager.
+6. Customize your workspace as per your preferences after switching modes.
+2026-08-03 14:11:23,292 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:23] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:11:23,300 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:23] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:11:32,306 - INFO - 127.0.0.1 - - [03/Aug/2026 14:11:32] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:11:57,048 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\AxeilAchia\\Desktop\\ai\\.venv\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-03 14:11:57,048 - INFO - Using writeable comtypes cache directory: 'C:\Users\AxeilAchia\Desktop\ai\.venv\Lib\site-packages\comtypes\gen'
+2026-08-03 14:11:57,278 - INFO - Starting Flask server...
+2026-08-03 14:11:57,289 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-03 14:11:57,290 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-03 14:12:00,218 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:00] "GET / HTTP/1.1" 200 -
+2026-08-03 14:12:00,425 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:00] "GET /api/microphones HTTP/1.1" 200 -
+2026-08-03 14:12:00,516 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-03 14:12:05,527 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:05] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:12:07,116 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-08-03 14:12:07,116 - INFO - User: run gaming mode
+2026-08-03 14:12:07,116 - INFO - Hachi: 1. Open Control Panel.
+2. Click on Hardware and Sound.
+3. Select Power Options.
+4. Choose "Change plan settings" next to your current plan.
+5. Click "Change advanced power settings."
+6. Find the "Display" section, then find "Gaming Mode."
+7. Enable Gaming Mode if not already enabled.
+8. Apply changes and close all windows.
+2026-08-03 14:12:07,116 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:07] "POST /api/chat HTTP/1.1" 200 -
+2026-08-03 14:12:07,122 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:07] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:12:11,722 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:11] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:12:12,023 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:12] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:12:17,144 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:12:17,185 - INFO - Launched: discord
+2026-08-03 14:12:17,190 - INFO - Launched: steam
+2026-08-03 14:12:17,190 - INFO - Mode activated: gaming mode, Apps launched: ['discord', 'steam']
+2026-08-03 14:12:17,190 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/activate-mode HTTP/1.1" 200 -
+2026-08-03 14:12:17,204 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:12:17,287 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/listen HTTP/1.1" 200 -
+2026-08-03 14:12:17,300 - INFO - Launched: discord
+2026-08-03 14:12:17,304 - INFO - Launched: steam
+2026-08-03 14:12:17,304 - INFO - Mode activated: gaming mode, Apps launched: ['discord', 'steam']
+2026-08-03 14:12:17,304 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/activate-mode HTTP/1.1" 200 -
+2026-08-03 14:12:17,311 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:17] "POST /api/speak HTTP/1.1" 200 -
+2026-08-03 14:12:20,566 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:20] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:12:20,945 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:20] "POST /api/stop-speaking HTTP/1.1" 200 -
+2026-08-03 14:12:37,782 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:37] "POST /api/listen HTTP/1.1" 200 -
