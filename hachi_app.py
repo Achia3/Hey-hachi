@@ -1,64 +1,107 @@
 #!/usr/bin/env python3
 """
-Hachi - AI Voice Assistant
+Hachi - Agentic AI Voice Assistant
 Desktop Application Launcher using PyWebView
 """
-import webview
-import threading
+import os
 import time
+import socket
 import logging
-from hachi_web import app
+import threading
+import webview
 
-# Configure logging
+# Configure logging ONCE here, before any other Hachi module is imported.
+# All sub-modules (hachi_web, hachi_agent, etc.) inherit this config.
+_log_path = os.path.join(os.path.dirname(__file__), "hachi.log")
 logging.basicConfig(
-    filename="hachi.log",
+    filename=_log_path,
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+from hachi_web import app, FLASK_PORT
+from hachi_db import init_db
+
+
+def _wait_for_flask(host="127.0.0.1", port=FLASK_PORT, timeout=15):
+    """
+    Poll until Flask is accepting connections.
+    Much more reliable than a fixed time.sleep() on slow machines.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def run_flask():
-    """Run Flask server in background thread"""
-    logging.info("Starting Flask server...")
-    app.run(
-        host='127.0.0.1',
-        port=5000,
-        debug=False,
-        use_reloader=False,
-        threaded=True
-    )
+    """Run Flask server in background thread. Errors are logged but won't crash the main thread."""
+    try:
+        logging.info("Starting Flask backend server...")
+        app.run(
+            host='127.0.0.1',
+            port=FLASK_PORT,
+            debug=False,
+            use_reloader=False,
+            threaded=True
+        )
+    except Exception as e:
+        logging.error(f"Flask startup failed: {e}")
+        print(f"❌ Flask error: {e}")
+
 
 def main():
     """Main application entry point"""
     print("\n" + "="*60)
-    print("  HACHI - AI Voice Assistant (Desktop App)")
+    print("  HACHI - Agentic AI Voice Assistant (Desktop App)")
     print("="*60)
-    print("🎤 Initializing voice assistant...")
-    print("🌐 Opening desktop application window...")
+    print("🎤 Initializing agent engine & SQLite memory...")
+
+    # Initialize DB once at startup (not on every DB call)
+    init_db()
+
+    print("🌐 Opening native desktop application window...")
     print("\nMake sure Ollama is running! (http://localhost:11434)")
     print("Close the window or press Ctrl+C to exit.\n")
-    
-    # Start Flask in background thread
+
+    # Start Flask in background daemon thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
-    # Give Flask time to start
-    time.sleep(2)
-    
+
+    # Poll until Flask is ready instead of blindly sleeping
+    logging.info("Waiting for Flask to be ready...")
+    if not _wait_for_flask():
+        logging.error("Flask did not start within timeout. Check hachi.log for details.")
+        print("❌ Flask did not start in time. See hachi.log for details.")
+        # Keep main thread alive so the user can see the error
+        flask_thread.join()
+        return
+
+    logging.info("Flask is ready. Opening WebView window.")
+
     # Create and show native desktop window
     try:
         webview.create_window(
-            title='Hachi — AI Voice Assistant',
-            url='http://127.0.0.1:5000',
-            width=1200,
-            height=800,
-            min_size=(600, 400),
-            background_color='#12141c',
+            title='Hachi — Agentic Voice Assistant',
+            url=f'http://127.0.0.1:{FLASK_PORT}',
+            width=1240,
+            height=820,
+            min_size=(700, 500),
+            background_color='#0f172a',
             js_api=None
         )
         webview.start(debug=False)
     except Exception as e:
-        logging.error(f"Error starting application: {e}")
-        print(f"❌ Error: {e}")
+        logging.error(f"Error starting desktop window: {e}")
+        print(f"❌ Desktop Window Error: {e}")
+        print(f"Falling back to running Flask web server on http://127.0.0.1:{FLASK_PORT}")
+        # Keep process alive so the user can use the web interface
+        flask_thread.join()
+
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,16 @@
-ollama>=0.1.0
-SpeechRecognition>=3.10.0
-pyttsx3>=2.90
-pyaudio>=0.2.13
-Flask>=2.0.0
+# Hachi AI - Python Dependencies
+# Install with: pip install -r requirements.txt
+#
+# NOTE on pyaudio (required by SpeechRecognition for microphone access):
+#   Windows: pip install pipwin && pipwin install pyaudio
+#   OR download a pre-built wheel from https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+
+edge-tts>=6.1.9
 pywebview>=5.0
+flask>=3.0
+speechrecognition>=3.10
+psutil>=5.9
+requests>=2.31
+pyttsx3>=2.90
+ollama>=0.3
+pyaudio>=0.2.14

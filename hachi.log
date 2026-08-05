@@ -517,3 +517,21 @@ Feel free to customize according to your tastes!
 2026-08-03 14:12:20,566 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:20] "POST /api/stop-speaking HTTP/1.1" 200 -
 2026-08-03 14:12:20,945 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:20] "POST /api/stop-speaking HTTP/1.1" 200 -
 2026-08-03 14:12:37,782 - INFO - 127.0.0.1 - - [03/Aug/2026 14:12:37] "POST /api/listen HTTP/1.1" 200 -
+2026-08-05 10:36:19,564 - INFO - Could not import comtypes.gen, trying to create it.
+2026-08-05 10:36:19,565 - INFO - Created comtypes.gen directory: 'C:\Users\Beo\AppData\Roaming\Python\Python314\site-packages\comtypes\gen'
+2026-08-05 10:36:19,565 - INFO - Writing __init__.py file: 'C:\Users\Beo\AppData\Roaming\Python\Python314\site-packages\comtypes\gen\__init__.py'
+2026-08-05 10:36:19,582 - INFO - Using writeable comtypes cache directory: 'C:\Users\Beo\AppData\Roaming\Python\Python314\site-packages\comtypes\gen'
+2026-08-05 10:36:19,594 - INFO - Could not import comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4: No module named 'comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4'
+2026-08-05 10:36:19,598 - INFO - # Generating comtypes.gen._C866CA3A_32F7_11D2_9602_00C04F8EE628_0_5_4
+2026-08-05 10:36:19,671 - INFO - # Generating comtypes.gen.SpeechLib
+2026-08-05 10:36:19,680 - INFO - Could not import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0: No module named 'comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0'
+2026-08-05 10:36:19,680 - INFO - # Generating comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
+2026-08-05 10:36:19,686 - INFO - # Generating comtypes.gen.stdole
+2026-08-05 10:36:20,151 - INFO - Starting Flask backend server...
+2026-08-05 10:36:20,185 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-08-05 10:36:20,185 - INFO - [33mPress CTRL+C to quit[0m
+2026-08-05 10:36:23,156 - INFO - 127.0.0.1 - - [05/Aug/2026 10:36:23] "GET / HTTP/1.1" 200 -
+2026-08-05 10:36:23,703 - INFO - 127.0.0.1 - - [05/Aug/2026 10:36:23] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-08-05 10:53:55,177 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Users\\Beo\\AppData\\Roaming\\Python\\Python314\\site-packages\\comtypes\\gen\\__init__.py'>
+2026-08-05 10:53:55,177 - INFO - Using writeable comtypes cache directory: 'C:\Users\Beo\AppData\Roaming\Python\Python314\site-packages\comtypes\gen'

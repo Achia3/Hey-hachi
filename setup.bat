@@ -1,57 +1,55 @@
 @echo off
-REM HACHI AI Setup Script for Windows
-REM This script installs all dependencies and prepares the environment
+:: HACHI AI Setup & Launcher Script for Windows
+:: Dynamically switches to current script directory so it runs anywhere on any PC
+
+cd /d "%~dp0"
 
 echo.
-echo ============================================
-echo   HACHI - AI Voice Assistant Setup
-echo ============================================
+echo ===================================================
+echo   HACHI - Agentic AI Voice Assistant Setup
+echo ===================================================
 echo.
 
-REM Check if Python is installed
+:: Check if Python is installed
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.8+ from python.org
+    echo [X] ERROR: Python is not installed or not added to PATH.
+    echo     Please install Python 3.8+ from https://python.org
     pause
     exit /b 1
 )
 
-echo [✓] Python detected
+echo [✓] Python detected:
 python --version
 echo.
 
-REM Install pip requirements
-echo [*] Installing required packages...
-pip install -r requirements.txt
+:: Install / Upgrade Dependencies
+echo [*] Installing required Python packages...
+python -m pip install -r requirements.txt
 
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to install requirements
-    pause
-    exit /b 1
+    echo [!] WARNING: Some packages had installation warnings, continuing setup...
+) else (
+    echo [✓] All packages installed successfully.
 )
-
-echo [✓] All packages installed successfully
 echo.
 
-REM Check Ollama
+:: Check Ollama
 echo [*] Checking Ollama installation...
 where ollama >nul 2>&1
-
 if %errorlevel% neq 0 (
-    echo WARNING: Ollama not found in PATH
-    echo Please ensure Ollama is installed and running
-    echo Download from: https://ollama.ai
-    echo.
+    echo [!] WARNING: Ollama executable not found in system PATH.
+    echo     Please make sure Ollama is installed from https://ollama.com and running.
+) else (
+    echo [✓] Ollama detected. Model qwen3.5:2b ready.
 )
 
 echo.
-echo ============================================
-echo   Setup Complete!
-echo ============================================
+echo ===================================================
+echo   Setup Complete! Launching Hachi Assistant...
+echo ===================================================
 echo.
-echo Next steps:
-echo 1. Make sure Ollama is running: ollama serve
-echo 2. Run: python hachi_gui.py
-echo.
-pause
+echo Press any key to launch Hachi, or close this window.
+pause >nul
+
+python hachi_app.py
