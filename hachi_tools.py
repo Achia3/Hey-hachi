@@ -169,7 +169,6 @@ def shutdown_hachi():
         time.sleep(2.5)  # Allow TTS to finish speaking farewell
         bat_path = os.path.join(os.path.dirname(__file__), "stop.bat")
         if os.path.exists(bat_path):
-            # Fixed: use string + shell=True OR list + shell=False (not mixed)
             subprocess.Popen(f'cmd.exe /c "{bat_path}"', shell=True)
         else:
             subprocess.Popen(['powershell', '-c', 'Get-Process -Name *ollama* -ErrorAction SilentlyContinue | Stop-Process -Force'], shell=False)
@@ -263,29 +262,33 @@ def get_weather(location: str = "Manila"):
     return f"Unable to fetch live weather for {location} right now."
 
 def search_web(query: str):
-    """Perform live web query search via DuckDuckGo API."""
+    """Perform live web search via DuckDuckGo HTML scraping with BeautifulSoup."""
     try:
         from urllib.parse import quote
+        from bs4 import BeautifulSoup
+
         safe_query = quote(query)
-        url = f"https://api.duckduckgo.com/?q={safe_query}&format=json&no_html=1"
-        res = requests.get(url, timeout=5)
+        url = f"https://html.duckduckgo.com/html/?q={safe_query}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        res = requests.get(url, headers=headers, timeout=6)
         if res.status_code == 200:
-            data = res.json()
-            abstract = data.get("AbstractText", "")
-            if abstract:
-                summary = f"Web result for '{query}': {abstract}"
-                add_task(f"Web Search: {query}", "Success", summary)
+            soup = BeautifulSoup(res.text, "html.parser")
+            snippets = []
+            for a in soup.find_all("a", class_="result__snippet"):
+                text = a.get_text(strip=True)
+                if text:
+                    snippets.append(text)
+                if len(snippets) >= 3:
+                    break
+            if snippets:
+                summary = f"Web results for '{query}': " + " ".join(snippets)
+                add_task(f"Web Search: {query}", "Success", summary[:250])
                 return summary
-            # Iterate through related topics to find one with a 'Text' key
-            related = data.get("RelatedTopics", [])
-            for item in related:
-                if isinstance(item, dict) and "Text" in item and item["Text"]:
-                    summary = f"Web result for '{query}': {item['Text']}"
-                    add_task(f"Web Search: {query}", "Success", summary)
-                    return summary
     except Exception as e:
         logging.error(f"Web search error: {e}")
-    return f"Searched web for '{query}', but no instant summary was available."
+    return f"Searched web for '{query}', but could not retrieve live results right now."
 
 def get_system_stats():
     """Get system CPU, RAM, and Battery status."""

@@ -19,7 +19,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-from hachi_web import app, FLASK_PORT
+from hachi_web import app, FLASK_PORT, start_wakeword_listener
 from hachi_db import init_db
 
 
@@ -63,6 +63,9 @@ def main():
 
     # Initialize DB once at startup (not on every DB call)
     init_db()
+
+    # Start background wakeword listener ('Hey Hachi')
+    start_wakeword_listener()
 
     print("🌐 Opening native desktop application window...")
     print("\nMake sure Ollama is running! (http://localhost:11434)")

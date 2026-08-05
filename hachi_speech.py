@@ -1,153 +1,241 @@
 import os
 import asyncio
 import tempfile
+import subprocess
 import threading
 import json
 import logging
 import re
 import speech_recognition as sr
 
-# Check edge-tts availability
 try:
     import edge_tts
     HAS_EDGE_TTS = True
 except ImportError:
     HAS_EDGE_TTS = False
 
-try:
-    import pyttsx3
-    pyttsx3_engine = pyttsx3.init()
-    pyttsx3_engine.setProperty("rate", 155)
-except Exception:
-    pyttsx3_engine = None
-
-# Load voice config from config.json
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 DEFAULT_TAGALOG_VOICE = "fil-PH-AngeloNeural"
 DEFAULT_ENGLISH_VOICE = "en-US-AvaNeural"
 
 if os.path.exists(_CONFIG_PATH):
     try:
-        with open(_CONFIG_PATH, "r") as _f:
+        with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
             _cfg = json.load(_f)
             DEFAULT_TAGALOG_VOICE = _cfg.get("tagalog_voice", DEFAULT_TAGALOG_VOICE)
             DEFAULT_ENGLISH_VOICE = _cfg.get("english_voice", DEFAULT_ENGLISH_VOICE)
-    except Exception as _e:
-        logging.warning(f"Could not load voice config: {_e}")
+    except Exception:
+        pass
 
-# Microphone access lock (prevents concurrent mic opens)
+# Locks
 _mic_lock = threading.Lock()
-
-# Speech output lock (ensures only one TTS audio plays at a time)
 speech_lock = threading.Lock()
 
+TAGALOG_WORDS = {
+    "ako", "ikaw", "opo", "kasi", "naman", "salamat", "kamusta",
+    "ano", "bakit", "sige", "talaga", "nga", "hindi", "oo",
+    "paalam", "po", "yung", "yun", "ba", "na", "si", "ang"
+}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def clean_speech_text(text: str) -> str:
-    """Remove markdown tags, thinking tags, or emojis before TTS."""
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    text = re.sub(r'[*#_`~]', '', text)
+    """Strip markdown, think-blocks, and extra whitespace before TTS."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"[*#_`~|>]", "", text)
+    text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
-async def _edge_tts_speak_async(text: str, voice: str, output_file: str):
-    """Generate audio file via edge-tts."""
+async def _generate_edge_tts_file(text: str, voice: str, out_path: str):
     communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_file)
+    await communicate.save(out_path)
 
 
-def speak(text: str, voice: str = DEFAULT_TAGALOG_VOICE):
+def _play_mp3_wmp(path: str):
     """
-    Synthesize and play speech.
-    Uses high quality edge-tts if available, else falls back to pyttsx3.
-    The speech_lock ensures concurrent speak() calls are serialized,
-    preventing audio overlap.
+    Play an MP3 via WMPlayer COM object in PowerShell.
+    Blocks until playback finishes (or 35 s timeout).
+    """
+    safe = path.replace("\\", "/")
+    ps = (
+        f"$m = New-Object -ComObject WMPlayer.OCX.7; "
+        f"$m.URL = '{safe}'; "
+        f"$m.controls.play(); "
+        f"$i = 0; "
+        f"while ($m.playState -ne 1 -and $i -lt 300) "
+        f"{{ Start-Sleep -Milliseconds 100; $i++ }}; "
+        f"$m.controls.stop()"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-c", ps],
+            timeout=35,
+            capture_output=True,
+        )
+    except subprocess.TimeoutExpired:
+        logging.warning("WMPlayer playback timed out (35 s).")
+    except Exception as e:
+        logging.error(f"WMPlayer error: {e}")
+
+
+def _speak_sapi(text: str):
+    """
+    Fallback TTS using Windows built-in SAPI via PowerShell.
+    Works 100% offline on any Windows 10/11 machine.
+    """
+    safe = text.replace("'", "''")[:500]   # escape single-quotes for PS
+    ps = (
+        f"Add-Type -AssemblyName System.speech; "
+        f"$t = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        f"$t.Rate = 1; "
+        f"$t.Speak('{safe}')"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-c", ps],
+            timeout=30,
+            capture_output=True,
+        )
+    except subprocess.TimeoutExpired:
+        logging.warning("SAPI TTS timed out.")
+    except Exception as e:
+        logging.error(f"SAPI error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def speak(text: str):
+    """
+    Synthesize speech and play it.
+    Always BLOCKS until audio finishes — do NOT call from the main Flask thread
+    when you want to keep the response non-blocking (use threading.Thread instead).
+    For voice-mode endpoints, call directly so the HTTP response is not sent
+    until speaking is done.
     """
     with speech_lock:
-        clean_text = clean_speech_text(text)
-        if not clean_text:
+        clean = clean_speech_text(text)
+        if not clean:
             return
 
-        logging.info(f"Speaking response: {clean_text[:80]}...")
+        logging.info(f"TTS: {clean[:80]}…")
 
+        # --- Primary: edge-tts (neural voices, requires internet) ---
         if HAS_EDGE_TTS:
             try:
-                temp_dir = tempfile.gettempdir()
-                # Use a unique filename per thread to avoid race condition on the file
-                audio_path = os.path.join(temp_dir, f"hachi_tts_{threading.get_ident()}.mp3")
-
-                # Detect language context (if Tagalog words present, use Tagalog voice)
-                lower = clean_text.lower()
-                if any(w in lower for w in ["ako", "ikaw", "opo", "kasi", "naman", "salamat", "kamusta", "ano", "bakit"]):
-                    chosen_voice = DEFAULT_TAGALOG_VOICE
-                else:
-                    chosen_voice = DEFAULT_ENGLISH_VOICE
-
-                # asyncio.run creates a new event loop; safe inside a daemon thread
-                asyncio.run(_edge_tts_speak_async(clean_text, chosen_voice, audio_path))
-
-                # Play mp3 via Windows MediaPlayer COM object (blocks until done)
-                ps_cmd = (
-                    f'powershell -c "$player = New-Object -ComObject WMPlayer.OCX; '
-                    f"$player.URL = '{audio_path}'; "
-                    f"$player.controls.play(); "
-                    f"while ($player.playState -ne 1) {{ Start-Sleep -Milliseconds 100 }}\""
+                tmp = os.path.join(
+                    tempfile.gettempdir(),
+                    f"hachi_{os.getpid()}_{threading.get_ident()}.mp3",
                 )
-                os.system(ps_cmd)
+                lower_words = set(clean.lower().split())
+                voice = (
+                    DEFAULT_TAGALOG_VOICE
+                    if lower_words & TAGALOG_WORDS
+                    else DEFAULT_ENGLISH_VOICE
+                )
 
-                # Cleanup temp file
+                # Create a fresh event loop — safe to call from any thread
+                loop = asyncio.new_event_loop()
                 try:
-                    os.remove(audio_path)
-                except OSError:
-                    pass
-                return
+                    loop.run_until_complete(
+                        _generate_edge_tts_file(clean, voice, tmp)
+                    )
+                finally:
+                    loop.close()
+
+                if os.path.exists(tmp) and os.path.getsize(tmp) > 500:
+                    _play_mp3_wmp(tmp)
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+                    return
             except Exception as e:
-                logging.warning(f"edge-tts failed ({e}), falling back to pyttsx3.")
+                logging.warning(f"edge-tts failed ({e}), using SAPI fallback.")
 
-        # Fallback to local pyttsx3 engine
-        if pyttsx3_engine:
-            try:
-                pyttsx3_engine.say(clean_text)
-                pyttsx3_engine.runAndWait()
-            except Exception as err:
-                logging.error(f"pyttsx3 error: {err}")
+        # --- Fallback: Windows SAPI (offline, always available) ---
+        _speak_sapi(clean)
 
 
-def listen_voice_input(energy_threshold: int = 4000) -> str:
+def listen_voice_input() -> str:
     """
-    Listen to microphone input and convert to text.
-    Uses _mic_lock to prevent concurrent microphone access from parallel HTTP requests.
+    Listen to the microphone and return the recognized text (may be empty).
+
+    Uses _mic_lock with a BLOCKING acquire (timeout=8 s) so this function
+    properly waits if the wakeword listener is currently using the mic,
+    rather than returning '' immediately.
     """
-    if not _mic_lock.acquire(blocking=False):
-        logging.warning("Microphone already in use, dropping concurrent listen request.")
+    acquired = _mic_lock.acquire(timeout=8)
+    if not acquired:
+        logging.warning("Could not acquire mic within 8 s, skipping listen turn.")
         return ""
 
     try:
-        recognizer = sr.Recognizer()
-        recognizer.energy_threshold = energy_threshold
-        recognizer.dynamic_energy_threshold = True
+        r = sr.Recognizer()
+        r.dynamic_energy_threshold = True
+        r.energy_threshold = 400
 
         with sr.Microphone() as source:
-            logging.info("Listening for user voice...")
-            recognizer.adjust_for_ambient_noise(source, duration=0.8)
-            audio = recognizer.listen(source, timeout=8, phrase_time_limit=12)
+            logging.info("Adjusting for ambient noise (0.5 s)…")
+            r.adjust_for_ambient_noise(source, duration=0.5)
+            logging.info("Listening (timeout=8 s)…")
+            audio = r.listen(source, timeout=8, phrase_time_limit=12)
 
-            # Try Filipino/Tagalog first, then English fallback
+        # Try Tagalog/Filipino first, fall back to English
+        for lang in ("fil-PH", "en-US"):
             try:
-                text = recognizer.recognize_google(audio, language="fil-PH")
-                logging.info(f"Speech recognized (fil-PH): {text}")
+                text = r.recognize_google(audio, language=lang)
+                if text:
+                    logging.info(f"Recognized ({lang}): {text}")
+                    return text
             except sr.UnknownValueError:
-                logging.info("fil-PH recognition yielded no result, retrying in en-US...")
-                text = recognizer.recognize_google(audio, language="en-US")
-                logging.info(f"Speech recognized (en-US): {text}")
+                pass
 
-            return text
+        logging.info("Speech not understood in either language.")
+        return ""
 
     except sr.WaitTimeoutError:
-        return ""
-    except sr.UnknownValueError:
+        logging.info("No speech detected within timeout.")
         return ""
     except Exception as e:
-        logging.error(f"Speech recognition error: {e}")
+        logging.error(f"listen_voice_input error: {e}")
         return ""
+    finally:
+        _mic_lock.release()
+
+
+def listen_for_wakeword() -> bool:
+    """
+    Quick listen (~3 s) for the phrase 'Hey Hachi'.
+    Uses NON-BLOCKING mic acquire — returns False instantly if mic is busy,
+    so it never competes with listen_voice_input.
+    """
+    acquired = _mic_lock.acquire(blocking=False)
+    if not acquired:
+        return False
+
+    try:
+        r = sr.Recognizer()
+        r.dynamic_energy_threshold = True
+        r.energy_threshold = 500
+
+        with sr.Microphone() as source:
+            r.adjust_for_ambient_noise(source, duration=0.3)
+            audio = r.listen(source, timeout=3, phrase_time_limit=2)
+
+        text = r.recognize_google(audio, language="en-US").lower()
+        logging.info(f"Wakeword check: '{text}'")
+        return "hachi" in text
+
+    except Exception:
+        return False
     finally:
         _mic_lock.release()

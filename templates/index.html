@@ -3,483 +3,640 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hachi — Agentic AI Voice Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Hachi — AI Voice Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-            --glass-bg: rgba(30, 41, 59, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --accent: #6366f1;
-            --accent-hover: #4f46e5;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --card-bg: rgba(15, 23, 42, 0.6);
+            --bg: #12141c;
+            --bg-elevated: #1a1d29;
+            --bg-elevated-2: #21243350;
+            --text: #ecedf4;
+            --text-dim: #8b8fa6;
+            --text-faint: #565b70;
+            --accent: #5eead4;
+            --accent-dim: #5eead422;
+            --accent-warm: #f5a65b;
+            --accent-warm-dim: #f5a65b22;
+            --border: rgba(255,255,255,0.08);
+            --border-strong: rgba(255,255,255,0.14);
+            --radius: 18px;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
 
         body {
-            background: var(--bg-gradient);
-            color: var(--text-main);
-            height: 100vh;
+            background: radial-gradient(ellipse 120% 80% at 50% -10%, #1b2030 0%, var(--bg) 55%);
+            color: var(--text);
+            font-family: var(--font-body);
             display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
             overflow: hidden;
         }
 
-        .sidebar {
-            width: 320px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            border-right: 1px solid var(--glass-border);
-            padding: 24px;
+        /* ===== App shell ===== */
+        .app {
+            width: 440px;
+            height: 820px;
+            max-height: 96vh;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 28px;
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 40px 80px -20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
         }
 
-        .brand-logo {
-            font-size: 28px;
-            background: linear-gradient(135deg, #818cf8, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 700;
-        }
-
-        .brand-subtitle {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Pomodoro Timer Hidden by default until Focus mode activated */
-        .pomodoro-card {
-            background: var(--card-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            display: none; /* Hidden until Focus Mode triggers */
-            animation: fadeIn 0.4s ease;
-        }
-
-        .timer-display {
-            font-size: 44px;
-            font-weight: 700;
-            color: #a5b4fc;
-            margin: 8px 0;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .timer-controls {
+        /* ===== Header ===== */
+        .header {
             display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-top: 12px;
-        }
-
-        .btn-small {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { background: var(--accent-hover); }
-        .btn-secondary { background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
-        .btn-secondary:hover { background: rgba(255, 255, 255, 0.2); }
-
-        .modes-section h3 {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-            text-transform: uppercase;
-        }
-
-        .mode-btn-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .mode-btn {
-            background: var(--card-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 12px;
-            color: var(--text-main);
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-        }
-
-        .mode-btn:hover {
-            transform: translateY(-2px);
-            border-color: var(--accent);
-        }
-
-        .main-chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: rgba(15, 23, 42, 0.4);
-        }
-
-        .chat-header {
-            padding: 20px 32px;
-            border-bottom: 1px solid var(--glass-border);
-            display: flex;
             justify-content: space-between;
-            align-items: center;
+            padding: 20px 22px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
         }
+        .brand { display: flex; align-items: center; gap: 10px; }
+        .brand-mark {
+            width: 32px; height: 32px;
+            border-radius: 10px;
+            background: linear-gradient(145deg, var(--accent), #2dd4bf);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 10px rgba(94,234,212,0.35);
+        }
+        .brand-mark svg { width: 17px; height: 17px; fill: none; stroke: #0a1a17; stroke-width: 2; stroke-linecap: round; }
+        .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+        .brand-text .name { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: 0.01em; }
+        .brand-text .status { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .header-actions { display: flex; gap: 8px; }
+        .icon-btn {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-dim);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: border-color .15s, color .15s, background .15s;
+        }
+        .icon-btn:hover { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,0.03); }
+        .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(99, 102, 241, 0.15);
-            color: #a5b4fc;
-            padding: 6px 14px;
+        /* ===== Mode chips ===== */
+        .modes-bar {
+            display: flex;
+            gap: 6px;
+            padding: 10px 18px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+        .modes-bar::-webkit-scrollbar { display: none; }
+        .chip {
+            padding: 5px 12px;
             border-radius: 20px;
-            font-size: 13px;
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            font-size: 12px;
+            font-family: var(--font-mono);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .2s;
+            user-select: none;
         }
+        .chip:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+        .chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
-        .progress-bar-container {
-            height: 4px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            overflow: hidden;
-            display: none;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #6366f1, #c084fc);
-            transition: width 0.3s ease;
-        }
-
-        .chat-feed {
+        /* ===== Messages ===== */
+        .messages {
             flex: 1;
-            padding: 32px;
             overflow-y: auto;
+            padding: 20px 22px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
         }
-
-        .message-bubble {
-            max-width: 75%;
-            padding: 16px 20px;
-            border-radius: 18px;
-            line-height: 1.5;
-            font-size: 15px;
-            animation: fadeIn 0.3s ease;
+        .messages::-webkit-scrollbar { width: 5px; }
+        .messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+        .msg { display: flex; flex-direction: column; max-width: 82%; animation: rise .3s ease both; }
+        @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .msg.user { align-self: flex-end; align-items: flex-end; }
+        .msg.assistant { align-self: flex-start; align-items: flex-start; }
+        .bubble {
+            padding: 11px 15px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.55;
+            word-break: break-word;
         }
+        .msg.user .bubble { background: var(--accent); color: #0a1a17; border-bottom-right-radius: 5px; font-weight: 500; }
+        .msg.assistant .bubble { background: var(--bg-elevated-2); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 5px; }
+        .meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 4px; padding: 0 3px; }
+        .typing { display: flex; gap: 4px; padding: 12px 15px; background: var(--bg-elevated-2); border: 1px solid var(--border); border-radius: var(--radius); border-bottom-left-radius: 5px; width: fit-content; }
+        .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); animation: bounce 1.1s infinite ease-in-out; }
+        .typing span:nth-child(2) { animation-delay: .15s; }
+        .typing span:nth-child(3) { animation-delay: .3s; }
+        @keyframes bounce { 0%,60%,100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* ===== Composer ===== */
+        .composer { padding: 12px 16px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+        .composer-row {
+            display: flex; align-items: flex-end; gap: 8px;
+            background: var(--bg-elevated-2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 6px 6px 16px;
+            transition: border-color .15s;
         }
-
-        .msg-user {
-            align-self: flex-end;
-            background: linear-gradient(135deg, #4f46e5, #6366f1);
-            color: white;
-            border-bottom-right-radius: 4px;
+        .composer-row:focus-within { border-color: var(--border-strong); }
+        .composer-row textarea {
+            flex: 1; background: none; border: none; outline: none; resize: none;
+            color: var(--text); font-family: var(--font-body); font-size: 14px;
+            line-height: 1.4; padding: 7px 0; max-height: 100px;
         }
-
-        .msg-assistant {
-            align-self: flex-start;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            border-bottom-left-radius: 4px;
+        .composer-row textarea::placeholder { color: var(--text-faint); }
+        .send-btn, .mic-btn {
+            width: 38px; height: 38px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0; transition: transform .15s, background .15s;
         }
+        .mic-btn { background: var(--accent-warm-dim); color: var(--accent-warm); }
+        .mic-btn:hover { background: var(--accent-warm); color: #241203; transform: scale(1.05); }
+        .mic-btn.active { background: var(--accent-warm); color: #241203; animation: pulse-btn 1.5s infinite; }
+        @keyframes pulse-btn { 0%,100% { box-shadow: 0 0 0 0 rgba(245,166,91,0.5); } 50% { box-shadow: 0 0 0 8px rgba(245,166,91,0); } }
+        .send-btn { background: var(--accent); color: #0a1a17; }
+        .send-btn:hover { transform: scale(1.05); }
+        .send-btn svg, .mic-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+        .hint { text-align: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 9px; letter-spacing: 0.02em; }
+        .hint kbd { background: var(--bg-elevated-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-family: var(--font-mono); }
 
-        .chat-input-container {
-            padding: 24px 32px;
-            border-top: 1px solid var(--glass-border);
+        /* ===== Voice overlay ===== */
+        .voice-overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 100% 70% at 50% 30%, #1c2333 0%, #0e0f16 70%);
             display: flex;
-            gap: 12px;
+            flex-direction: column;
             align-items: center;
-            background: var(--glass-bg);
+            justify-content: space-between;
+            padding: 30px 24px 34px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(14px);
+            transition: opacity .4s ease, transform .4s ease;
+            z-index: 20;
+        }
+        .voice-overlay.active { opacity: 1; pointer-events: all; transform: translateY(0); }
+
+        .voice-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        .voice-status {
+            font-family: var(--font-mono); font-size: 11px;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--text-dim); display: flex; align-items: center; gap: 7px;
+        }
+        .voice-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warm); animation: pulse-dot 1.4s infinite ease-in-out; }
+        @keyframes pulse-dot { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+        .orb-wrap { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+        .orb-ring { position: absolute; border-radius: 50%; border: 1px solid var(--border-strong); opacity: 0; }
+        .orb-ring.r1 { width: 100%; height: 100%; animation: ring-pulse 2.8s infinite ease-out; }
+        .orb-ring.r2 { width: 100%; height: 100%; animation: ring-pulse 2.8s infinite ease-out .9s; }
+        .orb-ring.r3 { width: 100%; height: 100%; animation: ring-pulse 2.8s infinite ease-out 1.8s; }
+        @keyframes ring-pulse {
+            0% { transform: scale(0.55); opacity: 0; border-color: var(--accent-warm); }
+            30% { opacity: .55; }
+            100% { transform: scale(1.15); opacity: 0; }
         }
 
-        .text-input {
-            flex: 1;
-            background: var(--card-bg);
-            border: 1px solid var(--glass-border);
-            padding: 14px 20px;
-            border-radius: 12px;
-            color: var(--text-main);
-            font-size: 15px;
-            outline: none;
-        }
-
-        .text-input:focus { border-color: var(--accent); }
-
-        .mic-btn {
-            width: 50px;
-            height: 50px;
+        /* Default orb: warm amber (idle/speaking) */
+        .orb-core {
+            width: 132px; height: 132px;
             border-radius: 50%;
-            border: none;
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s ease;
+            background: radial-gradient(circle at 35% 30%, #ffcf9b, var(--accent-warm) 45%, #c9702a 100%);
+            box-shadow: 0 0 50px 6px rgba(245,166,91,0.35), inset 0 -10px 24px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px;
+            transition: background .4s ease, box-shadow .4s ease, filter .3s ease;
         }
-
-        .mic-btn:hover { transform: scale(1.05); }
-
-        .mic-btn.listening {
-            animation: pulse-mic 1.2s infinite;
+        /* Listening: cyan */
+        .app[data-voice="listening"] .orb-core {
+            background: radial-gradient(circle at 35% 30%, #97fbe8, var(--accent) 45%, #1b8f7f 100%);
+            box-shadow: 0 0 50px 6px rgba(94,234,212,0.35), inset 0 -10px 24px rgba(0,0,0,0.25);
         }
+        /* Thinking: desaturated + pulsing */
+        .app[data-voice="thinking"] .orb-core {
+            filter: saturate(0.4) brightness(0.9);
+            animation: think-pulse 1.1s infinite ease-in-out;
+        }
+        @keyframes think-pulse { 0%,100% { transform: scale(0.97); } 50% { transform: scale(1.03); } }
 
-        @keyframes pulse-mic {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        .bar { width: 4px; border-radius: 3px; background: rgba(10,10,10,0.55); height: 14px; }
+        .app[data-voice="listening"] .bar,
+        .app[data-voice="speaking"] .bar { animation: bar-bounce 1s infinite ease-in-out; }
+        .app[data-voice="thinking"] .bar { height: 6px !important; opacity: .4; }
+        .bar:nth-child(1) { animation-delay: 0s; }
+        .bar:nth-child(2) { animation-delay: .12s; }
+        .bar:nth-child(3) { animation-delay: .24s; }
+        .bar:nth-child(4) { animation-delay: .36s; }
+        .bar:nth-child(5) { animation-delay: .48s; }
+        @keyframes bar-bounce { 0%,100% { height: 12px; } 50% { height: 38px; } }
+
+        .voice-caption { font-family: var(--font-display); font-size: 19px; font-weight: 500; color: var(--text); text-align: center; min-height: 26px; }
+        .voice-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 6px; text-align: center; max-width: 240px; }
+
+        .voice-bottom { display: flex; align-items: center; gap: 26px; }
+        .voice-ctrl {
+            width: 52px; height: 52px; border-radius: 50%;
+            border: 1px solid var(--border-strong); background: var(--bg-elevated-2);
+            color: var(--text-dim); display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform .15s, background .15s, color .15s;
+        }
+        .voice-ctrl:hover { transform: scale(1.06); color: var(--text); }
+        .voice-ctrl svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+        .voice-ctrl.end { width: 60px; height: 60px; background: #e5484d; border: none; color: #fff; }
+        .voice-ctrl.end:hover { background: #f5595e; }
+        .voice-ctrl.end svg { width: 20px; height: 20px; }
+        .voice-ctrl.muted { background: var(--accent-warm-dim); color: var(--accent-warm); border-color: transparent; }
+
+        /* Toast for wake-word notification */
+        .toast {
+            position: absolute; top: 16px; left: 50%; transform: translateX(-50%) translateY(-70px);
+            background: var(--accent-dim); border: 1px solid var(--accent);
+            color: var(--accent); padding: 8px 16px;
+            border-radius: 20px; font-family: var(--font-mono); font-size: 12px;
+            transition: transform .35s ease; z-index: 30; white-space: nowrap;
+            pointer-events: none;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        @media (max-width: 480px) {
+            body { padding: 0; }
+            .app { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; border: none; }
         }
     </style>
 </head>
 <body>
+<div class="app" id="appEl" data-voice="idle">
 
-    <div class="sidebar">
+    <!-- Header -->
+    <div class="header">
         <div class="brand">
-            <div class="brand-logo">HACHI</div>
-            <div class="brand-subtitle">Agentic Voice Assistant</div>
-        </div>
-
-        <!-- Pomodoro Timer Hidden by default until Focus mode requested -->
-        <div class="pomodoro-card" id="pomodoroCard">
-            <div style="font-size:13px; color:var(--text-muted);">⏱️ Focus Pomodoro</div>
-            <div class="timer-display" id="timerDisplay">25:00</div>
-            <div class="timer-controls">
-                <button class="btn-small btn-primary" onclick="startTimer()">Start</button>
-                <button class="btn-small btn-secondary" onclick="pauseTimer()">Pause</button>
-                <button class="btn-small btn-secondary" onclick="resetTimer()">Reset</button>
+            <div class="brand-mark">
+                <svg viewBox="0 0 24 24"><path d="M12 3v6M12 15v6M4.2 7l5.2 3M14.6 14l5.2 3M4.2 17l5.2-3M14.6 10l5.2-3"/></svg>
+            </div>
+            <div class="brand-text">
+                <span class="name">Hachi AI</span>
+                <span class="status"><span class="status-dot"></span>online · agentic</span>
             </div>
         </div>
-
-        <div class="modes-section">
-            <h3>Assistant Modes</h3>
-            <div class="mode-btn-grid">
-                <button class="mode-btn" onclick="triggerMode('gaming')"><span>🎮</span> Gaming</button>
-                <button class="mode-btn" onclick="triggerMode('study')"><span>📚</span> Study</button>
-                <button class="mode-btn" onclick="triggerMode('movie')"><span>🎬</span> Movie</button>
-                <button class="mode-btn" onclick="triggerMode('focus')"><span>⏱️</span> Focus</button>
-            </div>
+        <div class="header-actions">
+            <button class="icon-btn" title="Clear chat" onclick="clearChat()">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="icon-btn" title="Open voice mode" onclick="openVoice()">
+                <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
+            </button>
         </div>
     </div>
 
-    <div class="main-chat">
-        <div class="chat-header">
+    <!-- Mode chips -->
+    <div class="modes-bar">
+        <div class="chip" onclick="triggerMode('gaming', this)">🎮 Gaming</div>
+        <div class="chip" onclick="triggerMode('study', this)">📚 Study</div>
+        <div class="chip" onclick="triggerMode('movie', this)">🎬 Movie</div>
+        <div class="chip" onclick="triggerMode('focus', this)">⏱️ Focus</div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages" id="messages">
+        <div class="msg assistant">
+            <div class="bubble">Kamusta! Ako si Hachi, ang iyong AI assistant. I-tap ang mic o magsulat para magsimula. Say "Hey Hachi" to activate voice anytime!</div>
+            <div class="meta">Hachi · Ready</div>
+        </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="composer">
+        <div class="composer-row">
+            <textarea id="inputField" placeholder="Ask Hachi anything…" rows="1" onkeydown="handleKey(event)"></textarea>
+            <button class="mic-btn" id="micBtn" title="Voice mode" onclick="openVoice()">
+                <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
+            </button>
+            <button class="send-btn" title="Send" onclick="sendMessage()">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+        <div class="hint">Press <kbd>Enter</kbd> to send · Say <kbd>Hey Hachi</kbd> for voice · <kbd>Shift+Enter</kbd> new line</div>
+    </div>
+
+    <!-- Voice overlay (slides over everything) -->
+    <div class="voice-overlay" id="voiceOverlay">
+        <div class="voice-top">
+            <div class="voice-status"><span class="dot"></span><span id="voiceStatusText">Listening</span></div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint)" id="voiceTimer">00:00</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;gap:26px">
+            <div class="orb-wrap">
+                <div class="orb-ring r1"></div>
+                <div class="orb-ring r2"></div>
+                <div class="orb-ring r3"></div>
+                <div class="orb-core">
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                </div>
+            </div>
             <div>
-                <h2>Hachi Dashboard</h2>
-                <span style="font-size: 13px; color: var(--text-muted);">SQLite Memory & Autonomous Tool Engine</span>
-            </div>
-            <div class="status-badge" id="statusBadge">
-                🤖 Ready for input
+                <div class="voice-caption" id="voiceCaption">Listening…</div>
+                <div class="voice-sub" id="voiceSub">Speak whenever you're ready</div>
             </div>
         </div>
 
-        <div class="progress-bar-container" id="progressBarContainer">
-            <div class="progress-bar-fill" id="progressBarFill"></div>
-        </div>
-
-        <div class="chat-feed" id="chatFeed">
-            <div class="message-bubble msg-assistant">
-                Kamusta! I am Hachi, your agentic voice assistant. Ask me anything, or speak your command!
-            </div>
-        </div>
-
-        <div class="chat-input-container">
-            <input type="text" id="userInput" class="text-input" placeholder="Ask anything, e.g., 'I want to focus for 25 minutes'" onkeypress="handleKeyPress(event)">
-            <button class="btn-small btn-primary" onclick="sendMessage()">Send</button>
-            <button class="mic-btn" id="micBtn" onclick="toggleVoiceInput()" title="Voice Input">🎤</button>
+        <div class="voice-bottom">
+            <button class="voice-ctrl" id="muteBtn" title="Mute mic" onclick="toggleMute()">
+                <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
+            </button>
+            <button class="voice-ctrl end" title="End voice mode" onclick="closeVoice()">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="voice-ctrl" title="Switch to text" onclick="closeVoice()">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5z" stroke-linejoin="round"/></svg>
+            </button>
         </div>
     </div>
 
-    <script>
-        let timerInterval = null;
-        let timeLeft = 25 * 60;
+    <!-- Wake-word toast notification -->
+    <div class="toast" id="wakeToast">🎤 Hey Hachi detected!</div>
+</div>
 
-        function showPomodoroTimer() {
-            const pCard = document.getElementById('pomodoroCard');
-            pCard.style.display = 'block';
-            // Don't auto-start — let the user click Start when they're ready.
-            // startTimer() is called by the Start button.
-            updateDisplay();
+<script>
+    const appEl     = document.getElementById('appEl');
+    const overlay   = document.getElementById('voiceOverlay');
+    const caption   = document.getElementById('voiceCaption');
+    const sub       = document.getElementById('voiceSub');
+    const statusTxt = document.getElementById('voiceStatusText');
+    const timerEl   = document.getElementById('voiceTimer');
+    const muteBtn   = document.getElementById('muteBtn');
+    const micBtn    = document.getElementById('micBtn');
+    const msgBox    = document.getElementById('messages');
+    const inputEl   = document.getElementById('inputField');
+    const toast     = document.getElementById('wakeToast');
+
+    let currentMode   = 'default';
+    let voiceActive   = false;
+    let isMuted       = false;
+    let abortCtrl     = null;
+    let timerInterval = null;
+    let seconds       = 0;
+    let wakewordPoll  = null;
+
+    // ── Utilities ──────────────────────────────────────────────────────────
+
+    function timeNow() {
+        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function addMessage(text, role) {
+        const wrap   = document.createElement('div');
+        wrap.className = 'msg ' + role;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        const meta   = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + timeNow();
+        wrap.appendChild(bubble);
+        wrap.appendChild(meta);
+        msgBox.appendChild(wrap);
+        msgBox.scrollTop = msgBox.scrollHeight;
+    }
+
+    function showTyping() {
+        const w = document.createElement('div');
+        w.className = 'msg assistant'; w.id = 'typingDot';
+        w.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+        msgBox.appendChild(w);
+        msgBox.scrollTop = msgBox.scrollHeight;
+    }
+    function removeTyping() {
+        const el = document.getElementById('typingDot');
+        if (el) el.remove();
+    }
+
+    function setVoiceState(state, cap, sv) {
+        appEl.dataset.voice = state;
+        statusTxt.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+        caption.textContent   = cap;
+        sub.textContent       = sv || '';
+    }
+
+    // ── Text chat ─────────────────────────────────────────────────────────
+
+    async function sendMessage() {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        addMessage(text, 'user');
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        showTyping();
+        try {
+            const res  = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, mode: currentMode })
+            });
+            const data = await res.json();
+            removeTyping();
+            addMessage(data.response, 'assistant');
+        } catch {
+            removeTyping();
+            addMessage('Connection error. Is Hachi running?', 'assistant');
         }
+    }
 
-        function updateDisplay() {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            document.getElementById('timerDisplay').innerText = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    function handleKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    }
+    inputEl.addEventListener('input', () => {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+    });
+
+    function clearChat() {
+        msgBox.innerHTML = '';
+        addMessage("New conversation started. How can I help you?", 'assistant');
+    }
+
+    // ── Mode chips ────────────────────────────────────────────────────────
+
+    async function triggerMode(modeName, chipEl) {
+        currentMode = modeName;
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        if (chipEl) chipEl.classList.add('active');
+        addMessage(`Start ${modeName} mode`, 'user');
+        showTyping();
+        try {
+            const res  = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Start ${modeName} mode`, mode: modeName })
+            });
+            const data = await res.json();
+            removeTyping();
+            addMessage(data.response, 'assistant');
+        } catch {
+            removeTyping();
+            addMessage(`Could not activate ${modeName} mode.`, 'assistant');
         }
+    }
 
-        function startTimer() {
-            if (timerInterval) return;
-            timerInterval = setInterval(() => {
-                if (timeLeft > 0) {
-                    timeLeft--;
-                    updateDisplay();
-                } else {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                    alert("Focus session complete!");
-                }
-            }, 1000);
+    // ── Voice overlay ─────────────────────────────────────────────────────
+
+    function openVoice() {
+        if (voiceActive) return;
+        voiceActive = true;
+        abortCtrl   = new AbortController();
+        overlay.classList.add('active');
+        micBtn.classList.add('active');
+
+        seconds = 0;
+        clearInterval(timerInterval);
+        timerEl.textContent = '00:00';
+        timerInterval = setInterval(() => {
+            seconds++;
+            timerEl.textContent =
+                String(Math.floor(seconds / 60)).padStart(2, '0') + ':' +
+                String(seconds % 60).padStart(2, '0');
+        }, 1000);
+
+        // Pause wakeword listener on backend
+        fetch('/api/voice_mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: true })
+        }).catch(() => {});
+
+        runVoiceLoop();
+    }
+
+    function closeVoice() {
+        voiceActive = false;
+        if (abortCtrl) abortCtrl.abort();
+        overlay.classList.remove('active');
+        micBtn.classList.remove('active');
+        clearInterval(timerInterval);
+        appEl.dataset.voice = 'idle';
+
+        // Resume wakeword listener on backend
+        fetch('/api/voice_mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: false })
+        }).catch(() => {});
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        muteBtn.classList.toggle('muted', isMuted);
+        if (isMuted) {
+            setVoiceState('idle', 'Microphone muted', 'Tap mic icon to unmute');
         }
+        // The voice loop will naturally retry on next iteration
+    }
 
-        function pauseTimer() { clearInterval(timerInterval); timerInterval = null; }
-        function resetTimer() { pauseTimer(); timeLeft = 25 * 60; updateDisplay(); }
+    async function runVoiceLoop() {
+        while (voiceActive) {
+            // Skip a turn if muted
+            if (isMuted) { await sleep(600); continue; }
 
-        function setStatus(text, progressPct = 0) {
-            const badge = document.getElementById('statusBadge');
-            const barContainer = document.getElementById('progressBarContainer');
-            const barFill = document.getElementById('progressBarFill');
+            // ── Step 1: STT (Listen) ───────────────────────────────────
+            setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
 
-            badge.innerText = text;
-            if (progressPct > 0 && progressPct < 100) {
-                barContainer.style.display = 'block';
-                barFill.style.width = progressPct + '%';
-            } else {
-                barContainer.style.display = 'none';
-                barFill.style.width = '0%';
-            }
-        }
-
-        function appendMessage(role, text) {
-            const feed = document.getElementById('chatFeed');
-            const bubble = document.createElement('div');
-            bubble.className = `message-bubble ${role === 'user' ? 'msg-user' : 'msg-assistant'}`;
-            
-            const textDiv = document.createElement('div');
-            textDiv.innerText = text;
-            bubble.appendChild(textDiv);
-
-            feed.appendChild(bubble);
-            feed.scrollTop = feed.scrollHeight;
-        }
-
-        function checkToolsForState(tools) {
-            if (tools && tools.length > 0) {
-                tools.forEach(t => {
-                    if (t.tool === 'launch_mode' && t.args && t.args.mode_name) {
-                        const mName = t.args.mode_name.toLowerCase();
-                        if (mName.includes('focus')) showPomodoroTimer();
-                        setStatus(`🎮 Active Mode: ${t.args.mode_name.toUpperCase()}`, 100);
-                    } else if (t.tool === 'close_mode') {
-                        setStatus('🤖 Ready for input', 100);
-                    }
-                });
-            }
-        }
-
-        let currentMode = 'default';
-
-        async function sendMessage() {
-            const input = document.getElementById('userInput');
-            const text = input.value.trim();
-            if (!text) return;
-
-            appendMessage('user', text);
-            input.value = '';
-            setStatus('⚙️ Processing...', 40);
-
+            let listenData = { user_text: '' };
             try {
-                const res = await fetch('/api/chat', {
+                const res = await fetch('/api/voice_listen_only', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, mode: currentMode })
+                    body: JSON.stringify({ mode: currentMode }),
+                    signal: abortCtrl.signal
                 });
-                const data = await res.json();
-                setStatus('🤖 Ready for input', 100);
-                appendMessage('assistant', data.response);
-                checkToolsForState(data.tools);
+                listenData = await res.json();
             } catch (err) {
-                setStatus('❌ Error', 0);
-                appendMessage('assistant', 'Error connecting to Hachi backend.');
+                if (!voiceActive || err.name === 'AbortError') break;
+                setVoiceState('idle', 'Connection error', 'Retrying in 2 s…');
+                await sleep(2000);
+                continue;
             }
-        }
 
-        async function toggleVoiceInput() {
-            const btn = document.getElementById('micBtn');
-            btn.classList.add('listening');
-            setStatus('🎤 Listening for voice (Tagalog/English)...', 25);
+            if (!voiceActive) break;
+            if (!listenData.user_text) {
+                // Nothing heard — retry immediately
+                await sleep(200);
+                continue;
+            }
 
+            // ── Step 2: LLM + TTS (Process + Speak) ───────────────────
+            addMessage(listenData.user_text, 'user');
+            setVoiceState('thinking', 'Thinking…', `"${listenData.user_text}"`);
+
+            let chatData = { response: '' };
             try {
-                const res = await fetch('/api/voice_listen', {
+                const res = await fetch('/api/voice_chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: currentMode })
+                    // voice_chat blocks until Ollama + TTS both finish on server
+                    body: JSON.stringify({ user_text: listenData.user_text, mode: currentMode }),
+                    signal: abortCtrl.signal
                 });
-                const data = await res.json();
-                btn.classList.remove('listening');
-
-                if (data.user_text) {
-                    appendMessage('user', data.user_text);
-                    setStatus('⚙️ Processing input...', 60);
-                    setStatus('🤖 Ready for input', 100);
-                    appendMessage('assistant', data.response);
-                    checkToolsForState(data.tools);
-                } else {
-                    setStatus('🤖 Ready for input', 100);
-                    appendMessage('assistant', data.response || 'I did not catch that. Please try again.');
-                }
+                chatData = await res.json();
             } catch (err) {
-                btn.classList.remove('listening');
-                setStatus('❌ Voice Error', 0);
-                appendMessage('assistant', 'Voice input failed. Please check your microphone and try again.');
+                if (!voiceActive || err.name === 'AbortError') break;
+                setVoiceState('idle', 'Error processing', 'Retrying in 2 s…');
+                await sleep(2000);
+                continue;
+            }
+
+            if (!voiceActive) break;
+
+            // TTS has already finished playing by the time we reach here
+            if (chatData.response) {
+                addMessage(chatData.response, 'assistant');
+                setVoiceState('speaking', chatData.response.substring(0, 50) + (chatData.response.length > 50 ? '…' : ''), 'Hachi finished speaking');
+                await sleep(800);   // brief pause before next listen turn
             }
         }
+    }
 
-        async function triggerMode(modeName) {
-            appendMessage('user', `Start ${modeName} mode`);
-            setStatus(`🎮 Activating ${modeName} mode...`, 50);
-            currentMode = modeName;
-            if (modeName === 'focus') showPomodoroTimer();
+    // ── Wake-word polling ──────────────────────────────────────────────────
 
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Start ${modeName} mode`, mode: modeName })
-                });
-                const data = await res.json();
-                setStatus('🤖 Ready for input', 100);
-                appendMessage('assistant', data.response);
-                checkToolsForState(data.tools);
-            } catch (err) {
-                setStatus('❌ Error', 0);
-                appendMessage('assistant', `Failed to activate ${modeName} mode. Please check the backend.`);
+    function showWakeToast() {
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    async function pollWakeword() {
+        try {
+            const res  = await fetch('/api/wakeword_status');
+            const data = await res.json();
+            if (data.detected && !voiceActive) {
+                showWakeToast();
+                openVoice();
             }
-        }
+        } catch { /* server not ready yet */ }
+    }
 
-        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
-    </script>
+    // Poll every 600 ms
+    wakewordPoll = setInterval(pollWakeword, 600);
+</script>
 </body>
 </html>
