@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hachi — AI Voice Assistant</title>
+    <meta name="description" content="Hachi AI — your agentic desktop voice assistant with voice chat, Pomodoro timer, and smart tool integration.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg: #12141c;
             --bg-elevated: #1a1d29;
             --bg-elevated-2: #21243350;
+            --bg-elevated-3: #1e2135;
             --text: #ecedf4;
             --text-dim: #8b8fa6;
             --text-faint: #565b70;
@@ -18,6 +22,8 @@
             --accent-dim: #5eead422;
             --accent-warm: #f5a65b;
             --accent-warm-dim: #f5a65b22;
+            --accent-red: #e5484d;
+            --accent-green: #4ade80;
             --border: rgba(255,255,255,0.08);
             --border-strong: rgba(255,255,255,0.14);
             --radius: 18px;
@@ -41,8 +47,8 @@
 
         /* ===== App shell ===== */
         .app {
-            width: 440px;
-            height: 820px;
+            width: 480px;
+            height: 860px;
             max-height: 96vh;
             background: var(--bg-elevated);
             border: 1px solid var(--border);
@@ -116,6 +122,38 @@
         .chip:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
         .chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
+        /* ===== Pomodoro Banner ===== */
+        .pomodoro-banner {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 18px;
+            background: linear-gradient(90deg, rgba(94,234,212,0.08), rgba(94,234,212,0.03));
+            border-bottom: 1px solid rgba(94,234,212,0.2);
+            flex-shrink: 0;
+        }
+        .pomodoro-banner.visible { display: flex; }
+        .pomo-icon { font-size: 18px; flex-shrink: 0; }
+        .pomo-info { flex: 1; }
+        .pomo-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+        .pomo-timer {
+            font-family: var(--font-display); font-size: 22px; font-weight: 700;
+            color: var(--accent); letter-spacing: 0.04em;
+            text-shadow: 0 0 12px rgba(94,234,212,0.4);
+        }
+        .pomo-timer.break { color: var(--accent-warm); text-shadow: 0 0 12px rgba(245,166,91,0.4); }
+        .pomo-controls { display: flex; gap: 6px; }
+        .pomo-btn {
+            padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--text-dim); font-family: var(--font-mono);
+            font-size: 11px; cursor: pointer; transition: all .2s;
+        }
+        .pomo-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .pomo-btn.stop:hover { border-color: var(--accent-red); color: var(--accent-red); background: rgba(229,72,77,0.1); }
+        .pomo-sessions { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); display: flex; gap: 4px; }
+        .pomo-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--text-faint); }
+        .pomo-dot.done { background: var(--accent); border-color: var(--accent); }
+
         /* ===== Messages ===== */
         .messages {
             flex: 1;
@@ -123,24 +161,81 @@
             padding: 20px 22px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
         }
         .messages::-webkit-scrollbar { width: 5px; }
         .messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
-        .msg { display: flex; flex-direction: column; max-width: 82%; animation: rise .3s ease both; }
+        .msg { display: flex; flex-direction: column; max-width: 88%; animation: rise .3s ease both; }
         @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .msg.user { align-self: flex-end; align-items: flex-end; }
         .msg.assistant { align-self: flex-start; align-items: flex-start; }
         .bubble {
-            padding: 11px 15px;
+            padding: 12px 16px;
             border-radius: var(--radius);
             font-size: 14px;
-            line-height: 1.55;
+            line-height: 1.65;
             word-break: break-word;
         }
         .msg.user .bubble { background: var(--accent); color: #0a1a17; border-bottom-right-radius: 5px; font-weight: 500; }
-        .msg.assistant .bubble { background: var(--bg-elevated-2); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 5px; }
-        .meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 4px; padding: 0 3px; }
+        .msg.assistant .bubble {
+            background: var(--bg-elevated-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-bottom-left-radius: 5px;
+        }
+
+        /* ===== Markdown rendering inside bubbles ===== */
+        .bubble h1, .bubble h2, .bubble h3 {
+            font-family: var(--font-display);
+            font-weight: 600;
+            margin: 12px 0 6px;
+            line-height: 1.3;
+        }
+        .bubble h1 { font-size: 17px; }
+        .bubble h2 { font-size: 15px; color: var(--accent); }
+        .bubble h3 { font-size: 14px; color: var(--text-dim); }
+        .bubble p { margin: 6px 0; }
+        .bubble p:first-child { margin-top: 0; }
+        .bubble p:last-child { margin-bottom: 0; }
+        .bubble ul, .bubble ol { margin: 6px 0 6px 18px; }
+        .bubble li { margin: 3px 0; line-height: 1.55; }
+        .bubble strong { color: var(--accent); font-weight: 600; }
+        .bubble em { color: var(--text-dim); font-style: italic; }
+        .bubble code {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--accent-warm);
+        }
+        .bubble pre {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        .bubble pre code { background: none; border: none; padding: 0; font-size: 12px; color: var(--text); }
+        .bubble blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            margin: 8px 0;
+            color: var(--text-dim);
+            font-style: italic;
+        }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+        .bubble a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+
+        .meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 5px; padding: 0 3px; }
+        .tool-badge {
+            font-family: var(--font-mono); font-size: 10px;
+            background: var(--accent-warm-dim); border: 1px solid rgba(245,166,91,0.25);
+            color: var(--accent-warm); border-radius: 6px; padding: 2px 7px;
+            margin-top: 5px; display: inline-block;
+        }
         .typing { display: flex; gap: 4px; padding: 12px 15px; background: var(--bg-elevated-2); border: 1px solid var(--border); border-radius: var(--radius); border-bottom-left-radius: 5px; width: fit-content; }
         .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); animation: bounce 1.1s infinite ease-in-out; }
         .typing span:nth-child(2) { animation-delay: .15s; }
@@ -204,6 +299,8 @@
             color: var(--text-dim); display: flex; align-items: center; gap: 7px;
         }
         .voice-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warm); animation: pulse-dot 1.4s infinite ease-in-out; }
+        .voice-status .dot.listening { background: var(--accent); }
+        .voice-status .dot.speaking { background: var(--accent-warm); }
         @keyframes pulse-dot { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
 
         .orb-wrap { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
@@ -250,8 +347,35 @@
         .bar:nth-child(5) { animation-delay: .48s; }
         @keyframes bar-bounce { 0%,100% { height: 12px; } 50% { height: 38px; } }
 
+        /* Transcript box inside voice overlay */
+        .voice-transcript {
+            width: 100%;
+            min-height: 52px;
+            max-height: 100px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-family: var(--font-body);
+            font-size: 13px;
+            color: var(--text-dim);
+            text-align: center;
+            transition: all .3s;
+        }
+        .voice-transcript.heard { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+        .voice-transcript.interim { color: var(--accent); border-color: rgba(94,234,212,0.3); }
+
         .voice-caption { font-family: var(--font-display); font-size: 19px; font-weight: 500; color: var(--text); text-align: center; min-height: 26px; }
-        .voice-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 6px; text-align: center; max-width: 240px; }
+        .voice-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 6px; text-align: center; max-width: 260px; }
+
+        /* STT method indicator */
+        .stt-badge {
+            font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-faint);
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            border-radius: 6px; padding: 2px 8px; margin-top: 6px;
+        }
 
         .voice-bottom { display: flex; align-items: center; gap: 26px; }
         .voice-ctrl {
@@ -278,7 +402,39 @@
         }
         .toast.show { transform: translateX(-50%) translateY(0); }
 
-        @media (max-width: 480px) {
+        /* Pomodoro notification overlay */
+        .pomo-notify {
+            position: absolute; inset: 0; z-index: 40;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            gap: 16px; animation: fadeIn .3s ease;
+        }
+        .pomo-notify.show { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .pomo-notify-card {
+            background: var(--bg-elevated-3);
+            border: 1px solid var(--border-strong);
+            border-radius: 22px;
+            padding: 32px 36px;
+            text-align: center;
+            max-width: 320px;
+        }
+        .pomo-notify-icon { font-size: 48px; margin-bottom: 12px; }
+        .pomo-notify-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .pomo-notify-sub { font-family: var(--font-body); font-size: 14px; color: var(--text-dim); margin-bottom: 20px; }
+        .pomo-notify-btn {
+            padding: 10px 24px; border-radius: 12px; border: none;
+            background: var(--accent); color: #0a1a17; font-family: var(--font-display);
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: transform .15s;
+        }
+        .pomo-notify-btn:hover { transform: scale(1.03); }
+        .pomo-notify-btn.secondary {
+            background: transparent; border: 1px solid var(--border-strong);
+            color: var(--text-dim); margin-left: 8px;
+        }
+
+        @media (max-width: 500px) {
             body { padding: 0; }
             .app { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; border: none; }
         }
@@ -299,10 +455,10 @@
             </div>
         </div>
         <div class="header-actions">
-            <button class="icon-btn" title="Clear chat" onclick="clearChat()">
+            <button class="icon-btn" id="clearBtn" title="New conversation" onclick="clearChat()">
                 <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             </button>
-            <button class="icon-btn" title="Open voice mode" onclick="openVoice()">
+            <button class="icon-btn" id="voiceHeaderBtn" title="Open voice conversation" onclick="openVoice()">
                 <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
             </button>
         </div>
@@ -310,16 +466,35 @@
 
     <!-- Mode chips -->
     <div class="modes-bar">
-        <div class="chip" onclick="triggerMode('gaming', this)">🎮 Gaming</div>
-        <div class="chip" onclick="triggerMode('study', this)">📚 Study</div>
-        <div class="chip" onclick="triggerMode('movie', this)">🎬 Movie</div>
-        <div class="chip" onclick="triggerMode('focus', this)">⏱️ Focus</div>
+        <div class="chip" id="chip-gaming" onclick="triggerMode('gaming', this)">🎮 Gaming</div>
+        <div class="chip" id="chip-study" onclick="triggerMode('study', this)">📚 Study</div>
+        <div class="chip" id="chip-movie" onclick="triggerMode('movie', this)">🎬 Movie</div>
+        <div class="chip" id="chip-focus" onclick="triggerMode('focus', this)">⏱️ Focus</div>
+    </div>
+
+    <!-- Pomodoro Banner -->
+    <div class="pomodoro-banner" id="pomodoroBanner">
+        <span class="pomo-icon" id="pomoIcon">🍅</span>
+        <div class="pomo-info">
+            <div class="pomo-label" id="pomoLabel">Work Session</div>
+            <div class="pomo-timer" id="pomoTimer">25:00</div>
+            <div class="pomo-sessions" id="pomoSessions">
+                <span class="pomo-dot" id="pd1"></span>
+                <span class="pomo-dot" id="pd2"></span>
+                <span class="pomo-dot" id="pd3"></span>
+                <span class="pomo-dot" id="pd4"></span>
+            </div>
+        </div>
+        <div class="pomo-controls">
+            <button class="pomo-btn" id="pomoPauseBtn" onclick="togglePomodoro()">⏸ Pause</button>
+            <button class="pomo-btn stop" id="pomoStopBtn" onclick="stopPomodoro()">✕ Stop</button>
+        </div>
     </div>
 
     <!-- Messages -->
     <div class="messages" id="messages">
         <div class="msg assistant">
-            <div class="bubble">Kamusta! Ako si Hachi, ang iyong AI assistant. I-tap ang mic o magsulat para magsimula. Say "Hey Hachi" to activate voice anytime!</div>
+            <div class="bubble">Kamusta! Ako si <strong>Hachi</strong>, ang iyong AI assistant. Magtanong ka ng kahit ano, or tap the mic button to start a voice conversation! Say <strong>"Hey Hachi"</strong> anytime to activate voice mode 🎤</div>
             <div class="meta">Hachi · Ready</div>
         </div>
     </div>
@@ -328,24 +503,24 @@
     <div class="composer">
         <div class="composer-row">
             <textarea id="inputField" placeholder="Ask Hachi anything…" rows="1" onkeydown="handleKey(event)"></textarea>
-            <button class="mic-btn" id="micBtn" title="Voice mode" onclick="openVoice()">
+            <button class="mic-btn" id="micBtn" title="Start voice conversation" onclick="openVoice()">
                 <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
             </button>
-            <button class="send-btn" title="Send" onclick="sendMessage()">
+            <button class="send-btn" id="sendBtn" title="Send" onclick="sendMessage()">
                 <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linejoin="round"/></svg>
             </button>
         </div>
-        <div class="hint">Press <kbd>Enter</kbd> to send · Say <kbd>Hey Hachi</kbd> for voice · <kbd>Shift+Enter</kbd> new line</div>
+        <div class="hint">Press <kbd>Enter</kbd> to send · <kbd>Mic</kbd> for voice chat · <kbd>Shift+Enter</kbd> new line</div>
     </div>
 
-    <!-- Voice overlay (slides over everything) -->
+    <!-- Voice overlay (ChatGPT-style voice conversation) -->
     <div class="voice-overlay" id="voiceOverlay">
         <div class="voice-top">
-            <div class="voice-status"><span class="dot"></span><span id="voiceStatusText">Listening</span></div>
+            <div class="voice-status"><span class="dot" id="voiceDot"></span><span id="voiceStatusText">Listening</span></div>
             <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint)" id="voiceTimer">00:00</div>
         </div>
 
-        <div style="display:flex;flex-direction:column;align-items:center;gap:26px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:20px;width:100%">
             <div class="orb-wrap">
                 <div class="orb-ring r1"></div>
                 <div class="orb-ring r2"></div>
@@ -354,9 +529,14 @@
                     <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
                 </div>
             </div>
+
+            <!-- Live transcript display -->
+            <div class="voice-transcript" id="voiceTranscript">Speak whenever you're ready…</div>
+
             <div>
                 <div class="voice-caption" id="voiceCaption">Listening…</div>
-                <div class="voice-sub" id="voiceSub">Speak whenever you're ready</div>
+                <div class="voice-sub" id="voiceSub">Hachi is ready for your voice</div>
+                <div style="text-align:center"><span class="stt-badge" id="sttBadge">🎤 Web Speech API</span></div>
             </div>
         </div>
 
@@ -364,10 +544,10 @@
             <button class="voice-ctrl" id="muteBtn" title="Mute mic" onclick="toggleMute()">
                 <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0M12 18v3"/></svg>
             </button>
-            <button class="voice-ctrl end" title="End voice mode" onclick="closeVoice()">
+            <button class="voice-ctrl end" id="endVoiceBtn" title="End voice conversation" onclick="closeVoice()">
                 <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-width="2.2" stroke-linecap="round"/></svg>
             </button>
-            <button class="voice-ctrl" title="Switch to text" onclick="closeVoice()">
+            <button class="voice-ctrl" id="textSwitchBtn" title="Switch to text chat" onclick="closeVoice()">
                 <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5z" stroke-linejoin="round"/></svg>
             </button>
         </div>
@@ -375,268 +555,909 @@
 
     <!-- Wake-word toast notification -->
     <div class="toast" id="wakeToast">🎤 Hey Hachi detected!</div>
+
+    <!-- Pomodoro session complete notification -->
+    <div class="pomo-notify" id="pomoNotify">
+        <div class="pomo-notify-card">
+            <div class="pomo-notify-icon" id="pomoNotifyIcon">🍅</div>
+            <div class="pomo-notify-title" id="pomoNotifyTitle">Session Complete!</div>
+            <div class="pomo-notify-sub" id="pomoNotifyMsg">Great work! Time for a 5-minute break.</div>
+            <div>
+                <button class="pomo-notify-btn" id="pomoNotifyAction" onclick="pomoNextAction()">Start Break ☕</button>
+                <button class="pomo-notify-btn secondary" onclick="stopPomodoro()">Stop</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    const appEl     = document.getElementById('appEl');
-    const overlay   = document.getElementById('voiceOverlay');
-    const caption   = document.getElementById('voiceCaption');
-    const sub       = document.getElementById('voiceSub');
-    const statusTxt = document.getElementById('voiceStatusText');
-    const timerEl   = document.getElementById('voiceTimer');
-    const muteBtn   = document.getElementById('muteBtn');
-    const micBtn    = document.getElementById('micBtn');
-    const msgBox    = document.getElementById('messages');
-    const inputEl   = document.getElementById('inputField');
-    const toast     = document.getElementById('wakeToast');
+// ============================================================
+// DOM refs
+// ============================================================
+const appEl        = document.getElementById('appEl');
+const overlay      = document.getElementById('voiceOverlay');
+const caption      = document.getElementById('voiceCaption');
+const sub          = document.getElementById('voiceSub');
+const statusTxt    = document.getElementById('voiceStatusText');
+const voiceDot     = document.getElementById('voiceDot');
+const timerEl      = document.getElementById('voiceTimer');
+const muteBtn      = document.getElementById('muteBtn');
+const micBtn       = document.getElementById('micBtn');
+const msgBox       = document.getElementById('messages');
+const inputEl      = document.getElementById('inputField');
+const toast        = document.getElementById('wakeToast');
+const transcriptEl = document.getElementById('voiceTranscript');
+const sttBadge     = document.getElementById('sttBadge');
 
-    let currentMode   = 'default';
-    let voiceActive   = false;
-    let isMuted       = false;
-    let abortCtrl     = null;
-    let timerInterval = null;
-    let seconds       = 0;
-    let wakewordPoll  = null;
+// ============================================================
+// App state
+// ============================================================
+let currentMode   = 'default';
+let voiceActive   = false;
+let isMuted       = false;
+let voiceSeconds  = 0;
+let timerInterval = null;
+let wakewordPoll  = null;
 
-    // ── Utilities ──────────────────────────────────────────────────────────
+// Markdown renderer configuration
+marked.setOptions({
+    breaks: true,
+    gfm: true,
+});
 
-    function timeNow() {
-        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+function sanitizeHtml(html) {
+    // Basic sanitization — strip script tags
+    return html.replace(/<script[\s\S]*?<\/script>/gi, '');
+}
 
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// ============================================================
+// Utilities
+// ============================================================
+function timeNow() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-    function addMessage(text, role) {
-        const wrap   = document.createElement('div');
-        wrap.className = 'msg ' + role;
-        const bubble = document.createElement('div');
-        bubble.className = 'bubble';
+function addMessage(text, role, tools) {
+    const wrap   = document.createElement('div');
+    wrap.className = 'msg ' + role;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    if (role === 'assistant') {
+        // Render Markdown for assistant messages
+        const rendered = sanitizeHtml(marked.parse(text || ''));
+        bubble.innerHTML = rendered;
+    } else {
         bubble.textContent = text;
-        const meta   = document.createElement('div');
-        meta.className = 'meta';
-        meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + timeNow();
-        wrap.appendChild(bubble);
-        wrap.appendChild(meta);
-        msgBox.appendChild(wrap);
-        msgBox.scrollTop = msgBox.scrollHeight;
     }
 
-    function showTyping() {
-        const w = document.createElement('div');
-        w.className = 'msg assistant'; w.id = 'typingDot';
-        w.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
-        msgBox.appendChild(w);
-        msgBox.scrollTop = msgBox.scrollHeight;
-    }
-    function removeTyping() {
-        const el = document.getElementById('typingDot');
-        if (el) el.remove();
-    }
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + timeNow();
 
-    function setVoiceState(state, cap, sv) {
-        appEl.dataset.voice = state;
-        statusTxt.textContent = state.charAt(0).toUpperCase() + state.slice(1);
-        caption.textContent   = cap;
-        sub.textContent       = sv || '';
-    }
+    wrap.appendChild(bubble);
+    wrap.appendChild(meta);
 
-    // ── Text chat ─────────────────────────────────────────────────────────
-
-    async function sendMessage() {
-        const text = inputEl.value.trim();
-        if (!text) return;
-        addMessage(text, 'user');
-        inputEl.value = '';
-        inputEl.style.height = 'auto';
-        showTyping();
-        try {
-            const res  = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, mode: currentMode })
-            });
-            const data = await res.json();
-            removeTyping();
-            addMessage(data.response, 'assistant');
-        } catch {
-            removeTyping();
-            addMessage('Connection error. Is Hachi running?', 'assistant');
-        }
+    // Show tool badges
+    if (tools && tools.length > 0) {
+        tools.forEach(t => {
+            const badge = document.createElement('span');
+            badge.className = 'tool-badge';
+            const toolLabels = {
+                launch_mode: '⚡ Mode launched',
+                close_mode: '⛔ Mode closed',
+                close_app: '❌ App closed',
+                get_weather: '🌤 Weather fetched',
+                search_web: '🔍 Web searched',
+                fetch_url: '🌐 URL fetched',
+                get_system_stats: '💻 System check',
+                search_memory: '🧠 Memory searched',
+                shutdown_hachi: '🔴 Shutting down'
+            };
+            badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
+            wrap.appendChild(badge);
+        });
     }
 
-    function handleKey(e) {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    }
-    inputEl.addEventListener('input', () => {
-        inputEl.style.height = 'auto';
-        inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
-    });
+    msgBox.appendChild(wrap);
+    msgBox.scrollTop = msgBox.scrollHeight;
+}
 
-    function clearChat() {
-        msgBox.innerHTML = '';
-        addMessage("New conversation started. How can I help you?", 'assistant');
-    }
+function showTyping() {
+    const w = document.createElement('div');
+    w.className = 'msg assistant'; w.id = 'typingDot';
+    w.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    msgBox.appendChild(w);
+    msgBox.scrollTop = msgBox.scrollHeight;
+}
+function removeTyping() {
+    const el = document.getElementById('typingDot');
+    if (el) el.remove();
+}
 
-    // ── Mode chips ────────────────────────────────────────────────────────
+// ============================================================
+// Text Chat
+// ============================================================
+// ============================================================
+// Natural Language Intent Detector & Pomodoro Signal Handler
+// ============================================================
 
-    async function triggerMode(modeName, chipEl) {
-        currentMode = modeName;
+function detectUserIntent(userText) {
+    if (!userText) return;
+    const lower = userText.toLowerCase().trim();
+
+    // 1. Pomodoro / Focus / Timer intent
+    const pomoPatterns = [
+        'pomodoro', 'timer', 'clock', '25 min', '25-min', '25 minute',
+        'focus mode', 'focus timer', 'start focus', 'deep work', 'mag-focus',
+        'set a timer', 'start a timer', 'count down', 'countdown'
+    ];
+    if (pomoPatterns.some(p => lower.includes(p))) {
+        startPomodoro();
+        const focusChip = document.getElementById('chip-focus');
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        if (chipEl) chipEl.classList.add('active');
-        addMessage(`Start ${modeName} mode`, 'user');
-        showTyping();
+        if (focusChip) focusChip.classList.add('active');
+        currentMode = 'focus';
+    }
+
+    // 2. Gaming intent (e.g. "I wanna play a game right now", "let's game", "open steam")
+    const gamingPatterns = [
+        'wanna play', 'want to play', 'play a game', 'play games', 'game time',
+        'gaming', 'open steam', 'lets game', "let's game", 'laro tayo',
+        'maglaro', 'mag-laro', 'boot up steam', 'feel like playing'
+    ];
+    if (gamingPatterns.some(p => lower.includes(p))) {
+        const gameChip = document.getElementById('chip-gaming');
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        if (gameChip) gameChip.classList.add('active');
+        currentMode = 'gaming';
+    }
+
+    // 3. Study intent
+    const studyPatterns = ['study', 'homework', 'vscode', 'mag-aral', 'magaral', 'school work'];
+    if (studyPatterns.some(p => lower.includes(p))) {
+        const studyChip = document.getElementById('chip-study');
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        if (studyChip) studyChip.classList.add('active');
+        currentMode = 'study';
+    }
+
+    // 4. Movie intent
+    const moviePatterns = ['movie', 'watch a', 'film', 'manood', 'netflix', 'stream something'];
+    if (moviePatterns.some(p => lower.includes(p))) {
+        const movieChip = document.getElementById('chip-movie');
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        if (movieChip) movieChip.classList.add('active');
+        currentMode = 'movie';
+    }
+}
+
+async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    
+    // Check intent on user text locally before sending
+    detectUserIntent(text);
+
+    addMessage(text, 'user');
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    showTyping();
+    try {
+        const res  = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, mode: currentMode })
+        });
+        const data = await res.json();
+        removeTyping();
+        applyPomoSignals(data.response, data.tools, text);
+    } catch {
+        removeTyping();
+        addMessage('Connection error — is Hachi running?', 'assistant');
+    }
+}
+
+// Shared helper: handle __START_POMODORO__ / __STOP_POMODORO__ in any response,
+// and detect timer/pomodoro keywords as fallback.
+function applyPomoSignals(response, tools, userText) {
+    if (!response && !userText) return;
+    let msg = response || '';
+    let started = false;
+    let stopped = false;
+
+    if (msg.includes('__START_POMODORO__')) {
+        msg = msg.replace(/__START_POMODORO__\s?/g, '');
+        started = true;
+    }
+    if (msg.includes('__STOP_POMODORO__')) {
+        msg = msg.replace(/__STOP_POMODORO__\s?/g, '');
+        stopped = true;
+    }
+
+    const combined = ((userText || '') + ' ' + msg).toLowerCase();
+    const startKw = ['pomodoro', '25-minute timer', '25 minute timer',
+                     'pomodoro started', 'focus timer', 'starting a 25',
+                     'pomodoro clock', 'start timer', 'focus mode'];
+    const stopKw  = ['pomodoro stopped', 'stopping the timer', 'timer stopped', 'timer has been stopped'];
+
+    if (!started && !stopped) {
+        if (startKw.some(k => combined.includes(k))) started = true;
+        if (stopKw.some(k => combined.includes(k)))  stopped = true;
+    }
+
+    if (msg.trim()) {
+        addMessage(msg, 'assistant', tools);
+    }
+    if (started) startPomodoro();
+    if (stopped)  stopPomodoro();
+}
+
+function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+});
+
+function clearChat() {
+    msgBox.innerHTML = '';
+    addMessage("New conversation started. How can I help you?", 'assistant');
+}
+
+// ============================================================
+// Mode chips
+// ============================================================
+async function triggerMode(modeName, chipEl) {
+    currentMode = modeName;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    if (chipEl) chipEl.classList.add('active');
+
+    // Focus mode: start the Pomodoro immediately — don't wait for the LLM
+    if (modeName === 'focus') {
+        startPomodoro();
+        addMessage('Focus mode activated! Starting your 25-minute Pomodoro timer. Stay focused — I\'ll notify you when it\'s time for a break! ⏱️', 'assistant');
+        return;
+    }
+
+    addMessage(`Start ${modeName} mode`, 'user');
+    showTyping();
+    try {
+        const res  = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Start ${modeName} mode`, mode: modeName })
+        });
+        const data = await res.json();
+        removeTyping();
+        applyPomoSignals(data.response, data.tools, `Start ${modeName} mode`);
+    } catch {
+        removeTyping();
+        addMessage(`Could not activate ${modeName} mode.`, 'assistant');
+    }
+}
+
+// ============================================================
+// POMODORO TIMER
+// ============================================================
+const POMO_WORK_MINS  = 25;
+const POMO_SHORT_MINS = 5;
+const POMO_LONG_MINS  = 15;
+
+let pomoInterval  = null;
+let pomoSeconds   = 0;
+let pomoIsWork    = true;
+let pomoSession   = 0;   // 0-3 completed sessions
+let pomoPaused    = false;
+
+function startPomodoro() {
+    stopPomodoro(true); // clear any existing without notification
+    pomoIsWork   = true;
+    pomoSession  = 0;
+    pomoPaused   = false;
+    pomoSeconds  = POMO_WORK_MINS * 60;
+
+    updatePomoDisplay();
+    document.getElementById('pomodoroBanner').classList.add('visible');
+    document.getElementById('pomoPauseBtn').textContent = '⏸ Pause';
+
+    pomoInterval = setInterval(pomoTick, 1000);
+
+    // Request browser notification permission
+    if (Notification && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function pomoTick() {
+    if (pomoPaused) return;
+    pomoSeconds--;
+    updatePomoDisplay();
+    if (pomoSeconds <= 0) {
+        clearInterval(pomoInterval);
+        pomoSessionEnd();
+    }
+}
+
+function pomoSessionEnd() {
+    if (pomoIsWork) {
+        pomoSession++;
+        updatePomoSessionDots();
+        const isLong = (pomoSession % 4 === 0);
+        showPomoNotification(
+            '🎉',
+            'Work Session Done!',
+            isLong
+                ? `Excellent! ${pomoSession} sessions complete. Time for a long break (${POMO_LONG_MINS} min)!`
+                : `Great focus! Time for a short break (${POMO_SHORT_MINS} min).`,
+            isLong ? `Start Long Break ☕` : `Start Break ☕`
+        );
+        // Browser notification
+        if (Notification && Notification.permission === 'granted') {
+            new Notification('Hachi — Pomodoro', { body: isLong ? 'Work session done! Take a long break.' : 'Work session done! Take a 5-min break.' });
+        }
+    } else {
+        showPomoNotification(
+            '🍅',
+            'Break Over!',
+            'Ready to get back to work? Start your next focus session.',
+            'Start Focus 🍅'
+        );
+        if (Notification && Notification.permission === 'granted') {
+            new Notification('Hachi — Pomodoro', { body: 'Break over! Time to focus.' });
+        }
+    }
+}
+
+function showPomoNotification(icon, title, msg, btnLabel) {
+    document.getElementById('pomoNotifyIcon').textContent = icon;
+    document.getElementById('pomoNotifyTitle').textContent = title;
+    document.getElementById('pomoNotifyMsg').textContent   = msg;
+    document.getElementById('pomoNotifyAction').textContent = btnLabel;
+    document.getElementById('pomoNotify').classList.add('show');
+}
+
+function pomoNextAction() {
+    document.getElementById('pomoNotify').classList.remove('show');
+    pomoIsWork = !pomoIsWork;
+
+    if (pomoIsWork) {
+        pomoSeconds = POMO_WORK_MINS * 60;
+        document.getElementById('pomoLabel').textContent = 'Work Session';
+        document.getElementById('pomoIcon').textContent  = '🍅';
+        document.getElementById('pomoTimer').className   = 'pomo-timer';
+    } else {
+        const isLong = (pomoSession % 4 === 0);
+        pomoSeconds = (isLong ? POMO_LONG_MINS : POMO_SHORT_MINS) * 60;
+        document.getElementById('pomoLabel').textContent = isLong ? 'Long Break' : 'Short Break';
+        document.getElementById('pomoIcon').textContent  = '☕';
+        document.getElementById('pomoTimer').className   = 'pomo-timer break';
+    }
+
+    pomoPaused = false;
+    document.getElementById('pomoPauseBtn').textContent = '⏸ Pause';
+    updatePomoDisplay();
+    pomoInterval = setInterval(pomoTick, 1000);
+}
+
+function togglePomodoro() {
+    pomoPaused = !pomoPaused;
+    document.getElementById('pomoPauseBtn').textContent = pomoPaused ? '▶ Resume' : '⏸ Pause';
+}
+
+function stopPomodoro(silent) {
+    clearInterval(pomoInterval);
+    pomoInterval = null;
+    pomoSeconds  = 0;
+    pomoIsWork   = true;
+    pomoSession  = 0;
+    pomoPaused   = false;
+    document.getElementById('pomodoroBanner').classList.remove('visible');
+    document.getElementById('pomoNotify').classList.remove('show');
+    // Reset dots
+    ['pd1','pd2','pd3','pd4'].forEach(id => document.getElementById(id).classList.remove('done'));
+    if (!silent) {
+        addMessage('⏱️ Pomodoro session stopped.', 'assistant');
+        // Reset focus chip
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    }
+}
+
+function updatePomoDisplay() {
+    const mins = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
+    const secs = String(pomoSeconds % 60).padStart(2, '0');
+    document.getElementById('pomoTimer').textContent = `${mins}:${secs}`;
+}
+
+function updatePomoSessionDots() {
+    const dots = ['pd1','pd2','pd3','pd4'];
+    dots.forEach((id, i) => {
+        document.getElementById(id).classList.toggle('done', i < (pomoSession % 4 || 4));
+    });
+}
+
+// ============================================================
+// VOICE MODE — ChatGPT-style continuous conversation
+// ============================================================
+
+// Check if Web Speech API is available
+const HAS_WEB_SPEECH = ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition      = null;
+let voiceConvActive  = false;
+let voiceAborted     = false;
+let isSpeaking       = false;
+
+const synth = window.speechSynthesis;
+
+function setVoiceState(state, cap, sv) {
+    appEl.dataset.voice = state;
+    statusTxt.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+    caption.textContent   = cap;
+    sub.textContent       = sv || '';
+    voiceDot.className = 'dot ' + (state === 'listening' ? 'listening' : state === 'speaking' ? 'speaking' : '');
+}
+
+function openVoice() {
+    if (voiceActive) return;
+    voiceActive   = true;
+    voiceAborted  = false;
+    isSpeaking    = false;
+
+    overlay.classList.add('active');
+    micBtn.classList.add('active');
+
+    voiceSeconds = 0;
+    clearInterval(timerInterval);
+    timerEl.textContent = '00:00';
+    timerInterval = setInterval(() => {
+        voiceSeconds++;
+        timerEl.textContent =
+            String(Math.floor(voiceSeconds / 60)).padStart(2, '0') + ':' +
+            String(voiceSeconds % 60).padStart(2, '0');
+    }, 1000);
+
+    fetch('/api/voice_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: true })
+    }).catch(() => {});
+
+    transcriptEl.textContent = "Speak whenever you're ready…";
+    transcriptEl.className   = 'voice-transcript';
+
+    if (HAS_WEB_SPEECH) {
+        sttBadge.textContent = '🎤 Browser Speech · Streaming';
+        setVoiceState('listening', 'Listening…', 'Hachi is ready for your voice');
+        startVoiceConversation();
+    } else {
+        sttBadge.textContent = '🎙 Server-side STT (Fallback)';
+        setVoiceState('listening', 'Listening…', 'Using server-side speech recognition');
+        runServerVoiceLoop();
+    }
+}
+
+function closeVoice() {
+    voiceActive  = false;
+    voiceAborted = true;
+    isSpeaking   = false;
+
+    if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
+    if (synth.speaking) synth.cancel();
+
+    overlay.classList.remove('active');
+    micBtn.classList.remove('active');
+    clearInterval(timerInterval);
+    appEl.dataset.voice = 'idle';
+    transcriptEl.textContent = '';
+    transcriptEl.className   = 'voice-transcript';
+
+    fetch('/api/voice_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: false })
+    }).catch(() => {});
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    muteBtn.classList.toggle('muted', isMuted);
+    if (isMuted) {
+        setVoiceState('idle', 'Microphone muted', 'Tap mic icon to unmute');
+        transcriptEl.textContent = 'Muted';
+        if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
+        if (synth.speaking) synth.cancel();
+    } else {
+        setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
+        transcriptEl.textContent = "Unmuted — speak now…";
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// MAIN VOICE CONVERSATION LOOP (Clean single-mic instance per turn)
+// ──────────────────────────────────────────────────────────────────────────────
+
+async function startVoiceConversation() {
+    while (voiceActive && !voiceAborted) {
+        if (isMuted) { await sleep(400); continue; }
+
+        // ── 1. LISTEN PHASE ──────────────────────────────────────────────────
+        setVoiceState('listening', 'Listening…', 'Speak now…');
+        transcriptEl.textContent = 'Listening…';
+        transcriptEl.className   = 'voice-transcript';
+
+        const heard = await listenOneTurn();
+
+        if (!voiceActive || voiceAborted) break;
+        if (!heard || !heard.trim()) {
+            await sleep(200);
+            continue;
+        }
+
+        // ── 2. PROCESS + STREAM PHASE ────────────────────────────────────────
+        detectUserIntent(heard);
+        transcriptEl.textContent = `"${heard}"`;
+        transcriptEl.className   = 'voice-transcript heard';
+        addMessage(heard, 'user');
+        setVoiceState('thinking', 'Thinking…', 'Hachi is processing…');
+
+        await streamAndSpeakResponse(heard);
+
+        if (!voiceActive || voiceAborted) break;
+
+        setVoiceState('listening', 'Listening…', 'Your turn — speak now');
+        transcriptEl.textContent = 'Your turn…';
+        transcriptEl.className   = 'voice-transcript';
+        await sleep(300);
+    }
+}
+
+// ── Single listen turn using Web Speech API ──────────────────────────────────
+function listenOneTurn() {
+    return new Promise((resolve) => {
+        if (!HAS_WEB_SPEECH || !voiceActive || isMuted || voiceAborted) {
+            resolve('');
+            return;
+        }
+
+        // Stop any leftover instance
+        if (recognition) {
+            try { recognition.abort(); } catch(e) {}
+            recognition = null;
+        }
+
+        const rec = new SpeechRecognition();
+        recognition = rec;
+        rec.continuous      = false;
+        rec.interimResults  = true;
+        rec.maxAlternatives = 1;
+        rec.lang            = 'en-US';
+
+        let finalText   = '';
+        let interimText = '';
+        let settled     = false;
+
+        rec.onstart = () => {
+            transcriptEl.textContent = 'Listening…';
+            transcriptEl.className   = 'voice-transcript';
+        };
+
+        rec.onresult = (event) => {
+            interimText = '';
+            finalText   = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalText += event.results[i][0].transcript;
+                } else {
+                    interimText += event.results[i][0].transcript;
+                }
+            }
+            const display = finalText || interimText;
+            transcriptEl.textContent = display || 'Listening…';
+            transcriptEl.className   = display
+                ? (finalText ? 'voice-transcript heard' : 'voice-transcript interim')
+                : 'voice-transcript';
+        };
+
+        rec.onend = () => {
+            recognition = null;
+            if (!settled) {
+                settled = true;
+                resolve(finalText.trim() || interimText.trim());
+            }
+        };
+
+        rec.onerror = (event) => {
+            recognition = null;
+            if (!settled) {
+                settled = true;
+                console.warn('Speech error:', event.error);
+                if (event.error === 'not-allowed') {
+                    sub.textContent = 'Microphone permission denied — please allow mic access.';
+                }
+                resolve(finalText.trim() || interimText.trim());
+            }
+        };
+
         try {
-            const res  = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: `Start ${modeName} mode`, mode: modeName })
+            rec.start();
+        } catch(e) {
+            if (!settled) { settled = true; resolve(''); }
+        }
+    });
+}
+
+
+
+// ── Stream response + speak sentence-by-sentence with 0ms INSTANT interrupt ──
+let isInterrupting = false;
+let currentUtt      = null;
+let globalSentenceQueue = [];
+
+function cancelSpeechImmediately() {
+    isInterrupting = true;
+    globalSentenceQueue.length = 0; // Clear sentence queue immediately
+    if (currentUtt) {
+        try { currentUtt.volume = 0; } catch(_) {}
+    }
+    try { synth.pause(); } catch(_) {}
+    try { synth.cancel(); } catch(_) {}
+}
+
+async function streamAndSpeakResponse(userText) {
+    let tokenBuffer   = '';
+    let sentenceQueue = globalSentenceQueue;
+    sentenceQueue.length = 0;
+    let fullText      = '';
+    let toolsList     = [];
+    isInterrupting    = false;
+
+    // Start instant voice interruption listener during TTS
+    let interruptionText = '';
+    let interruptRec = null;
+
+    if (HAS_WEB_SPEECH && voiceActive && !isMuted) {
+        try {
+            const rec = new SpeechRecognition();
+            interruptRec = rec;
+            rec.continuous      = true;
+            rec.interimResults  = true;
+            rec.lang            = 'en-US';
+
+            rec.onresult = (event) => {
+                let txt = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    txt += event.results[i][0].transcript;
+                }
+                txt = txt.trim().toLowerCase();
+                // Instant 0ms stop if user speaks or says stop / quiet / shut up / pause
+                if (txt.length >= 2 || ['stop', 'quiet', 'shut up', 'pause', 'hachi stop', 'halt', 'silence'].some(k => txt.includes(k))) {
+                    interruptionText = txt;
+                    cancelSpeechImmediately();
+                }
+            };
+            rec.onerror = () => {};
+            rec.onend   = () => {};
+            try { rec.start(); } catch(_) {}
+        } catch(_) {}
+    }
+
+    // Fetch SSE stream
+    let reader;
+    try {
+        const res = await fetch('/api/stream_chat', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ message: userText, mode: currentMode })
+        });
+        reader = res.body.getReader();
+    } catch(e) {
+        if (interruptRec) { try { interruptRec.stop(); } catch(_) {} }
+        return '';
+    }
+
+    const decoder   = new TextDecoder();
+    let   sseBuffer = '';
+
+    // ── Sentence speaker task ─────────────────────────────────────────────────
+    let speakerDone = false;
+    async function drainSentenceQueue() {
+        while (!speakerDone || sentenceQueue.length > 0) {
+            if (!voiceActive || voiceAborted || isInterrupting) break;
+            if (sentenceQueue.length === 0) { await sleep(30); continue; }
+            const sentence = sentenceQueue.shift();
+            if (!sentence.trim()) continue;
+
+            setVoiceState('speaking', 'Speaking…', sentence.substring(0, 55));
+            transcriptEl.textContent = sentence.length > 100
+                ? sentence.substring(0, 100) + '…'
+                : sentence;
+            transcriptEl.className = 'voice-transcript';
+
+            await speakOneSentence(sentence);
+            if (isInterrupting) break;
+        }
+    }
+    const speakerTask = drainSentenceQueue();
+
+    // ── Read SSE tokens ───────────────────────────────────────────────────────
+    try {
+        while (voiceActive && !voiceAborted && !isInterrupting) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split('\n');
+            sseBuffer   = lines.pop() ?? '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+                try {
+                    const evt = JSON.parse(jsonStr);
+
+                    if (!evt.done && evt.token) {
+                        tokenBuffer += evt.token;
+                        const m = tokenBuffer.match(/^([\s\S]*?[.!?])\s/);
+                        if (m) {
+                            sentenceQueue.push(m[1].trim());
+                            tokenBuffer = tokenBuffer.slice(m[0].length);
+                        }
+                    }
+
+                    if (evt.done) {
+                        fullText  = evt.full  || fullText;
+                        toolsList = evt.tools || [];
+                        if (tokenBuffer.trim()) {
+                            sentenceQueue.push(tokenBuffer.trim());
+                            tokenBuffer = '';
+                        }
+                        break;
+                    }
+                } catch(_) {}
+            }
+        }
+    } catch(_) {
+    } finally {
+        try { reader.cancel(); } catch(_) {}
+        speakerDone = true;
+        if (interruptRec) { try { interruptRec.stop(); } catch(_) {} }
+    }
+
+    await speakerTask;
+
+    // Finalise chat bubble + Pomodoro signals
+    if (!voiceAborted && fullText && !isInterrupting) {
+        applyPomoSignals(fullText, toolsList, userText);
+    }
+}
+
+// ── Speak one sentence with female voice & Japanese Hachi pronunciation ─────
+function speakOneSentence(text) {
+    return new Promise((resolve) => {
+        if (!voiceActive || voiceAborted || isInterrupting || !text.trim()) {
+            resolve();
+            return;
+        }
+
+        // Japanese pronunciation fix: Hachi -> Hahtchee / Ha-tchee
+        let clean = text
+            .replace(/\bHachi\b/gi, 'Hahtchee')
+            .replace(/\bhachi\b/gi, 'hahtchee')
+            .replace(/<[^>]+>/g, '')
+            .replace(/[*#_~|>`]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!clean) { resolve(); return; }
+
+        const utt  = new SpeechSynthesisUtterance(clean);
+        currentUtt = utt;
+        utt.rate   = 1.05;
+        utt.pitch  = 1.15; // Natural female pitch setting
+        utt.volume = 1.0;
+
+        const voices    = synth.getVoices();
+        const preferred = voices.find(v =>
+            v.name.includes('Ava') ||
+            v.name.includes('Zira') ||
+            v.name.includes('Samantha') ||
+            v.name.includes('Jenny') ||
+            v.name.includes('Google US English') ||
+            (v.name.toLowerCase().includes('female'))
+        ) || voices.find(v => v.lang && v.lang.startsWith('en'));
+
+        if (preferred) utt.voice = preferred;
+
+        // Safety watchdog: max 6s per sentence
+        const maxMs = Math.max(1800, clean.length * 65);
+        let   guard = setTimeout(() => {
+            if (currentUtt === utt) currentUtt = null;
+            try { synth.cancel(); } catch(_) {}
+            resolve();
+        }, maxMs);
+
+        utt.onend = () => {
+            clearTimeout(guard);
+            if (currentUtt === utt) currentUtt = null;
+            resolve();
+        };
+        utt.onerror = () => {
+            clearTimeout(guard);
+            if (currentUtt === utt) currentUtt = null;
+            resolve();
+        };
+
+        try { synth.cancel(); } catch(_) {}
+        synth.speak(utt);
+    });
+}
+
+// ── Server-side fallback voice loop ─────────────────────────────────────────
+async function runServerVoiceLoop() {
+    while (voiceActive && !voiceAborted) {
+        if (isMuted) { await sleep(600); continue; }
+
+        setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
+        transcriptEl.textContent = 'Listening via server…';
+        transcriptEl.className   = 'voice-transcript';
+
+        let listenData = { user_text: '' };
+        try {
+            const res = await fetch('/api/voice_listen_only', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: currentMode })
             });
-            const data = await res.json();
-            removeTyping();
-            addMessage(data.response, 'assistant');
-        } catch {
-            removeTyping();
-            addMessage(`Could not activate ${modeName} mode.`, 'assistant');
+            listenData = await res.json();
+        } catch (err) {
+            if (!voiceActive || voiceAborted) break;
+            setVoiceState('idle', 'Connection error', 'Retrying in 2 s…');
+            await sleep(2000); continue;
         }
+
+        if (!voiceActive || voiceAborted) break;
+        if (!listenData.user_text) { await sleep(200); continue; }
+
+        addMessage(listenData.user_text, 'user');
+        transcriptEl.textContent = `"${listenData.user_text}"`;
+        transcriptEl.className   = 'voice-transcript heard';
+        setVoiceState('thinking', 'Thinking…', '');
+
+        // Use the streaming pipeline (same as the Web Speech path)
+        await streamAndSpeakResponse(listenData.user_text);
+
+        if (!voiceActive || voiceAborted) break;
+        setVoiceState('listening', 'Listening…', 'Your turn — speak now');
+        await sleep(300);
     }
+}
 
-    // ── Voice overlay ─────────────────────────────────────────────────────
+// ============================================================
+// Wake-word polling
+// ============================================================
+function showWakeToast() {
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
 
-    function openVoice() {
-        if (voiceActive) return;
-        voiceActive = true;
-        abortCtrl   = new AbortController();
-        overlay.classList.add('active');
-        micBtn.classList.add('active');
+async function pollWakeword() {
+    try {
+        const res  = await fetch('/api/wakeword_status');
+        const data = await res.json();
+        if (data.detected && !voiceActive) { showWakeToast(); openVoice(); }
+    } catch { /* server not ready yet */ }
+}
 
-        seconds = 0;
-        clearInterval(timerInterval);
-        timerEl.textContent = '00:00';
-        timerInterval = setInterval(() => {
-            seconds++;
-            timerEl.textContent =
-                String(Math.floor(seconds / 60)).padStart(2, '0') + ':' +
-                String(seconds % 60).padStart(2, '0');
-        }, 1000);
+wakewordPoll = setInterval(pollWakeword, 600);
 
-        // Pause wakeword listener on backend
-        fetch('/api/voice_mode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ active: true })
-        }).catch(() => {});
-
-        runVoiceLoop();
-    }
-
-    function closeVoice() {
-        voiceActive = false;
-        if (abortCtrl) abortCtrl.abort();
-        overlay.classList.remove('active');
-        micBtn.classList.remove('active');
-        clearInterval(timerInterval);
-        appEl.dataset.voice = 'idle';
-
-        // Resume wakeword listener on backend
-        fetch('/api/voice_mode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ active: false })
-        }).catch(() => {});
-    }
-
-    function toggleMute() {
-        isMuted = !isMuted;
-        muteBtn.classList.toggle('muted', isMuted);
-        if (isMuted) {
-            setVoiceState('idle', 'Microphone muted', 'Tap mic icon to unmute');
-        }
-        // The voice loop will naturally retry on next iteration
-    }
-
-    async function runVoiceLoop() {
-        while (voiceActive) {
-            // Skip a turn if muted
-            if (isMuted) { await sleep(600); continue; }
-
-            // ── Step 1: STT (Listen) ───────────────────────────────────
-            setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
-
-            let listenData = { user_text: '' };
-            try {
-                const res = await fetch('/api/voice_listen_only', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: currentMode }),
-                    signal: abortCtrl.signal
-                });
-                listenData = await res.json();
-            } catch (err) {
-                if (!voiceActive || err.name === 'AbortError') break;
-                setVoiceState('idle', 'Connection error', 'Retrying in 2 s…');
-                await sleep(2000);
-                continue;
-            }
-
-            if (!voiceActive) break;
-            if (!listenData.user_text) {
-                // Nothing heard — retry immediately
-                await sleep(200);
-                continue;
-            }
-
-            // ── Step 2: LLM + TTS (Process + Speak) ───────────────────
-            addMessage(listenData.user_text, 'user');
-            setVoiceState('thinking', 'Thinking…', `"${listenData.user_text}"`);
-
-            let chatData = { response: '' };
-            try {
-                const res = await fetch('/api/voice_chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    // voice_chat blocks until Ollama + TTS both finish on server
-                    body: JSON.stringify({ user_text: listenData.user_text, mode: currentMode }),
-                    signal: abortCtrl.signal
-                });
-                chatData = await res.json();
-            } catch (err) {
-                if (!voiceActive || err.name === 'AbortError') break;
-                setVoiceState('idle', 'Error processing', 'Retrying in 2 s…');
-                await sleep(2000);
-                continue;
-            }
-
-            if (!voiceActive) break;
-
-            // TTS has already finished playing by the time we reach here
-            if (chatData.response) {
-                addMessage(chatData.response, 'assistant');
-                setVoiceState('speaking', chatData.response.substring(0, 50) + (chatData.response.length > 50 ? '…' : ''), 'Hachi finished speaking');
-                await sleep(800);   // brief pause before next listen turn
-            }
-        }
-    }
-
-    // ── Wake-word polling ──────────────────────────────────────────────────
-
-    function showWakeToast() {
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 2500);
-    }
-
-    async function pollWakeword() {
-        try {
-            const res  = await fetch('/api/wakeword_status');
-            const data = await res.json();
-            if (data.detected && !voiceActive) {
-                showWakeToast();
-                openVoice();
-            }
-        } catch { /* server not ready yet */ }
-    }
-
-    // Poll every 600 ms
-    wakewordPoll = setInterval(pollWakeword, 600);
+// Preload TTS voices
+if (synth) { synth.onvoiceschanged = () => {}; synth.getVoices(); }
 </script>
 </body>
 </html>

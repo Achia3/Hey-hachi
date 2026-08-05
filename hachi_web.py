@@ -1,8 +1,9 @@
 import os
 import time
+import json
 import logging
 import threading
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from hachi_agent import process_agent_request
 from hachi_speech import speak, listen_voice_input
 
@@ -20,11 +21,12 @@ _wakeword_started = False
 def _wakeword_loop():
     """
     Background thread: continuously polls the mic for 'Hey Hachi'.
-    Automatically pauses when the voice overlay is open (_voice_mode_active).
+    Pauses when voice overlay is open (_voice_mode_active).
     Uses non-blocking mic acquire so it never fights the main listener.
     """
     from hachi_speech import listen_for_wakeword
     logging.info("Wakeword listener thread started.")
+    time.sleep(3.0)   # Brief delay on startup so Flask/PyWebView start 100% cleanly
     while True:
         try:
             if _voice_mode_active.is_set():
@@ -33,10 +35,11 @@ def _wakeword_loop():
             if listen_for_wakeword():
                 logging.info("Wake word 'Hachi' detected!")
                 _wakeword_detected.set()
-            time.sleep(0.3)   # short breath between poll cycles
+            time.sleep(0.8)   # Breath between poll cycles to keep PyAudio driver clear
         except Exception as e:
             logging.debug(f"Wakeword loop error: {e}")
-            time.sleep(1)
+            time.sleep(1.5)
+
 
 
 def start_wakeword_listener():
@@ -60,29 +63,73 @@ def index():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    """Text chat: LLM response with async TTS (does NOT block HTTP response)."""
+    """Text chat: LLM response with async TTS.
+    Pass voice_mode=true to skip server TTS (browser handles it).
+    """
     try:
         data = request.json or {}
-        user_msg = data.get("message", "").strip()
+        user_msg    = data.get("message", "").strip()
         current_mode = data.get("mode", "default")
+        voice_mode   = data.get("voice_mode", False)  # True = browser owns TTS
         if not user_msg:
             return jsonify({"response": "", "tools": []})
 
         agent_response, executed_tools = process_agent_request(user_msg, current_mode)
-        # Fire-and-forget TTS for text chat mode
-        threading.Thread(target=speak, args=(agent_response,), daemon=True).start()
+        # Skip server TTS when browser is handling speech (avoids double audio)
+        if not voice_mode:
+            threading.Thread(target=speak, args=(agent_response,), daemon=True).start()
         return jsonify({"response": agent_response, "tools": executed_tools})
     except Exception as e:
         logging.error(f"api_chat error: {e}")
         return jsonify({"response": "Something went wrong.", "tools": []}), 500
 
+@app.route("/api/stream_chat", methods=["POST"])
+def api_stream_chat():
+    """
+    SSE streaming endpoint for voice mode.
+    Streams LLM tokens as 'data: {json}\\n\\n' events.
+    No server-side TTS — browser handles speaking.
+    Frontend starts speaking the FIRST sentence while model is still generating.
+    """
+    data     = request.json or {}
+    user_msg = data.get("message", "").strip()
+    mode     = data.get("mode", "default")
 
-@app.route("/api/voice_listen_only", methods=["POST"])
+    if not user_msg:
+        return Response(
+            "data: " + json.dumps({"done": True, "full": "", "tools": []}) + "\n\n",
+            mimetype="text/event-stream"
+        )
+
+    def generate():
+        try:
+            from hachi_agent import process_agent_request_stream
+            for event in process_agent_request_stream(user_msg, mode):
+                yield "data: " + json.dumps(event) + "\n\n"
+        except GeneratorExit:
+            pass
+        except Exception as e:
+            logging.error(f"api_stream_chat error: {e}")
+            yield "data: " + json.dumps({"done": True, "full": "Stream error.", "tools": [], "error": True}) + "\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
+
+
 def api_voice_listen_only():
     """
-    Voice step 1: STT only.
-    Blocks until the user speaks (up to ~9 s) and returns recognized text.
+    Voice step 1: STT only (server-side fallback).
+    Blocks until the user speaks (up to ~12 s) and returns recognized text.
     Frontend shows 'Listening…' while this is pending.
+    NOTE: The primary voice path now uses browser Web Speech API.
+    This endpoint is kept as a reliable fallback.
     """
     try:
         user_text = listen_voice_input()
@@ -113,6 +160,25 @@ def api_voice_chat():
     except Exception as e:
         logging.error(f"voice_chat error: {e}")
         return jsonify({"response": "", "tools": [], "error": str(e)}), 500
+
+
+@app.route("/api/fetch_url", methods=["POST"])
+def api_fetch_url():
+    """
+    Directly fetch a URL and return extracted text content.
+    Allows the frontend to retrieve webpage content without going through the LLM.
+    """
+    try:
+        from hachi_tools import fetch_url
+        data = request.json or {}
+        url = data.get("url", "").strip()
+        if not url:
+            return jsonify({"content": "", "error": "No URL provided"}), 400
+        content = fetch_url(url)
+        return jsonify({"content": content})
+    except Exception as e:
+        logging.error(f"api_fetch_url error: {e}")
+        return jsonify({"content": "", "error": str(e)}), 500
 
 
 @app.route("/api/wakeword_status", methods=["GET"])

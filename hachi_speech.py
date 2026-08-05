@@ -46,9 +46,16 @@ TAGALOG_WORDS = {
 # ---------------------------------------------------------------------------
 
 def clean_speech_text(text: str) -> str:
-    """Strip markdown, think-blocks, and extra whitespace before TTS."""
+    """Strip markdown, think-blocks, code fences, and extra whitespace before TTS."""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    text = re.sub(r"[*#_`~|>]", "", text)
+    # Remove code fences
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"`[^`]+`", "", text)
+    # Remove markdown formatting chars
+    text = re.sub(r"[*#_~|>]", "", text)
+    # Remove leading list characters (-, *, 1.)
+    text = re.sub(r"^\s*[-*•]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -169,54 +176,63 @@ def listen_voice_input() -> str:
     """
     Listen to the microphone and return the recognized text (may be empty).
 
-    Uses _mic_lock with a BLOCKING acquire (timeout=8 s) so this function
+    Uses _mic_lock with a BLOCKING acquire (timeout=15 s) so this function
     properly waits if the wakeword listener is currently using the mic,
     rather than returning '' immediately.
     """
-    acquired = _mic_lock.acquire(timeout=8)
+    logging.info("listen_voice_input: attempting to acquire mic lock…")
+    acquired = _mic_lock.acquire(timeout=15)
     if not acquired:
-        logging.warning("Could not acquire mic within 8 s, skipping listen turn.")
+        logging.warning("listen_voice_input: Could NOT acquire mic lock within 15 s — mic is busy with wakeword listener.")
         return ""
 
+    logging.info("listen_voice_input: mic lock acquired.")
     try:
         r = sr.Recognizer()
         r.dynamic_energy_threshold = True
-        r.energy_threshold = 400
+        r.energy_threshold = 300        # More sensitive (was 400)
+        r.pause_threshold = 1.2         # Wait longer for user to finish speaking
+        r.non_speaking_duration = 0.6   # How long of silence before cutting off
 
         with sr.Microphone() as source:
-            logging.info("Adjusting for ambient noise (0.5 s)…")
-            r.adjust_for_ambient_noise(source, duration=0.5)
-            logging.info("Listening (timeout=8 s)…")
-            audio = r.listen(source, timeout=8, phrase_time_limit=12)
+            logging.info("listen_voice_input: adjusting for ambient noise (0.8 s)…")
+            r.adjust_for_ambient_noise(source, duration=0.8)
+            logging.info(f"listen_voice_input: energy threshold after calibration = {r.energy_threshold:.1f}. Listening (timeout=10 s)…")
+            try:
+                audio = r.listen(source, timeout=10, phrase_time_limit=15)
+                logging.info("listen_voice_input: audio captured, sending to STT…")
+            except sr.WaitTimeoutError:
+                logging.info("listen_voice_input: no speech detected within 10 s timeout.")
+                return ""
 
         # Try Tagalog/Filipino first, fall back to English
         for lang in ("fil-PH", "en-US"):
             try:
                 text = r.recognize_google(audio, language=lang)
                 if text:
-                    logging.info(f"Recognized ({lang}): {text}")
+                    logging.info(f"listen_voice_input: recognized ({lang}): '{text}'")
                     return text
             except sr.UnknownValueError:
-                pass
+                logging.info(f"listen_voice_input: speech not understood in {lang}.")
+            except sr.RequestError as e:
+                logging.error(f"listen_voice_input: Google STT request error ({lang}): {e}")
 
-        logging.info("Speech not understood in either language.")
+        logging.info("listen_voice_input: speech not understood in any language.")
         return ""
 
-    except sr.WaitTimeoutError:
-        logging.info("No speech detected within timeout.")
-        return ""
     except Exception as e:
-        logging.error(f"listen_voice_input error: {e}")
+        logging.error(f"listen_voice_input: unexpected error: {e}")
         return ""
     finally:
         _mic_lock.release()
+        logging.info("listen_voice_input: mic lock released.")
 
 
 def listen_for_wakeword() -> bool:
     """
-    Quick listen (~3 s) for the phrase 'Hey Hachi'.
-    Uses NON-BLOCKING mic acquire — returns False instantly if mic is busy,
-    so it never competes with listen_voice_input.
+    Quick non-blocking listen for 'Hey Hachi'.
+    Skips expensive ambient noise adjustment on every loop to keep PyAudio responsive
+    and prevent audio driver contention when opening voice mode.
     """
     acquired = _mic_lock.acquire(blocking=False)
     if not acquired:
@@ -224,18 +240,26 @@ def listen_for_wakeword() -> bool:
 
     try:
         r = sr.Recognizer()
-        r.dynamic_energy_threshold = True
-        r.energy_threshold = 500
+        r.energy_threshold = 350
+        r.pause_threshold = 0.5
 
         with sr.Microphone() as source:
-            r.adjust_for_ambient_noise(source, duration=0.3)
-            audio = r.listen(source, timeout=3, phrase_time_limit=2)
+            try:
+                audio = r.listen(source, timeout=1.2, phrase_time_limit=1.8)
+            except sr.WaitTimeoutError:
+                return False
+
+        # Check raw frame count / silence before calling network API
+        raw_data = audio.get_raw_data()
+        if not raw_data or len(raw_data) < 800:
+            return False
 
         text = r.recognize_google(audio, language="en-US").lower()
         logging.info(f"Wakeword check: '{text}'")
-        return "hachi" in text
+        return "hachi" in text or "hey hachi" in text
 
     except Exception:
         return False
     finally:
         _mic_lock.release()
+

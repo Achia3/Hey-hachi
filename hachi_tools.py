@@ -181,15 +181,19 @@ def launch_mode(mode_name: str):
     """
     Launch specified assistant mode.
     Modes: 'gaming', 'study', 'movie', 'focus'
+
+    Returns a string status message. For 'focus' mode, the message contains
+    the special token '__START_POMODORO__' so the frontend knows to trigger
+    the Pomodoro timer UI.
     """
     mode_clean = mode_name.lower().strip()
     status_msg = ""
     
     if "game" in mode_clean or "gaming" in mode_clean:
+        # Gaming Mode: Steam + Discord only. Spotify is NOT opened automatically.
         launch_app("steam", args=["-bigpicture"])
         launch_app("discord")
-        launch_app("spotify")
-        status_msg = "Gaming Mode activated. Launched Steam (Big Picture), Discord, and Spotify."
+        status_msg = "Gaming Mode activated. Launched Steam (Big Picture) and Discord. Ready to game!"
         
     elif "study" in mode_clean or "code" in mode_clean or "office" in mode_clean:
         launch_app("vscode")
@@ -203,8 +207,13 @@ def launch_mode(mode_name: str):
         status_msg = "Movie Mode activated. Opened YouTube and Netflix in browser."
         
     elif "focus" in mode_clean or "timer" in mode_clean:
-        launch_app("spotify")
-        status_msg = "Focus Mode activated. Launched Spotify. Your Pomodoro timer is now showing on screen."
+        # Focus Mode: NO apps are launched automatically — just start the Pomodoro timer.
+        # The special token triggers the frontend Pomodoro UI.
+        status_msg = (
+            "__START_POMODORO__ Focus Mode activated! "
+            "Starting a 25-minute Pomodoro work session. "
+            "Stay focused — I'll notify you when it's time for a break!"
+        )
     else:
         status_msg = f"Unknown mode '{mode_name}'."
         
@@ -222,7 +231,7 @@ def close_mode(mode_name: str):
             closed.append(app)
 
     if "game" in mode_clean or "gaming" in mode_clean:
-        for app in ["steam", "discord", "spotify"]:
+        for app in ["steam", "discord"]:
             _try_close(app)
         msg = f"Closed gaming apps: {', '.join(closed) if closed else 'No active gaming apps found.'}"
     elif "study" in mode_clean:
@@ -230,9 +239,7 @@ def close_mode(mode_name: str):
             _try_close(app)
         msg = f"Closed study apps: {', '.join(closed) if closed else 'No active study apps found.'}"
     elif "focus" in mode_clean:
-        for app in ["spotify"]:
-            _try_close(app)
-        msg = f"Closed focus mode apps: {', '.join(closed) if closed else 'No active focus apps found.'}"
+        msg = "Focus Mode stopped. __STOP_POMODORO__ Your Pomodoro session has ended."
     else:
         msg = f"Closed apps for {mode_name}."
 
@@ -272,31 +279,74 @@ def search_web(query: str):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        res = requests.get(url, headers=headers, timeout=6)
+        res = requests.get(url, headers=headers, timeout=8)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
-            snippets = []
-            for a in soup.find_all("a", class_="result__snippet"):
-                text = a.get_text(strip=True)
-                if text:
-                    snippets.append(text)
-                if len(snippets) >= 3:
-                    break
-            if snippets:
-                summary = f"Web results for '{query}': " + " ".join(snippets)
-                add_task(f"Web Search: {query}", "Success", summary[:250])
+            results = []
+            for item in soup.find_all("div", class_="result__body")[:5]:
+                title_el = item.find("a", class_="result__a")
+                snippet_el = item.find("a", class_="result__snippet")
+                title = title_el.get_text(strip=True) if title_el else ""
+                snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+                href = title_el.get("href", "") if title_el else ""
+                if title or snippet:
+                    results.append(f"• **{title}**: {snippet}" + (f" ({href})" if href else ""))
+            if results:
+                summary = f"**Web results for '{query}':**\n\n" + "\n".join(results)
+                add_task(f"Web Search: {query}", "Success", summary[:300])
                 return summary
     except Exception as e:
         logging.error(f"Web search error: {e}")
     return f"Searched web for '{query}', but could not retrieve live results right now."
 
-def get_system_stats():
-    """Get system CPU, RAM, and Battery status."""
+def fetch_url(url: str):
+    """
+    Fetch and extract readable text content from a specific URL.
+    Returns the main body text (first ~2000 chars) for the AI to summarize.
+    """
     try:
-        cpu = psutil.cpu_percent(interval=0.5)
-        ram = psutil.virtual_memory().percent
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code != 200:
+            return f"Could not fetch URL (HTTP {res.status_code}): {url}"
+
+        soup = BeautifulSoup(res.text, "html.parser")
+
+        # Remove script, style, nav, footer noise
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
+            tag.decompose()
+
+        # Try to get main content area
+        main = soup.find("article") or soup.find("main") or soup.find("div", {"id": "content"}) or soup.body
+        if main:
+            text = main.get_text(separator="\n", strip=True)
+        else:
+            text = soup.get_text(separator="\n", strip=True)
+
+        # Clean up excess whitespace
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        cleaned = "\n".join(lines)[:2500]
+
+        add_task(f"Fetch URL: {url[:60]}", "Success", f"Retrieved {len(cleaned)} chars")
+        return f"**Content from {url}:**\n\n{cleaned}"
+    except Exception as e:
+        logging.error(f"fetch_url error for {url}: {e}")
+        return f"Could not retrieve content from {url}: {e}"
+
+def get_system_stats():
+    """Get system CPU, RAM, and Battery status with accurate per-core CPU percentage."""
+    try:
+        # Per-core average calculation for 100% accurate Windows CPU readings
+        per_cpu = psutil.cpu_percent(interval=0.15, percpu=True)
+        cpu = round(sum(per_cpu) / len(per_cpu)) if per_cpu else round(psutil.cpu_percent(interval=0.15))
+        
+        ram = round(psutil.virtual_memory().percent)
         battery = psutil.sensors_battery()
-        bat_str = f"{battery.percent}%" if battery else "Desktop (No battery)"
+        bat_str = f"{round(battery.percent)}%" if battery else "Desktop (No battery)"
         stats = f"System Stats: CPU Usage: {cpu}%, RAM Usage: {ram}%, Battery: {bat_str}."
         add_task("System Check", "Success", stats)
         return stats
@@ -310,11 +360,30 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "launch_mode",
-            "description": "Launch desktop modes based on user intent (gaming, study, movie, focus)",
+            "description": (
+                "Launch a desktop mode based on user intent. "
+                "Call this tool whenever the user IMPLIES they want to game, study, watch something, or focus/concentrate — "
+                "even if they don't use the word 'mode'.\n"
+                "Mode triggers and examples:\n"
+                "  gaming: 'I wanna play', 'let's game', 'game time', 'i feel like playing', "
+                "'boot up steam', 'let me play some games', 'ayaw ko mag-aral gusto ko mag-laro', "
+                "'pag-laruin natin', 'start gaming', 'open steam', 'discord and steam'\n"
+                "  study: 'time to study', 'let me study', 'I need to focus on school', "
+                "'open vscode', 'mag-aral tayo', 'i need to do homework', 'study mode'\n"
+                "  movie: 'watch a movie', 'movie time', 'let's watch something', 'i want to chill and watch', "
+                "'movie night', 'manood tayo', 'stream something'\n"
+                "  focus: 'start a timer', 'pomodoro', 'I need to concentrate', 'deep work', "
+                "'25 minute timer', 'help me focus', 'focus mode', 'mag-focus tayo', 'work session'\n"
+                "ALWAYS call this tool when intent is clear. Do not ask for confirmation."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "mode_name": {"type": "string", "description": "Mode name to launch: gaming, study, movie, focus"}
+                    "mode_name": {
+                        "type": "string",
+                        "description": "Exactly one of: gaming, study, movie, focus",
+                        "enum": ["gaming", "study", "movie", "focus"]
+                    }
                 },
                 "required": ["mode_name"]
             }
@@ -324,11 +393,15 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "close_mode",
-            "description": "Close apps associated with a mode when user wants to stop or exit",
+            "description": (
+                "Close/stop a desktop mode and its apps when user wants to stop, exit, end, or quit a mode. "
+                "Examples: 'stop gaming', 'close game mode', 'done playing', 'exit study mode', "
+                "'stop the timer', 'end focus session'."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "mode_name": {"type": "string", "description": "Mode name to close e.g. gaming, study"}
+                    "mode_name": {"type": "string", "description": "Mode name to close e.g. gaming, study, focus"}
                 },
                 "required": ["mode_name"]
             }
@@ -376,13 +449,27 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "search_web",
-            "description": "Scrape or search the web for real-time information, news, or latest releases",
+            "description": "Search the web via DuckDuckGo for real-time information, news, latest releases, or any topic the user asks about",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Search query terms"}
                 },
                 "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_url",
+            "description": "Fetch and read the content of a specific webpage URL to get detailed information from that page",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The full URL to fetch and read (e.g. https://example.com/article)"}
+                },
+                "required": ["url"]
             }
         }
     },
@@ -428,6 +515,8 @@ def execute_tool_call(tool_name: str, arguments: dict):
         return get_weather(arguments.get("location", "Manila"))
     elif tool_name == "search_web":
         return search_web(arguments.get("query", ""))
+    elif tool_name == "fetch_url":
+        return fetch_url(arguments.get("url", ""))
     elif tool_name == "search_memory":
         return search_history(query=arguments.get("query"), date_str=arguments.get("date_str"))
     elif tool_name == "get_system_stats":
