@@ -4,8 +4,8 @@ import json
 import logging
 import threading
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
-from hachi_agent import process_agent_request
-from hachi_speech import speak, listen_voice_input
+from hachi_agent import process_agent_request, process_voice_request
+from hachi_speech import speak, speak_quick, listen_voice_input, interrupt_speech
 
 app = Flask(__name__)
 FLASK_PORT = 5000
@@ -123,13 +123,12 @@ def api_stream_chat():
     )
 
 
+@app.route("/api/voice_listen_only", methods=["POST"])
 def api_voice_listen_only():
     """
-    Voice step 1: STT only (server-side fallback).
-    Blocks until the user speaks (up to ~12 s) and returns recognized text.
+    Voice step 1 (server-side): STT only.
+    Blocks until the user speaks (pause_threshold=1.5 s, phrase_limit=45 s).
     Frontend shows 'Listening…' while this is pending.
-    NOTE: The primary voice path now uses browser Web Speech API.
-    This endpoint is kept as a reliable fallback.
     """
     try:
         user_text = listen_voice_input()
@@ -137,6 +136,43 @@ def api_voice_listen_only():
     except Exception as e:
         logging.error(f"voice_listen_only error: {e}")
         return jsonify({"user_text": "", "error": str(e)}), 500
+
+
+@app.route("/api/voice_request", methods=["POST"])
+def api_voice_request():
+    """
+    Voice step 2: DeepSeek understands intent → Qwen executes tools → edge-tts speaks.
+    Blocks until LLM response AND audio playback are both done, then returns.
+    Frontend shows 'Thinking…' while pending; TTS has already played on return.
+    """
+    try:
+        data         = request.json or {}
+        user_text    = data.get("user_text", "").strip()
+        current_mode = data.get("mode", "default")
+        if not user_text:
+            return jsonify({"response": "", "tools": []})
+
+        # ── Instant acknowledgment (offline SAPI, ~200 ms) ─────────────────
+        # User hears Hachi respond IMMEDIATELY while DeepSeek API is called.
+        speak_quick(user_text)
+
+        # ── DeepSeek intent → Qwen tools → edge-tts (2-5 s, runs after ack) ─
+        agent_response, executed_tools = process_voice_request(user_text, current_mode)
+        speak(agent_response)   # SYNCHRONOUS — blocks until TTS fully plays
+        return jsonify({"response": agent_response, "tools": executed_tools})
+    except Exception as e:
+        logging.error(f"voice_request error: {e}")
+        return jsonify({"response": "", "tools": [], "error": str(e)}), 500
+
+
+@app.route("/api/interrupt_speech", methods=["POST"])
+def api_interrupt_speech():
+    """Immediately kill TTS playback (called by frontend stop button)."""
+    try:
+        interrupt_speech()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/voice_chat", methods=["POST"])

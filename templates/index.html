@@ -746,24 +746,108 @@ async function sendMessage() {
     inputEl.value = '';
     inputEl.style.height = 'auto';
     showTyping();
+
+    // Create the assistant message elements in the DOM immediately
+    const wrap = document.createElement('div');
+    wrap.className = 'msg assistant';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = 'Hachi · ' + timeNow();
+
+    wrap.appendChild(bubble);
+    wrap.appendChild(meta);
+    msgBox.appendChild(wrap);
+    msgBox.scrollTop = msgBox.scrollHeight;
+
+    let accumulatedText = '';
+    let toolsList = [];
+    let reader = null;
+
     try {
-        const res  = await fetch('/api/chat', {
+        const res = await fetch('/api/stream_chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text, mode: currentMode })
         });
-        const data = await res.json();
+
+        removeTyping(); // Clear global loader indicator
+
+        reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split('\n');
+            sseBuffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+                try {
+                    const evt = JSON.parse(jsonStr);
+                    if (!evt.done && evt.token) {
+                        accumulatedText += evt.token;
+                        bubble.innerHTML = sanitizeHtml(marked.parse(accumulatedText));
+                        msgBox.scrollTop = msgBox.scrollHeight;
+                    }
+                    if (evt.done) {
+                        accumulatedText = evt.full || accumulatedText;
+                        toolsList = evt.tools || [];
+                        
+                        // Render final formatted markdown
+                        bubble.innerHTML = sanitizeHtml(marked.parse(accumulatedText));
+                        
+                        // If tools were executed, append badges below the message
+                        if (toolsList.length > 0) {
+                            toolsList.forEach(t => {
+                                const badge = document.createElement('span');
+                                badge.className = 'tool-badge';
+                                const toolLabels = {
+                                    launch_mode: '⚡ Mode launched',
+                                    close_mode: '⛔ Mode closed',
+                                    close_app: '❌ App closed',
+                                    get_weather: '🌤 Weather fetched',
+                                    search_web: '🔍 Web searched',
+                                    fetch_url: '🌐 URL fetched',
+                                    get_system_stats: '💻 System check',
+                                    search_memory: '🧠 Memory searched',
+                                    shutdown_hachi: '🔴 Shutting down'
+                                };
+                                badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
+                                wrap.appendChild(badge);
+                            });
+                        }
+                        msgBox.scrollTop = msgBox.scrollHeight;
+                        break;
+                    }
+                } catch(e) {
+                    console.error("SSE parse error", e);
+                }
+            }
+        }
+
+        applyPomoSignals(accumulatedText, toolsList, text, true);
+
+    } catch (err) {
         removeTyping();
-        applyPomoSignals(data.response, data.tools, text);
-    } catch {
-        removeTyping();
-        addMessage('Connection error — is Hachi running?', 'assistant');
+        try { if (reader) reader.cancel(); } catch(_) {}
+        bubble.textContent = 'Connection error — is Hachi running?';
     }
 }
 
 // Shared helper: handle __START_POMODORO__ / __STOP_POMODORO__ in any response,
 // and detect timer/pomodoro keywords as fallback.
-function applyPomoSignals(response, tools, userText) {
+function applyPomoSignals(response, tools, userText, skipAddMessage) {
     if (!response && !userText) return;
     let msg = response || '';
     let started = false;
@@ -789,7 +873,7 @@ function applyPomoSignals(response, tools, userText) {
         if (stopKw.some(k => combined.includes(k)))  stopped = true;
     }
 
-    if (msg.trim()) {
+    if (msg.trim() && !skipAddMessage) {
         addMessage(msg, 'assistant', tools);
     }
     if (started) startPomodoro();
@@ -1031,15 +1115,13 @@ function openVoice() {
     transcriptEl.textContent = "Speak whenever you're ready…";
     transcriptEl.className   = 'voice-transcript';
 
-    if (HAS_WEB_SPEECH) {
-        sttBadge.textContent = '🎤 Browser Speech · Streaming';
-        setVoiceState('listening', 'Listening…', 'Hachi is ready for your voice');
-        startVoiceConversation();
-    } else {
-        sttBadge.textContent = '🎙 Server-side STT (Fallback)';
-        setVoiceState('listening', 'Listening…', 'Using server-side speech recognition');
-        runServerVoiceLoop();
-    }
+    // Always use the server-side pipeline:
+    // Python Google STT (fil-PH → en-US) → DeepSeek intent → Qwen tools → edge-tts
+    sttBadge.textContent = '🎤 Hachi Voice · DeepSeek + Edge-TTS';
+    setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
+    // Pause wakeword polling while voice is open (avoids concurrent mic use)
+    if (wakewordPoll) { clearInterval(wakewordPoll); wakewordPoll = null; }
+    runServerVoiceLoop();
 }
 
 function closeVoice() {
@@ -1062,6 +1144,10 @@ function closeVoice() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: false })
     }).catch(() => {});
+    // Kill any in-progress server-side TTS immediately
+    fetch('/api/interrupt_speech', { method: 'POST' }).catch(() => {});
+    // Resume wakeword detection now that overlay is closed
+    if (!wakewordPoll) { wakewordPoll = setInterval(pollWakeword, 600); }
 }
 
 function toggleMute() {
@@ -1236,7 +1322,10 @@ async function streamAndSpeakResponse(userText) {
                 }
                 txt = txt.trim().toLowerCase();
                 // Instant 0ms stop if user speaks or says stop / quiet / shut up / pause
-                if (txt.length >= 2 || ['stop', 'quiet', 'shut up', 'pause', 'hachi stop', 'halt', 'silence'].some(k => txt.includes(k))) {
+                // Only stop on explicit stop-word phrases, NOT any 2-char noise
+                const STOP_WORDS = ['stop', 'quiet', 'shut up', 'pause', 'hachi stop',
+                                    'halt', 'silence', 'tama', 'tama na', 'tigil', 'hinto'];
+                if (STOP_WORDS.some(k => txt.includes(k))) {
                     interruptionText = txt;
                     cancelSpeechImmediately();
                 }
@@ -1399,41 +1488,62 @@ function speakOneSentence(text) {
     });
 }
 
-// ── Server-side fallback voice loop ─────────────────────────────────────────
 async function runServerVoiceLoop() {
     while (voiceActive && !voiceAborted) {
         if (isMuted) { await sleep(600); continue; }
 
-        setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
-        transcriptEl.textContent = 'Listening via server…';
+        // ── Phase 1: Listen (Python Google STT — fil-PH + en-US) ─────────────
+        setVoiceState('listening', 'Listening\u2026', "Speak whenever you're ready");
+        transcriptEl.textContent = 'Listening\u2026';
         transcriptEl.className   = 'voice-transcript';
 
         let listenData = { user_text: '' };
         try {
-            const res = await fetch('/api/voice_listen_only', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: currentMode })
+            const listenRes = await fetch('/api/voice_listen_only', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ mode: currentMode })
             });
-            listenData = await res.json();
+            listenData = await listenRes.json();
         } catch (err) {
             if (!voiceActive || voiceAborted) break;
-            setVoiceState('idle', 'Connection error', 'Retrying in 2 s…');
-            await sleep(2000); continue;
+            setVoiceState('idle', 'Connection error', 'Retrying in 2 s\u2026');
+            await sleep(2000);
+            continue;
         }
 
         if (!voiceActive || voiceAborted) break;
         if (!listenData.user_text) { await sleep(200); continue; }
 
+        // ── Phase 2: DeepSeek intent → Qwen tools → edge-tts (server-side) ──
         addMessage(listenData.user_text, 'user');
         transcriptEl.textContent = `"${listenData.user_text}"`;
         transcriptEl.className   = 'voice-transcript heard';
-        setVoiceState('thinking', 'Thinking…', '');
+        setVoiceState('thinking', 'Thinking\u2026', `"${listenData.user_text.substring(0,60)}"`);
 
-        // Use the streaming pipeline (same as the Web Speech path)
-        await streamAndSpeakResponse(listenData.user_text);
+        try {
+            // /api/voice_request blocks until LLM + TTS are both done server-side
+            const chatRes = await fetch('/api/voice_request', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ user_text: listenData.user_text, mode: currentMode })
+            });
+            const chatData = await chatRes.json();
+
+            if (chatData.response) {
+                addMessage(chatData.response, 'assistant', chatData.tools);
+                applyPomoSignals(chatData.response, chatData.tools || [], listenData.user_text);
+            }
+        } catch (err) {
+            if (!voiceActive || voiceAborted) break;
+            setVoiceState('idle', 'Error — retrying\u2026', '');
+            await sleep(1500);
+        }
 
         if (!voiceActive || voiceAborted) break;
-        setVoiceState('listening', 'Listening…', 'Your turn — speak now');
+        setVoiceState('listening', 'Listening\u2026', 'Your turn — speak now');
+        transcriptEl.textContent = 'Your turn\u2026';
+        transcriptEl.className   = 'voice-transcript';
         await sleep(300);
     }
 }

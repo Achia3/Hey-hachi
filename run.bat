@@ -76,7 +76,20 @@ goto :launch_hachi
 :ollama_ready
 echo [OK] Ollama engine is ready.
 
-:: ── Step 4: Launch Hachi ─────────────────────────────────────
+:: ── Step 4: Ensure Ollama Model is Ready ───────────────────────
+:ensure_model
+echo [*] Checking config.json for configured model...
+for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-Content config.json -ErrorAction SilentlyContinue | ConvertFrom-Json).model_name"') do set "MODEL_NAME=%%i"
+
+if "%MODEL_NAME%"=="" (
+    set "MODEL_NAME=qwen2.5:3b"
+)
+
+echo [*] Enforcing model: %MODEL_NAME% (pulling if missing)...
+:: Runs pull; if already downloaded it returns instantly
+"%OLLAMA_EXE%" pull %MODEL_NAME%
+
+:: ── Step 5: Launch Hachi ─────────────────────────────────────
 :launch_hachi
 echo.
 echo [*] Starting Hachi...

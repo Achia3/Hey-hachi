@@ -14,6 +14,25 @@ from hachi_db import search_history, add_task
 _log_path = os.path.join(os.path.dirname(__file__), "hachi.log")
 logging.basicConfig(filename=_log_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+# Background thread to monitor CPU usage continuously (0ms lookup delay, highly stable)
+_current_cpu_load = 0.0
+
+def _cpu_monitor_loop():
+    global _current_cpu_load
+    try:
+        # Prime the tracker
+        psutil.cpu_percent(interval=None)
+    except Exception:
+        pass
+    while True:
+        try:
+            # Average over a stable 1.0s window, identical to Task Manager's interval
+            _current_cpu_load = psutil.cpu_percent(interval=1.0)
+        except Exception:
+            time.sleep(1.0)
+
+threading.Thread(target=_cpu_monitor_loop, daemon=True).start()
+
 # App execution paths
 APP_PATHS = {
     "discord": [
@@ -172,7 +191,7 @@ def shutdown_hachi():
             subprocess.Popen(f'cmd.exe /c "{bat_path}"', shell=True)
         else:
             subprocess.Popen(['powershell', '-c', 'Get-Process -Name *ollama* -ErrorAction SilentlyContinue | Stop-Process -Force'], shell=False)
-            os._exit(0)
+        os._exit(0)
             
     threading.Thread(target=_kill_task, daemon=True).start()
     return "Shutting down Hachi and force stopping Ollama to free system RAM. Paalam!"
@@ -269,34 +288,27 @@ def get_weather(location: str = "Manila"):
     return f"Unable to fetch live weather for {location} right now."
 
 def search_web(query: str):
-    """Perform live web search via DuckDuckGo HTML scraping with BeautifulSoup."""
+    """Perform live web search via DuckDuckGo JSON API (duckduckgo_search)."""
     try:
-        from urllib.parse import quote
-        from bs4 import BeautifulSoup
-
-        safe_query = quote(query)
-        url = f"https://html.duckduckgo.com/html/?q={safe_query}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=8)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, "html.parser")
-            results = []
-            for item in soup.find_all("div", class_="result__body")[:5]:
-                title_el = item.find("a", class_="result__a")
-                snippet_el = item.find("a", class_="result__snippet")
-                title = title_el.get_text(strip=True) if title_el else ""
-                snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-                href = title_el.get("href", "") if title_el else ""
+        from ddgs import DDGS
+        
+        logging.info(f"[Search Engine] Performing query: '{query}'")
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=6):
+                title = r.get("title", "")
+                snippet = r.get("body", "")
+                href = r.get("href", "")
                 if title or snippet:
                     results.append(f"• **{title}**: {snippet}" + (f" ({href})" if href else ""))
-            if results:
-                summary = f"**Web results for '{query}':**\n\n" + "\n".join(results)
-                add_task(f"Web Search: {query}", "Success", summary[:300])
-                return summary
+                    
+        if results:
+            summary = f"**Live Web Search results for '{query}':**\n\n" + "\n".join(results)
+            add_task(f"Web Search: {query}", "Success", summary[:300])
+            return summary
     except Exception as e:
-        logging.error(f"Web search error: {e}")
+        logging.error(f"DuckDuckGo search_web API error: {e}")
+        
     return f"Searched web for '{query}', but could not retrieve live results right now."
 
 def fetch_url(url: str):
@@ -338,16 +350,17 @@ def fetch_url(url: str):
         return f"Could not retrieve content from {url}: {e}"
 
 def get_system_stats():
-    """Get system CPU, RAM, and Battery status with accurate per-core CPU percentage."""
+    """Get system date/time, CPU, RAM, and Battery status."""
     try:
-        # Per-core average calculation for 100% accurate Windows CPU readings
-        per_cpu = psutil.cpu_percent(interval=0.15, percpu=True)
-        cpu = round(sum(per_cpu) / len(per_cpu)) if per_cpu else round(psutil.cpu_percent(interval=0.15))
+        from datetime import datetime
+        now_str = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+        # Read the stable CPU load average computed continuously in the background
+        cpu = round(_current_cpu_load)
         
         ram = round(psutil.virtual_memory().percent)
         battery = psutil.sensors_battery()
         bat_str = f"{round(battery.percent)}%" if battery else "Desktop (No battery)"
-        stats = f"System Stats: CPU Usage: {cpu}%, RAM Usage: {ram}%, Battery: {bat_str}."
+        stats = f"System Stats: Clock Time: {now_str}, CPU Usage: {cpu}%, RAM Usage: {ram}%, Battery: {bat_str}."
         add_task("System Check", "Success", stats)
         return stats
     except Exception as e:
@@ -507,6 +520,8 @@ def execute_tool_call(tool_name: str, arguments: dict):
         return launch_mode(arguments.get("mode_name", "gaming"))
     elif tool_name == "close_mode":
         return close_mode(arguments.get("mode_name", "gaming"))
+    elif tool_name == "launch_app":
+        return launch_app(arguments.get("app_name", ""))
     elif tool_name == "close_app":
         return close_app(arguments.get("app_name", ""))
     elif tool_name == "shutdown_hachi":
