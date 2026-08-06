@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from datetime import datetime
+from typing import Optional
 from hachi_tools import AVAILABLE_TOOLS, execute_tool_call
 from hachi_db import add_message, search_history
 
@@ -222,7 +223,7 @@ def check_fast_intent(user_input: str) -> Optional[tuple[str, list]]:
         return res, [{"tool": "get_system_stats", "args": {}, "output": res}]
 
     # 5. Dynamic App Launching ("open [app]")
-    m_launch = re.match(r"^(?:open|launch|start)\s+([a-zA-Z0-9\s\.\-_]+)$", lower)
+    m_launch = re.match(r"(?:(?:can you|could you|please|pls|kindly)\s+)?(?:open|launch|start|run)\s+(.+?)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower)
     if m_launch:
         app_name = m_launch.group(1).strip()
         # ignore mode names
@@ -231,7 +232,7 @@ def check_fast_intent(user_input: str) -> Optional[tuple[str, list]]:
             return res, [{"tool": "launch_app", "args": {"app_name": app_name}, "output": res}]
 
     # 6. Dynamic App Closing ("close [app]" or "kill [app]")
-    m_close = re.match(r"^(?:close|kill|exit|stop)\s+([a-zA-Z0-9\s\.\-_]+)$", lower)
+    m_close = re.match(r"(?:(?:can you|could you|please|pls|kindly)\s+)?(?:close|kill|exit|quit)\s+(.+?)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower)
     if m_close:
         app_name = m_close.group(1).strip()
         if app_name not in ["gaming", "study", "movie", "focus", "timer", "pomodoro", "hachi"]:
@@ -239,6 +240,53 @@ def check_fast_intent(user_input: str) -> Optional[tuple[str, list]]:
             return res, [{"tool": "close_app", "args": {"app_name": app_name}, "output": res}]
 
     return None
+
+
+def classify_intent(user_input: str) -> str:
+    """
+    Classify user input into routing tiers (~1ms, pure keyword matching).
+    Returns: GREETING, SIMPLE_CHAT, TOOL_NEEDED, or COMPLEX
+    """
+    lower = user_input.lower().strip()
+    words = lower.split()
+    word_count = len(words)
+
+    # Tier: Greetings / pleasantries (short, casual)
+    GREETINGS = {
+        "hi", "hello", "hey", "hachi", "sup", "yo", "bye", "goodbye",
+        "good morning", "good night", "good evening", "good afternoon",
+        "thanks", "thank you", "salamat", "kumusta", "kamusta",
+        "how are you", "what's up", "whats up", "magandang",
+        "paalam", "ingat", "nice", "cool", "ok", "okay", "sure",
+        "haha", "lol", "hehe", "wow",
+    }
+    if word_count <= 6 and any(g in lower for g in GREETINGS):
+        return "GREETING"
+
+    # Tier: Tool-needing queries
+    TOOL_MARKERS = {
+        "weather", "temperature", "search", "google", "look up", "look-up",
+        "find", "what is", "who is", "when is", "where is", "news",
+        "cpu", "ram", "battery", "system", "stats",
+        "open", "launch", "close", "kill", "start", "run",
+        "fetch", "browse", "website", "url",
+    }
+    if any(m in lower for m in TOOL_MARKERS):
+        return "TOOL_NEEDED"
+
+    # Tier: Complex queries needing DeepSeek
+    COMPLEX_MARKERS = {
+        "explain", "compare", "analyze", "analyse", "write me", "create a",
+        "help me with", "how do i", "how can i", "step by step", "code",
+        "debug", "summarize", "research", "in detail", "elaborate",
+        "difference between", "pros and cons", "what are the",
+        "give me a", "list of", "teach me",
+    }
+    if any(m in lower for m in COMPLEX_MARKERS):
+        return "COMPLEX"
+
+    # Default: simple chat, Qwen handles it
+    return "SIMPLE_CHAT"
 
 
 def process_agent_request(user_input: str, current_mode: str = "default"):
@@ -263,7 +311,9 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
         if len(_session_history) > 20: _session_history = _session_history[-20:]
         return spoken, executed
 
-    logging.info(f"[Qwen Engine] Processing Request: '{user_input}' (Mode: {current_mode})")
+    # ── Intent Router: classify and route to appropriate engine ─────────────
+    intent = classify_intent(user_input)
+    logging.info(f"[Router] Intent={intent} for: '{user_input}' (Mode: {current_mode})")
     add_message("user", user_input, current_mode)
 
     history_slice = _session_history[-16:]
@@ -271,7 +321,64 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
     messages = [{"role": "system", "content": sys_content}] + history_slice + [{"role": "user", "content": user_input}]
     executed_tools_info = []
 
-    # ── PRIMARY ENGINE: DeepSeek API (Fastest when Online) ──────────────────
+    # ── GREETING / SIMPLE_CHAT: Qwen only, no tools, fast (~500ms) ──────────
+    if intent in ("GREETING", "SIMPLE_CHAT"):
+        try:
+            logging.info(f"[Qwen Fast] Simple chat/greeting — skipping DeepSeek")
+            fast_opts = {"num_predict": 150, "temperature": 0.8}
+            response = ollama.chat(model=MODEL_NAME, messages=messages, options=fast_opts)
+            final_text = clean_thinking(response.message.content or "")
+            _session_history.append({"role": "user", "content": user_input})
+            _session_history.append({"role": "assistant", "content": final_text})
+            if len(_session_history) > 20: _session_history = _session_history[-20:]
+            add_message("assistant", final_text, current_mode)
+            return final_text, []
+        except Exception as e:
+            logging.warning(f"[Qwen Fast] Error: {e}, falling through to standard path")
+
+    # ── TOOL_NEEDED: Qwen with tools first, DeepSeek fallback ───────────────
+    if intent == "TOOL_NEEDED":
+        try:
+            logging.info(f"[Qwen Tools] Tool-needing query — Qwen with tools")
+            response = ollama.chat(model=MODEL_NAME, messages=messages, tools=AVAILABLE_TOOLS)
+            msg = response.message
+            tool_calls = msg.tool_calls or []
+
+            if not tool_calls:
+                fb_fn, fb_args = detect_intent_tool_call(user_input)
+                if fb_fn: tool_calls = [{"function": {"name": fb_fn, "arguments": fb_args}}]
+
+            if tool_calls:
+                messages.append(msg if hasattr(msg, 'role') else {"role": "assistant", "content": getattr(msg, 'content', "") or ""})
+                for tc in tool_calls:
+                    if isinstance(tc, dict):
+                        fn = tc["function"]["name"]
+                        args = tc["function"]["arguments"]
+                    else:
+                        fn = tc.function.name
+                        args = tc.function.arguments or {}
+                        if isinstance(args, str):
+                            try: args = json.loads(args)
+                            except Exception: args = {}
+                    result = execute_tool_call(fn, args)
+                    executed_tools_info.append({"tool": fn, "args": args, "output": str(result)})
+                    messages.append({"role": "tool", "name": fn, "content": str(result)})
+
+                final_res = ollama.chat(model=MODEL_NAME, messages=messages)
+                final_text = clean_thinking(final_res.message.content or "")
+            else:
+                final_text = clean_thinking(msg.content or "")
+
+            _session_history.append({"role": "user", "content": user_input})
+            _session_history.append({"role": "assistant", "content": final_text})
+            if len(_session_history) > 20: _session_history = _session_history[-20:]
+            add_message("assistant", final_text, current_mode)
+            return final_text, executed_tools_info
+
+        except Exception as e:
+            logging.warning(f"[Qwen Tools] Error: {e}, falling through to DeepSeek")
+
+    # ── COMPLEX (or fallthrough): DeepSeek API Primary ──────────────────────
     if USE_DEEPSEEK and DEEPSEEK_API_KEY:
         try:
             logging.info(f"[DeepSeek Primary] Processing '{user_input}'...")
@@ -385,7 +492,9 @@ def process_agent_request_stream(user_input: str, current_mode: str = "default")
         yield {"done": True, "full": "", "tools": []}
         return
 
-    logging.info(f"[STREAM] Voice request: '{user_input}'")
+    # ── Intent Router for streaming ────────────────────────────────────────
+    intent = classify_intent(user_input)
+    logging.info(f"[STREAM] Intent={intent} for: '{user_input}'")
     add_message("user", user_input, current_mode)
 
     history_slice = _session_history[-10:]
@@ -393,34 +502,56 @@ def process_agent_request_stream(user_input: str, current_mode: str = "default")
     messages = [{"role": "system", "content": sys_content}] + history_slice + [{"role": "user", "content": user_input}]
     executed_tools_info = []
 
-    # ── Voice Stream Option 1: DeepSeek API Speed Pass ─────────────────────
+    # ── GREETING / SIMPLE_CHAT: Qwen stream only (skip DeepSeek) ───────────
+    if intent in ("GREETING", "SIMPLE_CHAT"):
+        try:
+            fast_opts = {"num_predict": 150, "temperature": 0.8}
+            accumulated = ""
+            for chunk in ollama.chat(model=MODEL_NAME, messages=messages, stream=True, options=fast_opts):
+                token = chunk.message.content or ""
+                if token:
+                    accumulated += token
+                    yield {"token": token, "done": False}
+            full_text = clean_thinking(accumulated)
+            _session_history.append({"role": "user", "content": user_input})
+            _session_history.append({"role": "assistant", "content": full_text})
+            if len(_session_history) > 16: _session_history = _session_history[-16:]
+            add_message("assistant", full_text, current_mode)
+            yield {"done": True, "full": full_text, "tools": []}
+            return
+        except Exception as e:
+            logging.warning(f"[STREAM] Qwen fast error: {e}, falling through")
+
+    # ── COMPLEX or TOOL_NEEDED: DeepSeek API Speed Pass ────────────────────
     if USE_DEEPSEEK and DEEPSEEK_API_KEY:
         try:
             logging.info("[STREAM] DeepSeek API Voice Stream...")
             headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
 
-            payload1 = {"model": DEEPSEEK_MODEL, "messages": messages, "tools": AVAILABLE_TOOLS, "temperature": 0.7}
-            r1 = requests.post(DEEPSEEK_URL, headers=headers, json=payload1, timeout=15)
-            r1.raise_for_status()
-            choice1 = r1.json()["choices"][0]["message"]
-            tool_calls = choice1.get("tool_calls", [])
+            tool_calls = []
+            if intent == "TOOL_NEEDED":
+                payload1 = {"model": DEEPSEEK_MODEL, "messages": messages, "tools": AVAILABLE_TOOLS, "temperature": 0.7}
+                r1 = requests.post(DEEPSEEK_URL, headers=headers, json=payload1, timeout=15)
+                r1.raise_for_status()
+                choice1 = r1.json()["choices"][0]["message"]
+                tool_calls = choice1.get("tool_calls", [])
 
-            if not tool_calls:
-                fb_fn, fb_args = detect_intent_tool_call(user_input)
-                if fb_fn:
-                    tool_calls = [{"id": f"call_fb_{int(time.time())}", "function": {"name": fb_fn, "arguments": json.dumps(fb_args)}}]
+                if not tool_calls:
+                    fb_fn, fb_args = detect_intent_tool_call(user_input)
+                    if fb_fn:
+                        tool_calls = [{"id": f"call_fb_{int(time.time())}", "function": {"name": fb_fn, "arguments": json.dumps(fb_args)}}]
 
-            if tool_calls:
-                if "tool_calls" not in choice1 or not choice1["tool_calls"]:
-                    choice1["tool_calls"] = tool_calls
-                messages.append(choice1)
-                for tc in tool_calls:
-                    fn = tc["function"]["name"]
-                    raw_args = tc["function"]["arguments"]
-                    args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
-                    result = execute_tool_call(fn, args)
-                    executed_tools_info.append({"tool": fn, "args": args, "output": str(result)})
-                    messages.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{int(time.time())}"), "name": fn, "content": str(result)})
+                if tool_calls:
+                    if "tool_calls" not in choice1 or not choice1["tool_calls"]:
+                        choice1["tool_calls"] = tool_calls
+                    messages.append(choice1)
+                    for tc in tool_calls:
+                        fn = tc["function"]["name"]
+                        raw_args = tc["function"]["arguments"]
+                        args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                        result = execute_tool_call(fn, args)
+                        executed_tools_info.append({"tool": fn, "args": args, "output": str(result)})
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{int(time.time())}"), "name": fn, "content": str(result)})
 
             payload2 = {"model": DEEPSEEK_MODEL, "messages": messages, "temperature": 0.7, "stream": True}
             s_res = requests.post(DEEPSEEK_URL, headers=headers, json=payload2, timeout=25, stream=True)
@@ -458,18 +589,20 @@ def process_agent_request_stream(user_input: str, current_mode: str = "default")
     fast_opts = {"num_predict": 250, "temperature": 0.75}  # Safe cap to prevent mid-sentence cutoff
     try:
         logging.info("[STREAM] Local Qwen Voice Stream...")
-        try:
-            resp1 = ollama.chat(model=MODEL_NAME, messages=messages, tools=AVAILABLE_TOOLS, options=fast_opts)
-        except Exception:
-            time.sleep(1)
-            resp1 = ollama.chat(model=MODEL_NAME, messages=messages, tools=AVAILABLE_TOOLS, options=fast_opts)
+        tool_calls = []
+        if intent == "TOOL_NEEDED":
+            try:
+                resp1 = ollama.chat(model=MODEL_NAME, messages=messages, tools=AVAILABLE_TOOLS, options=fast_opts)
+            except Exception:
+                time.sleep(1)
+                resp1 = ollama.chat(model=MODEL_NAME, messages=messages, tools=AVAILABLE_TOOLS, options=fast_opts)
 
-        msg1 = resp1.message
-        tool_calls = msg1.tool_calls or []
+            msg1 = resp1.message
+            tool_calls = msg1.tool_calls or []
 
-        if not tool_calls:
-            fb_fn, fb_args = detect_intent_tool_call(user_input)
-            if fb_fn: tool_calls = [{"function": {"name": fb_fn, "arguments": fb_args}}]
+            if not tool_calls:
+                fb_fn, fb_args = detect_intent_tool_call(user_input)
+                if fb_fn: tool_calls = [{"function": {"name": fb_fn, "arguments": fb_args}}]
 
         if tool_calls:
             messages.append(msg1 if hasattr(msg1, 'role') else {"role": "assistant", "content": getattr(msg1, 'content', "") or ""})
@@ -495,12 +628,13 @@ def process_agent_request_stream(user_input: str, current_mode: str = "default")
                     yield {"token": token, "done": False}
             full_text = clean_thinking(accumulated)
         else:
-            raw = msg1.content or ""
-            full_text = clean_thinking(raw)
-            words = full_text.split()
-            for i in range(0, len(words), 4):
-                chunk = " ".join(words[i : i + 4]) + " "
-                yield {"token": chunk, "done": False}
+            accumulated = ""
+            for chunk in ollama.chat(model=MODEL_NAME, messages=messages, stream=True, options=fast_opts):
+                token = chunk.message.content or ""
+                if token:
+                    accumulated += token
+                    yield {"token": token, "done": False}
+            full_text = clean_thinking(accumulated)
 
         _session_history.append({"role": "user", "content": user_input})
         _session_history.append({"role": "assistant", "content": full_text})
@@ -508,7 +642,6 @@ def process_agent_request_stream(user_input: str, current_mode: str = "default")
         add_message("assistant", full_text, current_mode)
 
         yield {"done": True, "full": full_text, "tools": executed_tools_info}
-
     except Exception as e:
         logging.error(f"[STREAM] Error: {e}")
         err = f"Sorry, I had a connection error."

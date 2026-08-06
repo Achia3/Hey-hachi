@@ -1,14 +1,34 @@
 import os
 import time
 import json
+import uuid
 import logging
 import threading
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
-from hachi_agent import process_agent_request, process_voice_request
-from hachi_speech import speak, speak_quick, listen_voice_input, interrupt_speech
+import tempfile
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
+from hachi_agent import process_agent_request
+from hachi_speech import speak, interrupt_speech, generate_tts_audio
 
 app = Flask(__name__)
 FLASK_PORT = 5000
+
+# ---------------------------------------------------------------------------
+# TTS audio cache for parallel voice pipeline
+# ---------------------------------------------------------------------------
+_tts_cache = {}          # {audio_id: {"path": str, "created": float}}
+_tts_cache_lock = threading.Lock()
+
+def _cleanup_tts_cache(max_age=60):
+    """Remove TTS audio files older than max_age seconds."""
+    now = time.time()
+    with _tts_cache_lock:
+        expired = [k for k, v in _tts_cache.items() if now - v["created"] > max_age]
+        for k in expired:
+            try:
+                os.remove(_tts_cache[k]["path"])
+            except OSError:
+                pass
+            del _tts_cache[k]
 
 # ---------------------------------------------------------------------------
 # Wakeword state
@@ -83,13 +103,13 @@ def api_chat():
         logging.error(f"api_chat error: {e}")
         return jsonify({"response": "Something went wrong.", "tools": []}), 500
 
+
 @app.route("/api/stream_chat", methods=["POST"])
 def api_stream_chat():
     """
-    SSE streaming endpoint for voice mode.
+    SSE streaming endpoint for text chat mode.
     Streams LLM tokens as 'data: {json}\\n\\n' events.
     No server-side TTS — browser handles speaking.
-    Frontend starts speaking the FIRST sentence while model is still generating.
     """
     data     = request.json or {}
     user_msg = data.get("message", "").strip()
@@ -123,46 +143,154 @@ def api_stream_chat():
     )
 
 
-@app.route("/api/voice_listen_only", methods=["POST"])
-def api_voice_listen_only():
+@app.route("/api/voice_stream", methods=["POST"])
+def api_voice_stream():
     """
-    Voice step 1 (server-side): STT only.
-    Blocks until the user speaks (pause_threshold=1.5 s, phrase_limit=45 s).
-    Frontend shows 'Listening…' while this is pending.
+    Parallel voice pipeline: streams LLM tokens + pre-generated TTS audio.
+    
+    SSE event types:
+      {"type":"token", "text":"..."} — individual LLM token for display
+      {"type":"audio", "id":"uuid", "sentence":"..."} — TTS audio ready to play
+      {"type":"done", "full":"...", "tools":[...]} — stream complete
+    
+    A background TTS worker runs in parallel with LLM generation.
     """
-    try:
-        user_text = listen_voice_input()
-        return jsonify({"user_text": user_text or ""})
-    except Exception as e:
-        logging.error(f"voice_listen_only error: {e}")
-        return jsonify({"user_text": "", "error": str(e)}), 500
+    data     = request.json or {}
+    user_msg = data.get("message", "").strip()
+    mode     = data.get("mode", "default")
+
+    if not user_msg:
+        return Response(
+            "data: " + json.dumps({"type": "done", "full": "", "tools": []}) + "\n\n",
+            mimetype="text/event-stream"
+        )
+
+    def generate():
+        _cleanup_tts_cache()
+
+        # Shared state between main thread and TTS worker
+        sentence_queue = []        # sentences waiting for TTS
+        audio_events = []          # completed audio events ready to send
+        tts_done = threading.Event()
+        llm_done = threading.Event()
+        queue_lock = threading.Lock()
+        audio_lock = threading.Lock()
+
+        def tts_worker():
+            """Background thread: picks sentences from queue, generates TTS audio."""
+            while True:
+                sentence = None
+                with queue_lock:
+                    if sentence_queue:
+                        sentence = sentence_queue.pop(0)
+
+                if sentence:
+                    audio_path = generate_tts_audio(sentence)
+                    if audio_path:
+                        audio_id = str(uuid.uuid4())[:8]
+                        with _tts_cache_lock:
+                            _tts_cache[audio_id] = {"path": audio_path, "created": time.time()}
+                        with audio_lock:
+                            audio_events.append({"type": "audio", "id": audio_id, "sentence": sentence})
+                elif llm_done.is_set():
+                    # No more sentences and LLM is done
+                    break
+                else:
+                    time.sleep(0.02)  # Brief sleep while waiting for sentences
+            tts_done.set()
+
+        # Start TTS worker thread
+        worker = threading.Thread(target=tts_worker, daemon=True)
+        worker.start()
+
+        try:
+            from hachi_agent import process_agent_request_stream
+
+            token_buffer = ""
+            full_text = ""
+            tools_list = []
+
+            for event in process_agent_request_stream(user_msg, mode):
+                # Yield token events immediately
+                if not event.get("done") and event.get("token"):
+                    token = event["token"]
+                    token_buffer += token
+                    yield "data: " + json.dumps({"type": "token", "text": token}) + "\n\n"
+
+                    # Eager sentence detection: match text ending with . ! ? or \n (no space needed)
+                    import re
+                    m = re.search(r'([^.!?\n]+[.!?\n])', token_buffer)
+                    if m:
+                        sentence = m.group(1).strip()
+                        # Avoid splitting short abbreviations like "Mr.", "U.S.", or decimals like "3.14"
+                        if len(sentence) > 3 and not (sentence[-1] == '.' and sentence[:-1].isdigit()):
+                            with queue_lock:
+                                sentence_queue.append(sentence)
+                            token_buffer = token_buffer[m.end():]
+
+                if event.get("done"):
+                    full_text = event.get("full", "")
+                    tools_list = event.get("tools", [])
+                    # Queue remaining buffer as final sentence
+                    if token_buffer.strip() and len(token_buffer.strip()) > 3:
+                        with queue_lock:
+                            sentence_queue.append(token_buffer.strip())
+                    break
+
+                # Flush any ready audio events immediately during token streaming
+                with audio_lock:
+                    for ae in audio_events:
+                        yield "data: " + json.dumps(ae) + "\n\n"
+                    audio_events.clear()
+
+            # Signal LLM is done
+            llm_done.set()
+
+            # Wait for TTS worker to finish remaining sentences, yielding audio events as they become ready
+            start_wait = time.time()
+            while not tts_done.is_set() and (time.time() - start_wait < 15):
+                with audio_lock:
+                    events_to_send = list(audio_events)
+                    audio_events.clear()
+                for ae in events_to_send:
+                    yield "data: " + json.dumps(ae) + "\n\n"
+                time.sleep(0.05)
+
+            # One final flush of any remaining audio events
+            with audio_lock:
+                events_to_send = list(audio_events)
+                audio_events.clear()
+            for ae in events_to_send:
+                yield "data: " + json.dumps(ae) + "\n\n"
+
+            yield "data: " + json.dumps({"type": "done", "full": full_text, "tools": tools_list}) + "\n\n"
+
+        except GeneratorExit:
+            llm_done.set()
+        except Exception as e:
+            llm_done.set()
+            logging.error(f"api_voice_stream error: {e}")
+            yield "data: " + json.dumps({"type": "done", "full": "Stream error.", "tools": [], "error": True}) + "\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 
-@app.route("/api/voice_request", methods=["POST"])
-def api_voice_request():
-    """
-    Voice step 2: DeepSeek understands intent → Qwen executes tools → edge-tts speaks.
-    Blocks until LLM response AND audio playback are both done, then returns.
-    Frontend shows 'Thinking…' while pending; TTS has already played on return.
-    """
-    try:
-        data         = request.json or {}
-        user_text    = data.get("user_text", "").strip()
-        current_mode = data.get("mode", "default")
-        if not user_text:
-            return jsonify({"response": "", "tools": []})
-
-        # ── Instant acknowledgment (offline SAPI, ~200 ms) ─────────────────
-        # User hears Hachi respond IMMEDIATELY while DeepSeek API is called.
-        speak_quick(user_text)
-
-        # ── DeepSeek intent → Qwen tools → edge-tts (2-5 s, runs after ack) ─
-        agent_response, executed_tools = process_voice_request(user_text, current_mode)
-        speak(agent_response)   # SYNCHRONOUS — blocks until TTS fully plays
-        return jsonify({"response": agent_response, "tools": executed_tools})
-    except Exception as e:
-        logging.error(f"voice_request error: {e}")
-        return jsonify({"response": "", "tools": [], "error": str(e)}), 500
+@app.route("/api/tts_audio/<audio_id>", methods=["GET"])
+def api_tts_audio(audio_id):
+    """Serve a pre-generated TTS audio file by ID."""
+    with _tts_cache_lock:
+        entry = _tts_cache.get(audio_id)
+    if not entry or not os.path.exists(entry["path"]):
+        return jsonify({"error": "Audio not found"}), 404
+    return send_file(entry["path"], mimetype="audio/mpeg")
 
 
 @app.route("/api/interrupt_speech", methods=["POST"])
@@ -173,29 +301,6 @@ def api_interrupt_speech():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@app.route("/api/voice_chat", methods=["POST"])
-def api_voice_chat():
-    """
-    Voice step 2: LLM + synchronous TTS.
-    Blocks until Ollama finishes AND audio playback finishes,
-    then returns. Frontend shows 'Thinking…' while this is pending,
-    and the voice already played by the time the response arrives.
-    """
-    try:
-        data = request.json or {}
-        user_text = data.get("user_text", "").strip()
-        current_mode = data.get("mode", "default")
-        if not user_text:
-            return jsonify({"response": "", "tools": []})
-
-        agent_response, executed_tools = process_agent_request(user_text, current_mode)
-        speak(agent_response)   # SYNCHRONOUS — blocks until audio done
-        return jsonify({"response": agent_response, "tools": executed_tools})
-    except Exception as e:
-        logging.error(f"voice_chat error: {e}")
-        return jsonify({"response": "", "tools": [], "error": str(e)}), 500
 
 
 @app.route("/api/fetch_url", methods=["POST"])

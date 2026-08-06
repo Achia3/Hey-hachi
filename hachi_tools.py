@@ -14,24 +14,7 @@ from hachi_db import search_history, add_task
 _log_path = os.path.join(os.path.dirname(__file__), "hachi.log")
 logging.basicConfig(filename=_log_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Background thread to monitor CPU usage continuously (0ms lookup delay, highly stable)
-_current_cpu_load = 0.0
 
-def _cpu_monitor_loop():
-    global _current_cpu_load
-    try:
-        # Prime the tracker
-        psutil.cpu_percent(interval=None)
-    except Exception:
-        pass
-    while True:
-        try:
-            # Average over a stable 1.0s window, identical to Task Manager's interval
-            _current_cpu_load = psutil.cpu_percent(interval=1.0)
-        except Exception:
-            time.sleep(1.0)
-
-threading.Thread(target=_cpu_monitor_loop, daemon=True).start()
 
 # App execution paths
 APP_PATHS = {
@@ -75,6 +58,31 @@ def get_app_path(app_name):
         if os.path.exists(path):
             return path
     return APP_PATHS[app_name][-1]
+
+def find_app_in_start_menu(app_name: str):
+    """Search Windows Start Menu shortcuts for any installed application."""
+    search_dirs = [
+        os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+        os.path.join(os.environ.get('PROGRAMDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    ]
+    app_lower = app_name.lower().strip()
+    best_match = None
+
+    for base_dir in search_dirs:
+        if not os.path.isdir(base_dir):
+            continue
+        for root, dirs, files in os.walk(base_dir):
+            for f in files:
+                if f.lower().endswith('.lnk'):
+                    name = f[:-4].lower()
+                    # Exact substring match
+                    if app_lower in name or name in app_lower:
+                        return os.path.join(root, f)
+                    # All words present (fuzzy)
+                    if all(w in name for w in app_lower.split()):
+                        best_match = os.path.join(root, f)
+
+    return best_match
 
 def launch_app(app_name, args=None):
     """Launch app process with protocol fallbacks for 100% reliability on any PC."""
@@ -121,6 +129,17 @@ def launch_app(app_name, args=None):
                 os.system("start discord:")
             return True
 
+        # Try Start Menu shortcut for unknown apps
+        shortcut = find_app_in_start_menu(app_clean)
+        if shortcut:
+            try:
+                os.startfile(shortcut)
+                logging.info(f"Launched via Start Menu: {shortcut}")
+                add_task(f"Launch App: {app_name}", "Success", f"Opened via Start Menu shortcut")
+                return True
+            except Exception:
+                pass
+
         app_path = get_app_path(app_name)
         cmd = [app_path]
         if args:
@@ -129,9 +148,19 @@ def launch_app(app_name, args=None):
         logging.info(f"Launched application: {app_name}")
         return True
     except Exception as e:
-        logging.error(f"Failed to launch {app_name}, trying system start fallback: {e}")
+        logging.error(f"Failed to launch {app_name} directly: {e}")
+        # Try Start Menu shortcut discovery
+        shortcut = find_app_in_start_menu(app_name)
+        if shortcut:
+            try:
+                os.startfile(shortcut)
+                logging.info(f"Launched via Start Menu shortcut: {shortcut}")
+                return True
+            except Exception:
+                pass
+        # Final fallback: Windows shell start
         try:
-            os.system(f'start {app_name}')
+            os.system(f'start "" "{app_name}"')
             return True
         except Exception:
             return False
@@ -354,8 +383,7 @@ def get_system_stats():
     try:
         from datetime import datetime
         now_str = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
-        # Read the stable CPU load average computed continuously in the background
-        cpu = round(_current_cpu_load)
+        cpu = round(psutil.cpu_percent(interval=0.5))
         
         ram = round(psutil.virtual_memory().percent)
         battery = psutil.sensors_battery()
@@ -429,6 +457,28 @@ AVAILABLE_TOOLS = [
                 "type": "object",
                 "properties": {
                     "app_name": {"type": "string", "description": "Name of application or process to close"}
+                },
+                "required": ["app_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "launch_app",
+            "description": (
+                "Open or launch ANY desktop application by name. "
+                "Use when the user wants to open a specific app that is NOT a mode. "
+                "Examples: chrome, notepad, league of legends, spotify, calculator, "
+                "file explorer, word, excel, paint, obs, vlc, telegram, whatsapp."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "app_name": {
+                        "type": "string",
+                        "description": "Name of the application to open"
+                    }
                 },
                 "required": ["app_name"]
             }

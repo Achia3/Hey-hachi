@@ -1065,7 +1065,7 @@ function updatePomoSessionDots() {
 }
 
 // ============================================================
-// VOICE MODE — ChatGPT-style continuous conversation
+// VOICE MODE — ChatGPT-style with parallel TTS pipeline
 // ============================================================
 
 // Check if Web Speech API is available
@@ -1075,9 +1075,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let recognition      = null;
 let voiceConvActive  = false;
 let voiceAborted     = false;
-let isSpeaking       = false;
-
-const synth = window.speechSynthesis;
+let currentAudio     = null;    // Currently playing <audio> element
 
 function setVoiceState(state, cap, sv) {
     appEl.dataset.voice = state;
@@ -1091,7 +1089,7 @@ function openVoice() {
     if (voiceActive) return;
     voiceActive   = true;
     voiceAborted  = false;
-    isSpeaking    = false;
+    currentAudio  = null;
 
     overlay.classList.add('active');
     micBtn.classList.add('active');
@@ -1115,22 +1113,22 @@ function openVoice() {
     transcriptEl.textContent = "Speak whenever you're ready…";
     transcriptEl.className   = 'voice-transcript';
 
-    // Always use the server-side pipeline:
-    // Python Google STT (fil-PH → en-US) → DeepSeek intent → Qwen tools → edge-tts
-    sttBadge.textContent = '🎤 Hachi Voice · DeepSeek + Edge-TTS';
+    // Use browser-driven voice with Edge TTS audio
+    sttBadge.textContent = '🎤 Browser STT · Edge-TTS Audio';
     setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
     // Pause wakeword polling while voice is open (avoids concurrent mic use)
     if (wakewordPoll) { clearInterval(wakewordPoll); wakewordPoll = null; }
-    runServerVoiceLoop();
+    startVoiceConversation();
 }
+
+let activeAudioResolve = null;
 
 function closeVoice() {
     voiceActive  = false;
     voiceAborted = true;
-    isSpeaking   = false;
 
     if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
-    if (synth.speaking) synth.cancel();
+    stopCurrentAudio();
 
     overlay.classList.remove('active');
     micBtn.classList.remove('active');
@@ -1144,10 +1142,20 @@ function closeVoice() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: false })
     }).catch(() => {});
-    // Kill any in-progress server-side TTS immediately
     fetch('/api/interrupt_speech', { method: 'POST' }).catch(() => {});
     // Resume wakeword detection now that overlay is closed
     if (!wakewordPoll) { wakewordPoll = setInterval(pollWakeword, 600); }
+}
+
+function stopCurrentAudio() {
+    if (currentAudio) {
+        try { currentAudio.pause(); currentAudio.currentTime = 0; } catch(_) {}
+        currentAudio = null;
+    }
+    if (activeAudioResolve) {
+        activeAudioResolve();
+        activeAudioResolve = null;
+    }
 }
 
 function toggleMute() {
@@ -1157,7 +1165,7 @@ function toggleMute() {
         setVoiceState('idle', 'Microphone muted', 'Tap mic icon to unmute');
         transcriptEl.textContent = 'Muted';
         if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
-        if (synth.speaking) synth.cancel();
+        stopCurrentAudio();
     } else {
         setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
         transcriptEl.textContent = "Unmuted — speak now…";
@@ -1165,7 +1173,7 @@ function toggleMute() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// MAIN VOICE CONVERSATION LOOP (Clean single-mic instance per turn)
+// MAIN VOICE CONVERSATION LOOP (Browser STT + Streaming LLM + Edge TTS Audio)
 // ──────────────────────────────────────────────────────────────────────────────
 
 async function startVoiceConversation() {
@@ -1185,7 +1193,7 @@ async function startVoiceConversation() {
             continue;
         }
 
-        // ── 2. PROCESS + STREAM PHASE ────────────────────────────────────────
+        // ── 2. PROCESS + STREAM + PARALLEL TTS PHASE ────────────────────────
         detectUserIntent(heard);
         transcriptEl.textContent = `"${heard}"`;
         transcriptEl.className   = 'voice-transcript heard';
@@ -1279,34 +1287,39 @@ function listenOneTurn() {
 }
 
 
-
-// ── Stream response + speak sentence-by-sentence with 0ms INSTANT interrupt ──
+// ── Stream response + play Edge TTS audio with instant barge-in ──────────────
 let isInterrupting = false;
-let currentUtt      = null;
-let globalSentenceQueue = [];
-
-function cancelSpeechImmediately() {
-    isInterrupting = true;
-    globalSentenceQueue.length = 0; // Clear sentence queue immediately
-    if (currentUtt) {
-        try { currentUtt.volume = 0; } catch(_) {}
-    }
-    try { synth.pause(); } catch(_) {}
-    try { synth.cancel(); } catch(_) {}
-}
 
 async function streamAndSpeakResponse(userText) {
-    let tokenBuffer   = '';
-    let sentenceQueue = globalSentenceQueue;
-    sentenceQueue.length = 0;
-    let fullText      = '';
-    let toolsList     = [];
-    isInterrupting    = false;
+    const audioQueue = [];        // pre-fetched Audio objects ready to play
+    let playerDone = false;
+    let isInterrupted = false;
+    isInterrupting = false;
 
-    // Start instant voice interruption listener during TTS
-    let interruptionText = '';
+    // ── Audio player task (runs in parallel) ──────────────────────────────
+    async function drainAudioQueue() {
+        while (!playerDone || audioQueue.length > 0) {
+            if (isInterrupted || !voiceActive || voiceAborted) break;
+            if (audioQueue.length === 0) { await sleep(30); continue; }
+
+            const item = audioQueue.shift();
+            setVoiceState('speaking', 'Speaking…', item.sentence.substring(0, 60));
+            transcriptEl.textContent = item.sentence.length > 100
+                ? item.sentence.substring(0, 100) + '…'
+                : item.sentence;
+            transcriptEl.className = 'voice-transcript';
+
+            await playAudio(item.audio);
+            if (audioQueue.length === 0 && !playerDone) {
+                setVoiceState('thinking', 'Thinking…', 'Synthesizing next sentence…');
+            }
+            if (isInterrupted) break;
+        }
+    }
+
+    // ── Barge-in interruption listener ─────────────────────────────────────
+    // If user says ANYTHING while Hachi is speaking → cancel all audio instantly
     let interruptRec = null;
-
     if (HAS_WEB_SPEECH && voiceActive && !isMuted) {
         try {
             const rec = new SpeechRecognition();
@@ -1320,63 +1333,56 @@ async function streamAndSpeakResponse(userText) {
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     txt += event.results[i][0].transcript;
                 }
-                txt = txt.trim().toLowerCase();
-                // Instant 0ms stop if user speaks or says stop / quiet / shut up / pause
-                // Only stop on explicit stop-word phrases, NOT any 2-char noise
-                const STOP_WORDS = ['stop', 'quiet', 'shut up', 'pause', 'hachi stop',
-                                    'halt', 'silence', 'tama', 'tama na', 'tigil', 'hinto'];
-                if (STOP_WORDS.some(k => txt.includes(k))) {
-                    interruptionText = txt;
-                    cancelSpeechImmediately();
+                txt = txt.trim();
+                // ANY speech during playback = instant interrupt (ChatGPT style)
+                if (txt.length > 1) {
+                    isInterrupted = true;
+                    isInterrupting = true;
+                    audioQueue.length = 0;
+                    stopCurrentAudio();
                 }
             };
             rec.onerror = () => {};
-            rec.onend   = () => {};
-            try { rec.start(); } catch(_) {}
+            rec.onend   = () => {
+                // Restart if we're still in speaking state and not interrupted
+                if (!isInterrupted && !playerDone && voiceActive && !voiceAborted) {
+                    try { rec.start(); } catch(_) {}
+                }
+            };
+            // 250ms delay to allow previous listener to fully release microphone
+            setTimeout(() => {
+                if (voiceActive && !isMuted && !playerDone && !isInterrupted && !voiceAborted) {
+                    try { rec.start(); } catch(_) {}
+                }
+            }, 250);
         } catch(_) {}
     }
 
-    // Fetch SSE stream
+    // ── Start audio player in parallel ────────────────────────────────────
+    const playerTask = drainAudioQueue();
+
+    // ── SSE reader (voice_stream endpoint) ────────────────────────────────
+    let fullText = '';
+    let toolsList = [];
     let reader;
+
     try {
-        const res = await fetch('/api/stream_chat', {
-            method:  'POST',
+        const res = await fetch('/api/voice_stream', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ message: userText, mode: currentMode })
+            body: JSON.stringify({ message: userText, mode: currentMode })
         });
         reader = res.body.getReader();
     } catch(e) {
         if (interruptRec) { try { interruptRec.stop(); } catch(_) {} }
-        return '';
+        return;
     }
 
     const decoder   = new TextDecoder();
     let   sseBuffer = '';
 
-    // ── Sentence speaker task ─────────────────────────────────────────────────
-    let speakerDone = false;
-    async function drainSentenceQueue() {
-        while (!speakerDone || sentenceQueue.length > 0) {
-            if (!voiceActive || voiceAborted || isInterrupting) break;
-            if (sentenceQueue.length === 0) { await sleep(30); continue; }
-            const sentence = sentenceQueue.shift();
-            if (!sentence.trim()) continue;
-
-            setVoiceState('speaking', 'Speaking…', sentence.substring(0, 55));
-            transcriptEl.textContent = sentence.length > 100
-                ? sentence.substring(0, 100) + '…'
-                : sentence;
-            transcriptEl.className = 'voice-transcript';
-
-            await speakOneSentence(sentence);
-            if (isInterrupting) break;
-        }
-    }
-    const speakerTask = drainSentenceQueue();
-
-    // ── Read SSE tokens ───────────────────────────────────────────────────────
     try {
-        while (voiceActive && !voiceAborted && !isInterrupting) {
+        while (voiceActive && !voiceAborted && !isInterrupted) {
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -1391,22 +1397,25 @@ async function streamAndSpeakResponse(userText) {
                 try {
                     const evt = JSON.parse(jsonStr);
 
-                    if (!evt.done && evt.token) {
-                        tokenBuffer += evt.token;
-                        const m = tokenBuffer.match(/^([\s\S]*?[.!?])\s/);
-                        if (m) {
-                            sentenceQueue.push(m[1].trim());
-                            tokenBuffer = tokenBuffer.slice(m[0].length);
+                    if (evt.type === 'token') {
+                        // Update thinking display
+                        if (!isInterrupted) {
+                            setVoiceState('thinking', 'Thinking…', evt.text);
                         }
                     }
 
-                    if (evt.done) {
-                        fullText  = evt.full  || fullText;
-                        toolsList = evt.tools || [];
-                        if (tokenBuffer.trim()) {
-                            sentenceQueue.push(tokenBuffer.trim());
-                            tokenBuffer = '';
+                    if (evt.type === 'audio') {
+                        // Pre-fetch the audio blob and queue it
+                        if (!isInterrupted) {
+                            const audio = new Audio(`/api/tts_audio/${evt.id}`);
+                            audio.preload = 'auto';
+                            audioQueue.push({ audio, sentence: evt.sentence || '' });
                         }
+                    }
+
+                    if (evt.type === 'done') {
+                        fullText  = evt.full  || '';
+                        toolsList = evt.tools || [];
                         break;
                     }
                 } catch(_) {}
@@ -1415,137 +1424,59 @@ async function streamAndSpeakResponse(userText) {
     } catch(_) {
     } finally {
         try { reader.cancel(); } catch(_) {}
-        speakerDone = true;
+        playerDone = true;
         if (interruptRec) { try { interruptRec.stop(); } catch(_) {} }
     }
 
-    await speakerTask;
+    await playerTask;
 
-    // Finalise chat bubble + Pomodoro signals
-    if (!voiceAborted && fullText && !isInterrupting) {
+    // Add assistant message to chat
+    if (!voiceAborted && fullText && !isInterrupted) {
+        addMessage(fullText, 'assistant', toolsList);
         applyPomoSignals(fullText, toolsList, userText);
     }
 }
 
-// ── Speak one sentence with female voice & Japanese Hachi pronunciation ─────
-function speakOneSentence(text) {
+// ── Play a single <audio> element ────────────────────────────────────────────
+function playAudio(audio) {
     return new Promise((resolve) => {
-        if (!voiceActive || voiceAborted || isInterrupting || !text.trim()) {
+        if (!voiceActive || voiceAborted || isInterrupting) {
             resolve();
             return;
         }
+        currentAudio = audio;
 
-        // Japanese pronunciation fix: Hachi -> Hahtchee / Ha-tchee
-        let clean = text
-            .replace(/\bHachi\b/gi, 'Hahtchee')
-            .replace(/\bhachi\b/gi, 'hahtchee')
-            .replace(/<[^>]+>/g, '')
-            .replace(/[*#_~|>`]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        if (!clean) { resolve(); return; }
-
-        const utt  = new SpeechSynthesisUtterance(clean);
-        currentUtt = utt;
-        utt.rate   = 1.05;
-        utt.pitch  = 1.15; // Natural female pitch setting
-        utt.volume = 1.0;
-
-        const voices    = synth.getVoices();
-        const preferred = voices.find(v =>
-            v.name.includes('Ava') ||
-            v.name.includes('Zira') ||
-            v.name.includes('Samantha') ||
-            v.name.includes('Jenny') ||
-            v.name.includes('Google US English') ||
-            (v.name.toLowerCase().includes('female'))
-        ) || voices.find(v => v.lang && v.lang.startsWith('en'));
-
-        if (preferred) utt.voice = preferred;
-
-        // Safety watchdog: max 6s per sentence
-        const maxMs = Math.max(1800, clean.length * 65);
-        let   guard = setTimeout(() => {
-            if (currentUtt === utt) currentUtt = null;
-            try { synth.cancel(); } catch(_) {}
-            resolve();
-        }, maxMs);
-
-        utt.onend = () => {
+        // Save the resolve function so it can be called externally to interrupt instantly
+        activeAudioResolve = () => {
             clearTimeout(guard);
-            if (currentUtt === utt) currentUtt = null;
-            resolve();
-        };
-        utt.onerror = () => {
-            clearTimeout(guard);
-            if (currentUtt === utt) currentUtt = null;
             resolve();
         };
 
-        try { synth.cancel(); } catch(_) {}
-        synth.speak(utt);
-    });
-}
-
-async function runServerVoiceLoop() {
-    while (voiceActive && !voiceAborted) {
-        if (isMuted) { await sleep(600); continue; }
-
-        // ── Phase 1: Listen (Python Google STT — fil-PH + en-US) ─────────────
-        setVoiceState('listening', 'Listening\u2026', "Speak whenever you're ready");
-        transcriptEl.textContent = 'Listening\u2026';
-        transcriptEl.className   = 'voice-transcript';
-
-        let listenData = { user_text: '' };
-        try {
-            const listenRes = await fetch('/api/voice_listen_only', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ mode: currentMode })
-            });
-            listenData = await listenRes.json();
-        } catch (err) {
-            if (!voiceActive || voiceAborted) break;
-            setVoiceState('idle', 'Connection error', 'Retrying in 2 s\u2026');
-            await sleep(2000);
-            continue;
-        }
-
-        if (!voiceActive || voiceAborted) break;
-        if (!listenData.user_text) { await sleep(200); continue; }
-
-        // ── Phase 2: DeepSeek intent → Qwen tools → edge-tts (server-side) ──
-        addMessage(listenData.user_text, 'user');
-        transcriptEl.textContent = `"${listenData.user_text}"`;
-        transcriptEl.className   = 'voice-transcript heard';
-        setVoiceState('thinking', 'Thinking\u2026', `"${listenData.user_text.substring(0,60)}"`);
-
-        try {
-            // /api/voice_request blocks until LLM + TTS are both done server-side
-            const chatRes = await fetch('/api/voice_request', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ user_text: listenData.user_text, mode: currentMode })
-            });
-            const chatData = await chatRes.json();
-
-            if (chatData.response) {
-                addMessage(chatData.response, 'assistant', chatData.tools);
-                applyPomoSignals(chatData.response, chatData.tools || [], listenData.user_text);
+        // Safety watchdog: max 15s per audio clip
+        const guard = setTimeout(() => {
+            if (currentAudio === audio) {
+                try { audio.pause(); } catch(_) {}
+                currentAudio = null;
             }
-        } catch (err) {
-            if (!voiceActive || voiceAborted) break;
-            setVoiceState('idle', 'Error — retrying\u2026', '');
-            await sleep(1500);
-        }
+            if (activeAudioResolve) activeAudioResolve();
+        }, 15000);
 
-        if (!voiceActive || voiceAborted) break;
-        setVoiceState('listening', 'Listening\u2026', 'Your turn — speak now');
-        transcriptEl.textContent = 'Your turn\u2026';
-        transcriptEl.className   = 'voice-transcript';
-        await sleep(300);
-    }
+        audio.onended = () => {
+            if (currentAudio === audio) currentAudio = null;
+            if (activeAudioResolve) activeAudioResolve();
+        };
+        audio.onerror = () => {
+            if (currentAudio === audio) currentAudio = null;
+            if (activeAudioResolve) activeAudioResolve();
+        };
+
+        audio.play().then(() => {
+            // Keep original event listeners
+        }).catch(() => {
+            if (currentAudio === audio) currentAudio = null;
+            if (activeAudioResolve) activeAudioResolve();
+        });
+    });
 }
 
 // ============================================================
@@ -1566,8 +1497,6 @@ async function pollWakeword() {
 
 wakewordPoll = setInterval(pollWakeword, 600);
 
-// Preload TTS voices
-if (synth) { synth.onvoiceschanged = () => {}; synth.getVoices(); }
 </script>
 </body>
 </html>

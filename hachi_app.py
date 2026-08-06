@@ -4,15 +4,25 @@ Hachi - Agentic AI Voice Assistant
 Desktop Application Launcher using PyWebView
 """
 import os
+# Disable autoplay restrictions for Edge WebView2 on Windows
+os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--autoplay-policy=no-user-gesture-required"
 import time
 import socket
 import logging
 import threading
 import webview
 
-# Configure logging ONCE here, before any other Hachi module is imported.
-# All sub-modules (hachi_web, hachi_agent, etc.) inherit this config.
+# Truncate log on startup to prevent unbounded growth (keep last 500 lines)
 _log_path = os.path.join(os.path.dirname(__file__), "hachi.log")
+try:
+    if os.path.exists(_log_path) and os.path.getsize(_log_path) > 500_000:
+        with open(_log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        with open(_log_path, "w", encoding="utf-8") as f:
+            f.writelines(lines[-500:])
+except Exception:
+    pass
+
 logging.basicConfig(
     filename=_log_path,
     level=logging.INFO,

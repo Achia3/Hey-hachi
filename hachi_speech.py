@@ -97,6 +97,39 @@ def clean_speech_text(text: str) -> str:
     return text.strip()
 
 
+def generate_tts_audio(text: str) -> Optional[str]:
+    """
+    Generate Edge TTS audio for text and return the temp file path.
+    Returns None if generation fails. Caller is responsible for cleanup.
+    Used by the /api/voice_stream endpoint for parallel TTS pipeline.
+    """
+    clean = clean_speech_text(text)
+    if not clean:
+        return None
+
+    if not HAS_EDGE_TTS:
+        return None
+
+    try:
+        voice = _pick_voice(clean)
+        tmp = os.path.join(
+            tempfile.gettempdir(),
+            f"hachi_tts_{os.getpid()}_{threading.get_ident()}_{int(time.time()*1000)}.mp3",
+        )
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_generate_edge_tts_file(clean, voice, tmp))
+        finally:
+            loop.close()
+
+        if os.path.exists(tmp) and os.path.getsize(tmp) > 500:
+            return tmp
+        return None
+    except Exception as e:
+        logging.warning(f"generate_tts_audio failed: {e}")
+        return None
+
+
 async def _generate_edge_tts_file(text: str, voice: str, out_path: str):
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(out_path)
@@ -132,10 +165,6 @@ def _play_mp3_interruptible(path: str):
             stderr=subprocess.DEVNULL,
         )
 
-    # Start stop-word listener in background (non-blocking mic acquire)
-    sw_thread = threading.Thread(target=_stop_word_listener, daemon=True)
-    sw_thread.start()
-
     try:
         _tts_proc.wait(timeout=40)
     except subprocess.TimeoutExpired:
@@ -146,56 +175,6 @@ def _play_mp3_interruptible(path: str):
     with _tts_proc_lock:
         _tts_proc = None
 
-
-def _stop_word_listener():
-    """
-    Background thread: listens for stop-words while TTS is playing.
-    Uses non-blocking mic acquire — gracefully skips if mic is busy.
-    """
-    acquired = _mic_lock.acquire(timeout=1.5)
-    if not acquired:
-        logging.debug("Stop-word listener: mic busy, skipping.")
-        return
-
-    try:
-        r = sr.Recognizer()
-        r.energy_threshold = 300
-        r.dynamic_energy_threshold = False
-        r.pause_threshold = 0.5
-
-        with sr.Microphone() as source:
-            r.adjust_for_ambient_noise(source, duration=0.2)
-
-            while True:
-                # Check if TTS is still running
-                with _tts_proc_lock:
-                    proc = _tts_proc
-                if proc is None or proc.poll() is not None:
-                    break  # TTS finished naturally
-
-                try:
-                    audio = r.listen(source, timeout=0.5, phrase_time_limit=2)
-                except sr.WaitTimeoutError:
-                    continue
-                except Exception:
-                    break
-
-                for lang in ("en-US", "fil-PH"):
-                    try:
-                        text = r.recognize_google(audio, language=lang).lower()
-                        logging.info(f"Stop-word check heard: '{text}'")
-                        if any(sw in text for sw in STOP_WORDS):
-                            interrupt_speech()
-                            return
-                        break
-                    except sr.UnknownValueError:
-                        continue
-                    except Exception:
-                        break
-    except Exception as e:
-        logging.debug(f"Stop-word listener error: {e}")
-    finally:
-        _mic_lock.release()
 
 
 def _speak_sapi(text: str):
@@ -216,10 +195,6 @@ def _speak_sapi(text: str):
         with _tts_proc_lock:
             global _tts_proc
             _tts_proc = proc
-
-        # Start stop-word listener
-        sw_thread = threading.Thread(target=_stop_word_listener, daemon=True)
-        sw_thread.start()
 
         proc.wait(timeout=35)
     except subprocess.TimeoutExpired:
