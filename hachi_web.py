@@ -488,27 +488,42 @@ def api_voice_mode():
     return jsonify({"ok": True})
 
 
+_mic_status_cache = None
+_mic_status_time = 0.0
+
 @app.route("/api/mic_status", methods=["GET"])
 def api_mic_status():
     """Report whether a microphone is detected and which one. Lets the user know
     if the program can see their mic (fixes 'it can't hear my mic' confusion)."""
+    global _mic_status_cache, _mic_status_time
+    now = time.time()
+    if _mic_status_cache is not None and (now - _mic_status_time) < 15.0:
+        return jsonify(_mic_status_cache)
+
     try:
-        import pyaudio
-        pa = pyaudio.PyAudio()
-        try:
-            mics = []
-            for i in range(pa.get_device_count()):
-                info = pa.get_device_info_by_index(i)
-                if info.get("maxInputChannels", 0) > 0:
-                    mics.append({
-                        "index": i,
-                        "name": info.get("name", f"Microphone {i}"),
-                        "channels": info.get("maxInputChannels", 0),
-                        "sample_rate": info.get("defaultSampleRate", 0),
-                    })
-            return jsonify({"ok": True, "mics": mics, "detected": len(mics) > 0})
-        finally:
-            pa.terminate()
+        from hachi_speech import pyaudio_c_lock
+        with pyaudio_c_lock:
+            import pyaudio
+            pa = pyaudio.PyAudio()
+            try:
+                mics = []
+                for i in range(pa.get_device_count()):
+                    try:
+                        info = pa.get_device_info_by_index(i)
+                        if info.get("maxInputChannels", 0) > 0:
+                            mics.append({
+                                "index": i,
+                                "name": info.get("name", f"Microphone {i}"),
+                                "channels": info.get("maxInputChannels", 0),
+                                "sample_rate": info.get("defaultSampleRate", 0),
+                            })
+                    except Exception:
+                        continue
+                _mic_status_cache = {"ok": True, "mics": mics, "detected": len(mics) > 0}
+                _mic_status_time = now
+                return jsonify(_mic_status_cache)
+            finally:
+                pa.terminate()
     except Exception as e:
         logging.warning(f"mic_status error: {e}")
         return jsonify({"ok": False, "mics": [], "detected": False, "error": str(e)})

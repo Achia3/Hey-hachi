@@ -38,6 +38,7 @@ if os.path.exists(_CONFIG_PATH):
 # ---------------------------------------------------------------------------
 _mic_lock    = threading.Lock()    # Exclusive microphone access
 speech_lock  = threading.Lock()    # Exclusive TTS playback
+pyaudio_c_lock = threading.Lock()  # Global PortAudio C-library lock (prevents concurrent init/terminate segfaults)
 
 # Set when the voice overlay is open (browser mic in use). The wakeword thread
 # checks this so it never fights the browser for the audio device.
@@ -231,27 +232,62 @@ def interrupt_speech():
 
 def speak_quick(user_text: str = ""):
     """
-    Instant offline acknowledgment via Windows SAPI (~200 ms, no internet needed).
-    Call this immediately after STT returns, BEFORE calling DeepSeek/tools,
-    so the user hears Hachi respond right away instead of waiting 2-4 seconds.
+    Fast acknowledgment using Edge TTS (same female voice as the main reply).
+    Falls back to Windows SAPI with an explicit female voice if Edge TTS is
+    unavailable or too slow.
 
     Detects whether user spoke Tagalog and picks a matching ack phrase.
     Uses speech_lock so it won't overlap with a concurrent speak() call.
     """
     # Don't block behind a long TTS reply — skip the ack if speech_lock is held
-    # (the "instant" ack should only steal a free moment, not queue up).
     if not speech_lock.acquire(timeout=0.3):
         return
     try:
         words = set(user_text.lower().split()) if user_text else set()
         is_tagalog = bool(words & TAGALOG_WORDS)
         phrase = random.choice(_ACKS_TL if is_tagalog else _ACKS_EN)
+        logging.info(f"speak_quick: '{phrase}'")
 
+        # ── Try Edge TTS (same female neural voice as speak()) ────────────
+        tmp = None
+        if HAS_EDGE_TTS:
+            try:
+                tmp = os.path.join(
+                    tempfile.gettempdir(),
+                    f"hachi_ack_{os.getpid()}_{int(time.time()*1000)}.mp3",
+                )
+                voice = _pick_voice(phrase)
+                loop = asyncio.new_event_loop()
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(_generate_edge_tts_file(phrase, voice, tmp), timeout=4)
+                    )
+                finally:
+                    loop.close()
+                if not (os.path.exists(tmp) and os.path.getsize(tmp) > 500):
+                    tmp = None
+            except Exception as e:
+                logging.debug(f"speak_quick edge-tts failed: {e}")
+                tmp = None
+
+        if tmp:
+            try:
+                _play_mp3_interruptible(tmp)
+            finally:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            return
+
+        # ── Fallback: SAPI with female voice ─────────────────────────────
         safe = phrase.replace("'", "''")
         ps = (
             f"Add-Type -AssemblyName System.speech; "
             f"$t = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-            f"$t.Rate = 2; "     # Slightly faster rate for brief ack
+            f"$f = $t.GetInstalledVoices() | Where-Object {{ $_.VoiceInfo.Gender -eq 'Female' }} | Select-Object -First 1; "
+            f"if ($f) {{ $t.SelectVoice($f.VoiceInfo.Name) }}; "
+            f"$t.Rate = 2; "
             f"$t.Speak('{safe}')"
         )
         try:
@@ -261,9 +297,8 @@ def speak_quick(user_text: str = ""):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            logging.info(f"speak_quick: '{phrase}'")
         except Exception as e:
-            logging.debug(f"speak_quick error: {e}")
+            logging.debug(f"speak_quick sapi error: {e}")
     finally:
         speech_lock.release()
 
@@ -341,8 +376,9 @@ def listen_voice_input() -> str:
         r.phrase_threshold        = 0.1
         r.dynamic_energy_threshold = False  # We manage threshold manually
 
-        with sr.Microphone() as source:
-            now = time.time()
+        with pyaudio_c_lock:
+            with sr.Microphone() as source:
+                now = time.time()
             if _noise_threshold < 100 or (now - _noise_calibrated_at) >= _RECALIBRATE_SECS:
                 logging.info("Calibrating ambient noise (0.5 s)…")
                 r.energy_threshold = 400
@@ -402,9 +438,10 @@ def listen_for_wakeword() -> bool:
         r.energy_threshold = 500
         r.pause_threshold  = 0.6
 
-        with sr.Microphone() as source:
-            r.adjust_for_ambient_noise(source, duration=0.15)
-            audio = r.listen(source, timeout=2, phrase_time_limit=2)
+        with pyaudio_c_lock:
+            with sr.Microphone() as source:
+                r.adjust_for_ambient_noise(source, duration=0.15)
+                audio = r.listen(source, timeout=2, phrase_time_limit=2)
 
         text = ""
         for lang in ("en-US", "fil-PH"):

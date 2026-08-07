@@ -4,8 +4,25 @@ Hachi - Agentic AI Voice Assistant
 Desktop Application Launcher using PyWebView
 """
 import os
-# Disable autoplay restrictions for Edge WebView2 on Windows
-os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--autoplay-policy=no-user-gesture-required"
+import sys
+# Force UTF-8 output so emoji / non-ASCII chars don't crash the Windows terminal
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+# Edge WebView2 browser flags:
+#  - no-user-gesture-required   → allow audio autoplay (TTS)
+#  - use-fake-ui-for-media-stream → auto-grant mic permission for localhost
+os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (
+    "--autoplay-policy=no-user-gesture-required "
+    "--use-fake-ui-for-media-stream"
+)
 import time
 import socket
 import logging
@@ -97,6 +114,9 @@ def main():
     logging.info("Flask is ready. Opening WebView window.")
 
     # Create and show native desktop window
+    # storage_path: persist Edge WebView2 profile (mic permission, cookies)
+    _storage = os.path.join(os.path.dirname(__file__), ".webview_profile")
+    os.makedirs(_storage, exist_ok=True)
     try:
         webview.create_window(
             title='Hachi — Agentic Voice Assistant',
@@ -107,7 +127,11 @@ def main():
             background_color='#0f172a',
             js_api=None
         )
-        webview.start(debug=False)
+        webview.start(
+            debug=False,
+            private_mode=False,     # allow Edge WebView2 to save mic permission
+            storage_path=_storage,  # persistent profile dir
+        )
     except Exception as e:
         logging.error(f"Error starting desktop window: {e}")
         print(f"❌ Desktop Window Error: {e}")
