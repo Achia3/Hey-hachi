@@ -25,7 +25,7 @@ A fully autonomous, voice-enabled **Agentic AI Desktop Assistant** built for loc
 
 - **Python 3.8+**
 - **Ollama** running locally (`http://localhost:11434`)
-- **Qwen Model** (configured with `qwen3.5:2b` in `config.json`)
+- **Qwen Model** (configured with `qwen2.5:3b` in `config.json`)
 - **Microphone & Speaker**
 - **Windows OS**
 
@@ -54,11 +54,26 @@ Edit `config.json` to change the Ollama model or TTS voices dynamically:
 
 ```json
 {
-  "model_name": "qwen3.5:2b",
+  "model_name": "qwen2.5:3b",
+  "use_deepseek": true,
+  "deepseek_model": "deepseek-chat",
   "tagalog_voice": "fil-PH-AngeloNeural",
   "english_voice": "en-US-AvaNeural"
 }
 ```
+
+### 🧠 Dual-Mode Engine Routing
+
+Hachi uses a **Qwen-first dual mode**: the local LLM (Qwen via Ollama) is the primary brain and handles every request. DeepSeek (cloud) escalates only when Qwen can't handle it.
+
+| Intent | Qwen (local) | DeepSeek (cloud) |
+|--------|--------------|------------------|
+| Greetings / simple chat | ✅ primary | — |
+| Tool commands (open/close apps, modes, system stats, weather) | ✅ primary with tools | escalate only if Qwen produces no tool call |
+| Knowledge tools (web search, URL fetch) | ✅ tried first | escalate for tool call + final synthesis |
+| Complex reasoning (explain/compare/code) | quick local-action pass | ✅ primary for the reasoning answer |
+
+The chat bubble shows which engine answered: **"Qwen · local"** or **"DeepSeek · cloud"**. Set `"use_deepseek": false` (or remove the API key from `.env`) to run Qwen-only, fully offline. Set `DEEPSEEK_API_KEY` in `.env` (never in `config.json`) to enable the cloud escalator.
 
 ---
 

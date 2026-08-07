@@ -112,6 +112,12 @@ def main():
         logging.error(f"Error starting desktop window: {e}")
         print(f"❌ Desktop Window Error: {e}")
         print(f"Falling back to running Flask web server on http://127.0.0.1:{FLASK_PORT}")
+        # Open the web UI in the default browser so the user isn't left staring at a dead terminal
+        try:
+            import webbrowser
+            webbrowser.open(f"http://127.0.0.1:{FLASK_PORT}")
+        except Exception as we:
+            logging.error(f"Could not open browser: {we}")
         # Keep process alive so the user can use the web interface
         flask_thread.join()
 

@@ -39,6 +39,10 @@ if os.path.exists(_CONFIG_PATH):
 _mic_lock    = threading.Lock()    # Exclusive microphone access
 speech_lock  = threading.Lock()    # Exclusive TTS playback
 
+# Set when the voice overlay is open (browser mic in use). The wakeword thread
+# checks this so it never fights the browser for the audio device.
+voice_mode_active = threading.Event()
+
 # Interruptible TTS process reference
 _tts_proc: Optional[subprocess.Popen] = None
 _tts_proc_lock = threading.Lock()
@@ -118,7 +122,8 @@ def generate_tts_audio(text: str) -> Optional[str]:
         )
         loop = asyncio.new_event_loop()
         try:
-            loop.run_until_complete(_generate_edge_tts_file(clean, voice, tmp))
+            # 10s timeout so a dropped network can't hang TTS forever
+            loop.run_until_complete(asyncio.wait_for(_generate_edge_tts_file(clean, voice, tmp), timeout=10))
         finally:
             loop.close()
 
@@ -153,7 +158,8 @@ def _play_mp3_interruptible(path: str):
         f"$m.URL = '{safe}'; "
         f"$m.controls.play(); "
         f"$i = 0; "
-        f"while ($m.playState -ne 1 -and $i -lt 300) "
+        f"$maxIter = if ($m.currentMedia.duration) {{ [Math]::Min(300, [Math]::Ceiling($m.currentMedia.duration * 10) + 10) }} else {{ 300 }}; "
+        f"while ($m.playState -ne 1 -and $m.playState -ne 8 -and $i -lt $maxIter) "
         f"{{ Start-Sleep -Milliseconds 100; $i++ }}; "
         f"$m.controls.stop()"
     )
@@ -232,7 +238,11 @@ def speak_quick(user_text: str = ""):
     Detects whether user spoke Tagalog and picks a matching ack phrase.
     Uses speech_lock so it won't overlap with a concurrent speak() call.
     """
-    with speech_lock:
+    # Don't block behind a long TTS reply — skip the ack if speech_lock is held
+    # (the "instant" ack should only steal a free moment, not queue up).
+    if not speech_lock.acquire(timeout=0.3):
+        return
+    try:
         words = set(user_text.lower().split()) if user_text else set()
         is_tagalog = bool(words & TAGALOG_WORDS)
         phrase = random.choice(_ACKS_TL if is_tagalog else _ACKS_EN)
@@ -254,46 +264,54 @@ def speak_quick(user_text: str = ""):
             logging.info(f"speak_quick: '{phrase}'")
         except Exception as e:
             logging.debug(f"speak_quick error: {e}")
+    finally:
+        speech_lock.release()
 
 
 def speak(text: str):
     """
     Synthesize speech and play it.
     BLOCKS until audio finishes (or is interrupted via interrupt_speech()).
+    Generation runs OUTSIDE speech_lock so a network delay never blocks other TTS.
     """
-    with speech_lock:
-        clean = clean_speech_text(text)
-        if not clean:
-            return
+    clean = clean_speech_text(text)
+    if not clean:
+        return
 
+    logging.info(f"TTS speaking: {clean[:80]}…")
 
-        logging.info(f"TTS speaking: {clean[:80]}…")
-
-        # Primary: edge-tts neural voices (requires internet)
-        if HAS_EDGE_TTS:
+    tmp = None
+    # Primary: edge-tts neural voices (requires internet) — generate outside the lock
+    if HAS_EDGE_TTS:
+        try:
+            tmp = os.path.join(
+                tempfile.gettempdir(),
+                f"hachi_{os.getpid()}_{threading.get_ident()}_{int(time.time()*1000)}.mp3",
+            )
+            voice = _pick_voice(clean)
+            loop = asyncio.new_event_loop()
             try:
-                tmp = os.path.join(
-                    tempfile.gettempdir(),
-                    f"hachi_{os.getpid()}_{threading.get_ident()}.mp3",
-                )
-                voice = _pick_voice(clean)
+                # 10s timeout so a dropped network can't hang TTS forever
+                loop.run_until_complete(asyncio.wait_for(_generate_edge_tts_file(clean, voice, tmp), timeout=10))
+            finally:
+                loop.close()
+            if not (os.path.exists(tmp) and os.path.getsize(tmp) > 500):
+                tmp = None
+        except Exception as e:
+            logging.warning(f"edge-tts failed ({e}), using SAPI fallback.")
+            tmp = None
 
-                loop = asyncio.new_event_loop()
+    # Playback is serialized — only one voice at a time
+    with speech_lock:
+        if tmp:
+            try:
+                _play_mp3_interruptible(tmp)
+            finally:
                 try:
-                    loop.run_until_complete(_generate_edge_tts_file(clean, voice, tmp))
-                finally:
-                    loop.close()
-
-                if os.path.exists(tmp) and os.path.getsize(tmp) > 500:
-                    _play_mp3_interruptible(tmp)
-                    try:
-                        os.remove(tmp)
-                    except OSError:
-                        pass
-                    return
-            except Exception as e:
-                logging.warning(f"edge-tts failed ({e}), using SAPI fallback.")
-
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            return
         # Fallback: Windows SAPI (offline)
         _speak_sapi(clean)
 
@@ -350,7 +368,7 @@ def listen_voice_input() -> str:
                 continue
             except sr.RequestError as re_err:
                 logging.error(f"Google STT request error ({lang}): {re_err}")
-                break
+                continue
 
         logging.info("Speech not understood in either language.")
         return ""
@@ -367,9 +385,13 @@ def listen_voice_input() -> str:
 
 def listen_for_wakeword() -> bool:
     """
-    Quick listen (~3 s) for the phrase 'Hey Hachi'.
-    NON-BLOCKING mic acquire — returns False immediately if mic is busy.
+    Quick listen (~2 s) for the phrase 'Hey Hachi'.
+    NON-BLOCKING mic acquire — returns False immediately if mic is busy or if
+    the voice overlay is open (browser owns the mic). Recognizes English then
+    Tagalog so Tagalog speakers can wake it too.
     """
+    if voice_mode_active.is_set():
+        return False
     acquired = _mic_lock.acquire(blocking=False)
     if not acquired:
         return False
@@ -381,10 +403,17 @@ def listen_for_wakeword() -> bool:
         r.pause_threshold  = 0.6
 
         with sr.Microphone() as source:
-            r.adjust_for_ambient_noise(source, duration=0.3)
-            audio = r.listen(source, timeout=3, phrase_time_limit=2)
+            r.adjust_for_ambient_noise(source, duration=0.15)
+            audio = r.listen(source, timeout=2, phrase_time_limit=2)
 
-        text = r.recognize_google(audio, language="en-US").lower()
+        text = ""
+        for lang in ("en-US", "fil-PH"):
+            try:
+                text = r.recognize_google(audio, language=lang).lower()
+                if text:
+                    break
+            except Exception:
+                continue
         logging.info(f"Wakeword check: '{text}'")
         return "hachi" in text
 

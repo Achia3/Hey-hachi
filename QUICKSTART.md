@@ -40,10 +40,10 @@ setup.bat
 
 ## ⚙️ Model Settings (`config.json`)
 
-To change the Ollama model (e.g., `qwen3.5:2b`, `qwen2.5:3b`, `qwen2.5:7b`), edit `config.json`:
+To change the Ollama model (e.g., `qwen2.5:3b`, `qwen2.5:7b`), edit `config.json`:
 
 ```json
 {
-  "model_name": "qwen3.5:2b"
+  "model_name": "qwen2.5:3b"
 }
 ```

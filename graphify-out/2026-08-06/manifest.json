@@ -1,0 +1,72 @@
+{
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\config.json": {
+    "mtime": 1786012389.7965672,
+    "ast_hash": "59410b0102390113af9305cd72b579ed",
+    "semantic_hash": "59410b0102390113af9305cd72b579ed"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_agent.py": {
+    "mtime": 1786012583.9618049,
+    "ast_hash": "2e57a6ae47ac8d84f8488b6cb8e48887",
+    "semantic_hash": "2e57a6ae47ac8d84f8488b6cb8e48887"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_app.py": {
+    "mtime": 1786009609.5429006,
+    "ast_hash": "ff63237d1c821021bfceb1be8c65d356",
+    "semantic_hash": "ff63237d1c821021bfceb1be8c65d356"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_db.py": {
+    "mtime": 1785898248.4013717,
+    "ast_hash": "b3b0cebfa79ede73aa231a7223b14f30",
+    "semantic_hash": "b3b0cebfa79ede73aa231a7223b14f30"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_speech.py": {
+    "mtime": 1786012467.5641568,
+    "ast_hash": "ad73d9ab78da3fe8fdd1a9e454b83b01",
+    "semantic_hash": "ad73d9ab78da3fe8fdd1a9e454b83b01"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_tools.py": {
+    "mtime": 1786012515.211961,
+    "ast_hash": "8170c158041e536ca7b0fc6e65e9df54",
+    "semantic_hash": "8170c158041e536ca7b0fc6e65e9df54"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\hachi_web.py": {
+    "mtime": 1786012465.6294725,
+    "ast_hash": "abff47d9696a004908c76e63c20e006a",
+    "semantic_hash": "abff47d9696a004908c76e63c20e006a"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\old_version\\app_verification.py": {
+    "mtime": 1785889281.900453,
+    "ast_hash": "0f30580ec4bb9f6c476ccea760bda2c6",
+    "semantic_hash": "0f30580ec4bb9f6c476ccea760bda2c6"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\old_version\\audio_diagnostic.py": {
+    "mtime": 1785889281.900453,
+    "ast_hash": "4ad064e25dc0c71e5ec7cc611164fb88",
+    "semantic_hash": "4ad064e25dc0c71e5ec7cc611164fb88"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\old_version\\hachi_gui.py": {
+    "mtime": 1785889281.9014616,
+    "ast_hash": "09f710daa9b076b5b6f3794323ff0926",
+    "semantic_hash": "09f710daa9b076b5b6f3794323ff0926"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\QUICKSTART.md": {
+    "mtime": 1785897335.3483121,
+    "ast_hash": "cd8e511d31213e7ed91cc65d921014dc",
+    "semantic_hash": "cd8e511d31213e7ed91cc65d921014dc"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\README.md": {
+    "mtime": 1785897338.378927,
+    "ast_hash": "de9a098d64161abee88bc1a72b0fc4ac",
+    "semantic_hash": "de9a098d64161abee88bc1a72b0fc4ac"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\requirements.txt": {
+    "mtime": 1786012616.5429406,
+    "ast_hash": "d8c1331cc8a62617af5d67a1d7f98fa3",
+    "semantic_hash": "d8c1331cc8a62617af5d67a1d7f98fa3"
+  },
+  "C:\\Users\\Beo\\Downloads\\02_Programming\\01_Python\\02_Project\\AI-LAB-WORKS\\Hey-hachi\\templates\\index.html": {
+    "mtime": 1786012627.172165,
+    "ast_hash": "542d16dd1851240fe14d30854431e2c2",
+    "semantic_hash": "542d16dd1851240fe14d30854431e2c2"
+  }
+}

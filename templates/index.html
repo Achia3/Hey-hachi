@@ -452,6 +452,8 @@
             <div class="brand-text">
                 <span class="name">Hachi AI</span>
                 <span class="status"><span class="status-dot"></span>online · agentic</span>
+                <span class="status" id="micStatus" style="margin-top:2px;font-size:11px;opacity:.85;">
+                    <span class="status-dot" id="micDot" style="background:#f87171;"></span>mic…</span>
             </div>
         </div>
         <div class="header-actions">
@@ -607,8 +609,43 @@ marked.setOptions({
 });
 
 function sanitizeHtml(html) {
-    // Basic sanitization — strip script tags
-    return html.replace(/<script[\s\S]*?<\/script>/gi, '');
+    // Allow only a safe subset of tags/attributes from LLM output.
+    // Blocks <script>, event handlers, javascript: URLs, iframes, etc.
+    const allowed = new Set(['p','br','b','strong','i','em','u','s','code','pre','ul','ol','li','blockquote','h1','h2','h3','h4','table','thead','tbody','tr','th','td','a','hr']);
+    const allowedAttrs = new Set(['href','title','target','rel','class']);
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const walk = (node) => {
+        [...node.childNodes].forEach((child) => {
+            if (child.nodeType === Node.ELEMENT_NODE) {
+                const tag = child.tagName.toLowerCase();
+                // Drop event handlers and unsafe URLs anywhere
+                [...child.attributes].forEach((attr) => {
+                    const name = attr.name.toLowerCase();
+                    const val = attr.value.trim().toLowerCase();
+                    if (name.startsWith('on') ||
+                        (name === 'href' && (val.startsWith('javascript:') || val.startsWith('data:'))) ||
+                        (name === 'src' && (val.startsWith('javascript:') || val.startsWith('data:'))) ||
+                        (name === 'style')) {
+                        child.removeAttribute(attr.name);
+                    } else if (!allowedAttrs.has(name)) {
+                        child.removeAttribute(attr.name);
+                    }
+                });
+                if (!allowed.has(tag)) {
+                    // Replace disallowed element with its text content
+                    const frag = document.createDocumentFragment();
+                    while (child.firstChild) frag.appendChild(child.firstChild);
+                    child.replaceWith(frag);
+                } else {
+                    walk(child);
+                }
+            } else if (child.nodeType === Node.TEXT_NODE) {
+                // Leave text nodes as-is (their content came from marked/LLM)
+            }
+        });
+    };
+    walk(doc.body);
+    return doc.body.innerHTML;
 }
 
 // ============================================================
@@ -619,7 +656,7 @@ function timeNow() {
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function addMessage(text, role, tools) {
+function addMessage(text, role, tools, engine) {
     const wrap   = document.createElement('div');
     wrap.className = 'msg ' + role;
 
@@ -636,7 +673,10 @@ function addMessage(text, role, tools) {
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + timeNow();
+    const engineBadge = (role === 'assistant' && engine)
+        ? (engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · '
+        : '';
+    meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + engineBadge + timeNow();
 
     wrap.appendChild(bubble);
     wrap.appendChild(meta);
@@ -803,7 +843,14 @@ async function sendMessage() {
                     if (evt.done) {
                         accumulatedText = evt.full || accumulatedText;
                         toolsList = evt.tools || [];
-                        
+                        if (evt.engine) {
+                            meta.textContent = 'Hachi · ' + (evt.engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · ' + timeNow();
+                        }
+                        if (evt.pomo) {
+                            if (evt.pomo === 'start') startPomodoro();
+                            else stopPomodoro();
+                        }
+
                         // Render final formatted markdown
                         bubble.innerHTML = sanitizeHtml(marked.parse(accumulatedText));
                         
@@ -847,7 +894,7 @@ async function sendMessage() {
 
 // Shared helper: handle __START_POMODORO__ / __STOP_POMODORO__ in any response,
 // and detect timer/pomodoro keywords as fallback.
-function applyPomoSignals(response, tools, userText, skipAddMessage) {
+function applyPomoSignals(response, tools, userText, skipAddMessage, engine) {
     if (!response && !userText) return;
     let msg = response || '';
     let started = false;
@@ -874,7 +921,7 @@ function applyPomoSignals(response, tools, userText, skipAddMessage) {
     }
 
     if (msg.trim() && !skipAddMessage) {
-        addMessage(msg, 'assistant', tools);
+        addMessage(msg, 'assistant', tools, engine);
     }
     if (started) startPomodoro();
     if (stopped)  stopPomodoro();
@@ -918,7 +965,7 @@ async function triggerMode(modeName, chipEl) {
         });
         const data = await res.json();
         removeTyping();
-        applyPomoSignals(data.response, data.tools, `Start ${modeName} mode`);
+        applyPomoSignals(data.response, data.tools, `Start ${modeName} mode`, false, data.engine);
     } catch {
         removeTyping();
         addMessage(`Could not activate ${modeName} mode.`, 'assistant');
@@ -1212,6 +1259,10 @@ async function startVoiceConversation() {
 }
 
 // ── Single listen turn using Web Speech API ──────────────────────────────────
+// Fix 8 (endpointing): continuous=true so Hachi keeps listening across pauses
+// ("uhms", mid-sentence breaths). A 1.8s silence timer ends the turn only when
+// the user actually STOPS speaking. Watchdog (~55s) prevents a stuck "Listening".
+// Fix 10b: tries fil-PH → en-PH → en-US.
 function listenOneTurn() {
     return new Promise((resolve) => {
         if (!HAS_WEB_SPEECH || !voiceActive || isMuted || voiceAborted) {
@@ -1225,64 +1276,120 @@ function listenOneTurn() {
             recognition = null;
         }
 
-        const rec = new SpeechRecognition();
-        recognition = rec;
-        rec.continuous      = false;
-        rec.interimResults  = true;
-        rec.maxAlternatives = 1;
-        rec.lang            = 'en-US';
+        const LANGUAGES = ['fil-PH', 'en-PH', 'en-US'];
+        let langIndex = 0;
 
-        let finalText   = '';
-        let interimText = '';
-        let settled     = false;
+        const attempt = () => {
+            const rec = new SpeechRecognition();
+            recognition = rec;
+            rec.continuous      = true;          // keep listening through pauses
+            rec.interimResults  = true;
+            rec.maxAlternatives = 1;
+            rec.lang            = LANGUAGES[langIndex];
 
-        rec.onstart = () => {
-            transcriptEl.textContent = 'Listening…';
-            transcriptEl.className   = 'voice-transcript';
-        };
+            let accumulated   = '';    // final segments joined
+            let interimText   = '';
+            let settled       = false;
+            let silenceTimer  = null;
+            let watchdogTimer = null;
 
-        rec.onresult = (event) => {
-            interimText = '';
-            finalText   = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    finalText += event.results[i][0].transcript;
+            const finish = (text) => {
+                if (settled) return;
+                settled = true;
+                if (silenceTimer) clearTimeout(silenceTimer);
+                if (watchdogTimer) clearTimeout(watchdogTimer);
+                recognition = null;
+                resolve(text);
+            };
+
+            const armSilence = () => {
+                if (silenceTimer) clearTimeout(silenceTimer);
+                // 1.8s of no new speech → the user stopped → execute
+                silenceTimer = setTimeout(() => {
+                    const got = accumulated.trim() || interimText.trim();
+                    if (got) { finish(got); return; }
+                    // No speech at all on this language → try next
+                    if (langIndex < LANGUAGES.length - 1) {
+                        langIndex++;
+                        settled = true;
+                        attempt();
+                    } else {
+                        finish('');
+                    }
+                }, 1800);
+            };
+
+            rec.onstart = () => {
+                transcriptEl.textContent = 'Listening…';
+                transcriptEl.className   = 'voice-transcript';
+                armSilence();
+            };
+
+            rec.onresult = (event) => {
+                interimText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const seg = event.results[i][0].transcript || '';
+                    if (event.results[i].isFinal) {
+                        accumulated += (accumulated && !accumulated.endsWith(' ') ? ' ' : '') + seg;
+                    } else {
+                        interimText += seg;
+                    }
+                }
+                const display = accumulated.trim() || interimText.trim();
+                transcriptEl.textContent = display || 'Listening…';
+                transcriptEl.className   = display
+                    ? (accumulated.trim() ? 'voice-transcript heard' : 'voice-transcript interim')
+                    : 'voice-transcript';
+                // New speech → restart the silence timer (keeps listening)
+                armSilence();
+            };
+
+            rec.onend = () => {
+                // continuous=true stops on its own sometimes; settle with what we have
+                if (settled) return;
+                const got = accumulated.trim() || interimText.trim();
+                if (got) { finish(got); return; }
+                if (langIndex < LANGUAGES.length - 1) {
+                    langIndex++;
+                    settled = true;
+                    attempt();
                 } else {
-                    interimText += event.results[i][0].transcript;
+                    finish('');
                 }
-            }
-            const display = finalText || interimText;
-            transcriptEl.textContent = display || 'Listening…';
-            transcriptEl.className   = display
-                ? (finalText ? 'voice-transcript heard' : 'voice-transcript interim')
-                : 'voice-transcript';
-        };
+            };
 
-        rec.onend = () => {
-            recognition = null;
-            if (!settled) {
-                settled = true;
-                resolve(finalText.trim() || interimText.trim());
-            }
-        };
-
-        rec.onerror = (event) => {
-            recognition = null;
-            if (!settled) {
-                settled = true;
-                console.warn('Speech error:', event.error);
+            rec.onerror = (event) => {
+                if (settled) return;
                 if (event.error === 'not-allowed') {
+                    settled = true;
                     sub.textContent = 'Microphone permission denied — please allow mic access.';
+                    finish('');
+                    return;
                 }
-                resolve(finalText.trim() || interimText.trim());
+                // Recoverable → next language, else settle empty
+                if (langIndex < LANGUAGES.length - 1) {
+                    langIndex++;
+                    settled = true;
+                    attempt();
+                } else {
+                    finish('');
+                }
+            };
+
+            // Watchdog: never hang on "Listening" (Chrome caps ~60s per recognition)
+            watchdogTimer = setTimeout(() => {
+                const got = accumulated.trim() || interimText.trim();
+                finish(got);
+            }, 55000);
+
+            try {
+                rec.start();
+            } catch(e) {
+                if (!settled) { settled = true; resolve(''); }
             }
         };
 
-        try {
-            rec.start();
-        } catch(e) {
-            if (!settled) { settled = true; resolve(''); }
-        }
+        attempt();
     });
 }
 
@@ -1292,15 +1399,28 @@ let isInterrupting = false;
 
 async function streamAndSpeakResponse(userText) {
     const audioQueue = [];        // pre-fetched Audio objects ready to play
+    const pendingAudioIds = [];   // audio IDs held back by the prefetch cap
     let playerDone = false;
     let isInterrupted = false;
+    let engine = 'qwen';
     isInterrupting = false;
 
     // ── Audio player task (runs in parallel) ──────────────────────────────
     async function drainAudioQueue() {
-        while (!playerDone || audioQueue.length > 0) {
+        while (!playerDone || audioQueue.length > 0 || pendingAudioIds.length > 0) {
             if (isInterrupted || !voiceActive || voiceAborted) break;
-            if (audioQueue.length === 0) { await sleep(30); continue; }
+            if (audioQueue.length === 0) {
+                // Lazy-fetch from the held-back queue when we have room
+                if (pendingAudioIds.length > 0) {
+                    const id = pendingAudioIds.shift();
+                    const audio = new Audio(`/api/tts_audio/${id}`);
+                    audio.preload = 'auto';
+                    audioQueue.push({ audio, sentence: '' });
+                    continue;
+                }
+                await sleep(30);
+                continue;
+            }
 
             const item = audioQueue.shift();
             setVoiceState('speaking', 'Speaking…', item.sentence.substring(0, 60));
@@ -1317,8 +1437,16 @@ async function streamAndSpeakResponse(userText) {
         }
     }
 
-    // ── Barge-in interruption listener ─────────────────────────────────────
-    // If user says ANYTHING while Hachi is speaking → cancel all audio instantly
+    // ── Stop-word listener (Fix 9) ────────────────────────────────────────
+    // Unlike the old "any speech = interrupt", this only stops Hachi when the
+    // user says a cue word (English or Tagalog). Regular speech no longer cuts
+    // Hachi mid-sentence.
+    const STOP_WORDS = [
+        'stop', 'quiet', 'shh', 'shhh', 'pause', 'cancel', 'enough',
+        'shut up', 'be quiet', 'please stop',
+        'tama', 'tama na', 'hinto', 'tigil', 'tumahimik', 'sandali',
+        'pakitigil', 'sige na', 'tumigil'
+    ];
     let interruptRec = null;
     if (HAS_WEB_SPEECH && voiceActive && !isMuted) {
         try {
@@ -1326,20 +1454,21 @@ async function streamAndSpeakResponse(userText) {
             interruptRec = rec;
             rec.continuous      = true;
             rec.interimResults  = true;
-            rec.lang            = 'en-US';
+            rec.lang            = 'fil-PH';  // English + Tagalog cue words
 
             rec.onresult = (event) => {
                 let txt = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     txt += event.results[i][0].transcript;
                 }
-                txt = txt.trim();
-                // ANY speech during playback = instant interrupt (ChatGPT style)
-                if (txt.length > 1) {
+                txt = txt.trim().toLowerCase();
+                if (STOP_WORDS.some(w => txt.includes(w))) {
                     isInterrupted = true;
                     isInterrupting = true;
                     audioQueue.length = 0;
                     stopCurrentAudio();
+                    // Also kill server-side TTS
+                    fetch('/api/interrupt_speech', { method: 'POST' }).catch(() => {});
                 }
             };
             rec.onerror = () => {};
@@ -1405,17 +1534,28 @@ async function streamAndSpeakResponse(userText) {
                     }
 
                     if (evt.type === 'audio') {
-                        // Pre-fetch the audio blob and queue it
+                        // Pre-fetch audio but cap the queue so long replies don't
+                        // stack many parallel downloads (lazy-create when it drains).
                         if (!isInterrupted) {
-                            const audio = new Audio(`/api/tts_audio/${evt.id}`);
-                            audio.preload = 'auto';
-                            audioQueue.push({ audio, sentence: evt.sentence || '' });
+                            if (audioQueue.length < 3) {
+                                const audio = new Audio(`/api/tts_audio/${evt.id}`);
+                                audio.preload = 'auto';
+                                audioQueue.push({ audio, sentence: evt.sentence || '' });
+                            } else {
+                                // Queue is full — remember the sentence and fetch lazily
+                                pendingAudioIds.push(evt.id);
+                            }
                         }
                     }
 
                     if (evt.type === 'done') {
                         fullText  = evt.full  || '';
                         toolsList = evt.tools || [];
+                        engine    = evt.engine || 'qwen';
+                        if (evt.pomo) {
+                            if (evt.pomo === 'start') startPomodoro();
+                            else stopPomodoro();
+                        }
                         break;
                     }
                 } catch(_) {}
@@ -1431,9 +1571,11 @@ async function streamAndSpeakResponse(userText) {
     await playerTask;
 
     // Add assistant message to chat
+    // C1: applyPomoSignals(..., true) — skip its internal addMessage so we don't
+    // render the same response twice. Engine badge shows which model answered.
     if (!voiceAborted && fullText && !isInterrupted) {
-        addMessage(fullText, 'assistant', toolsList);
-        applyPomoSignals(fullText, toolsList, userText);
+        addMessage(fullText, 'assistant', toolsList, engine);
+        applyPomoSignals(fullText, toolsList, userText, true);
     }
 }
 
@@ -1496,6 +1638,29 @@ async function pollWakeword() {
 }
 
 wakewordPoll = setInterval(pollWakeword, 600);
+
+// ── Mic status indicator (Fix 12) ───────────────────────────────────────────
+// Tells the user whether the program sees a microphone (green) or not (red),
+// with the device name — so a broken mic is obvious instead of silent.
+async function pollMicStatus() {
+    try {
+        const res  = await fetch('/api/mic_status');
+        const data = await res.json();
+        const micEl   = document.getElementById('micStatus');
+        const dotEl   = document.getElementById('micDot');
+        if (!micEl || !dotEl) return;
+        if (data.ok && data.detected) {
+            dotEl.style.background = '#4ade80';   // green
+            micEl.textContent = 'mic · ' + (data.mics[0]?.name || 'detected');
+        } else {
+            dotEl.style.background = '#f87171';   // red
+            micEl.textContent = 'mic · not detected';
+        }
+        micEl.style.cursor = 'default';
+    } catch { /* server not ready yet — leave as "mic…" */ }
+}
+pollMicStatus();
+setInterval(pollMicStatus, 8000);
 
 </script>
 </body>

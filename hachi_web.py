@@ -1,16 +1,111 @@
 import os
 import time
+import re
 import json
 import uuid
 import logging
 import threading
 import tempfile
+from queue import Queue
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
-from hachi_agent import process_agent_request
-from hachi_speech import speak, interrupt_speech, generate_tts_audio
+from hachi_agent import process_agent_request, get_llm_debug
+from hachi_speech import speak, speak_quick, interrupt_speech, generate_tts_audio
 
 app = Flask(__name__)
 FLASK_PORT = 5000
+
+# Abbreviations that should NOT be treated as a sentence boundary in TTS
+_ABBREVIATIONS = {
+    "prof", "dr", "mr", "mrs", "ms", "sr", "jr", "st", "approx",
+    "incl", "vs", "etc", "dept", "univ", "est", "govt", "corp",
+    "inc", "ltd", "co", "min", "max", "temp", "vol", "pg", "fig",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep",
+    "oct", "nov", "dec", "a.m", "p.m", "u.s", "u.k", "e.g", "i.e",
+}
+
+
+def _is_false_boundary(buffer: str, abs_end: int, segment: str) -> bool:
+    """True if the matched punctuation is NOT a real sentence boundary.
+    Handles decimals ("3.14", "v1.2.3") and abbreviations ("Dr.", "e.g.")."""
+    # Decimal point: period immediately followed by a digit
+    if abs_end < len(buffer) and buffer[abs_end].isdigit():
+        return True
+    # Abbreviation word ("Dr.", "Prof.", "e.g", "i.e")
+    last_word = re.split(r'\s', segment.rstrip('.!?\n'))[-1].lower().rstrip('.')
+    if last_word in _ABBREVIATIONS:
+        return True
+    # "e.g." / "i.e." style: single letter + period + letter + period
+    if re.search(r'\b[a-z]\.$', segment) and abs_end < len(buffer) and re.match(r'[a-z]\.', buffer[abs_end:]):
+        return True
+    return False
+
+
+def _pop_sentence(token_buffer: str):
+    """Pop the first complete sentence from the buffer, skipping abbreviations and
+    decimal numbers. Returns (sentence_or_None, remaining_buffer)."""
+    search_pos = 0
+    while True:
+        m = re.search(r'([^.!?\n]+[.!?\n])', token_buffer[search_pos:])
+        if not m:
+            return None, token_buffer
+        abs_end = search_pos + m.end()
+        # Inspect the FULL segment from the buffer start so the prefix is kept.
+        # "Hello Dr. Smith." → last word "Smith" (not an abbreviation) → whole thing
+        segment = token_buffer[:abs_end].strip()
+        if len(segment) <= 1:
+            # Just a lone punctuation mark — consume and keep scanning
+            token_buffer = token_buffer[abs_end:]
+            search_pos = 0
+            continue
+        if _is_false_boundary(token_buffer, abs_end, segment):
+            # Skip past this punctuation, keeping the prefix for the next match
+            search_pos = abs_end
+            continue
+        return segment, token_buffer[abs_end:]
+
+
+# ---------------------------------------------------------------------------
+# Single speak worker — drops stale queued speech so rapid messages never
+# play old replies after the current one (fixes thread backlog).
+# ---------------------------------------------------------------------------
+_speak_cond = threading.Condition()
+_latest_speak = None
+_speak_worker_started = False
+
+
+def _speak_worker():
+    global _latest_speak
+    while True:
+        with _speak_cond:
+            while _latest_speak is None:
+                _speak_cond.wait()
+            text = _latest_speak
+            _latest_speak = None
+        try:
+            speak(text)
+        except Exception as e:
+            logging.error(f"speak worker error: {e}")
+
+
+def _ensure_speak_worker():
+    global _speak_worker_started
+    # Guard with the cond lock so two concurrent api_chat calls can't both spawn a
+    # worker (which would double-speak).
+    with _speak_cond:
+        if not _speak_worker_started:
+            _speak_worker_started = True
+            threading.Thread(target=_speak_worker, daemon=True, name="SpeakWorker").start()
+
+
+def _request_speak(text: str):
+    """Queue speech; only the latest pending text is spoken."""
+    if not text:
+        return
+    _ensure_speak_worker()
+    with _speak_cond:
+        global _latest_speak
+        _latest_speak = text
+        _speak_cond.notify()
 
 # ---------------------------------------------------------------------------
 # TTS audio cache for parallel voice pipeline
@@ -30,6 +125,43 @@ def _cleanup_tts_cache(max_age=60):
                 pass
             del _tts_cache[k]
 
+
+_tts_janitor_started = False
+
+
+def _tts_janitor():
+    """Background thread: periodically purge stale TTS cache + orphaned temp files
+    (covers interrupt/crash leaks that _cleanup_tts_cache misses)."""
+    while True:
+        time.sleep(30)
+        try:
+            _cleanup_tts_cache()
+            tmpdir = tempfile.gettempdir()
+            cutoff = time.time() - 60
+            # Don't delete files still referenced by the active cache (a slow client
+            # on a long reply could 404 on audio the janitor already removed).
+            with _tts_cache_lock:
+                cached_paths = {v.get("path") for v in _tts_cache.values()}
+            for f in os.listdir(tmpdir):
+                if f.startswith("hachi_") and f.endswith(".mp3"):
+                    p = os.path.join(tmpdir, f)
+                    if p in cached_paths:
+                        continue
+                    try:
+                        if os.path.getmtime(p) < cutoff:
+                            os.remove(p)
+                    except OSError:
+                        pass
+        except Exception as e:
+            logging.debug(f"tts janitor error: {e}")
+
+
+def start_tts_janitor():
+    global _tts_janitor_started
+    if not _tts_janitor_started:
+        _tts_janitor_started = True
+        threading.Thread(target=_tts_janitor, daemon=True, name="TTSJanitor").start()
+
 # ---------------------------------------------------------------------------
 # Wakeword state
 # ---------------------------------------------------------------------------
@@ -46,7 +178,7 @@ def _wakeword_loop():
     """
     from hachi_speech import listen_for_wakeword
     logging.info("Wakeword listener thread started.")
-    time.sleep(3.0)   # Brief delay on startup so Flask/PyWebView start 100% cleanly
+    time.sleep(1.0)   # Brief delay on startup so Flask/PyWebView start cleanly
     while True:
         try:
             if _voice_mode_active.is_set():
@@ -55,7 +187,7 @@ def _wakeword_loop():
             if listen_for_wakeword():
                 logging.info("Wake word 'Hachi' detected!")
                 _wakeword_detected.set()
-            time.sleep(0.8)   # Breath between poll cycles to keep PyAudio driver clear
+            time.sleep(0.3)   # Breath between poll cycles to keep PyAudio driver clear
         except Exception as e:
             logging.debug(f"Wakeword loop error: {e}")
             time.sleep(1.5)
@@ -66,6 +198,7 @@ def start_wakeword_listener():
     global _wakeword_started
     if not _wakeword_started:
         _wakeword_started = True
+        start_tts_janitor()
         t = threading.Thread(
             target=_wakeword_loop, daemon=True, name="WakewordListener"
         )
@@ -92,16 +225,16 @@ def api_chat():
         current_mode = data.get("mode", "default")
         voice_mode   = data.get("voice_mode", False)  # True = browser owns TTS
         if not user_msg:
-            return jsonify({"response": "", "tools": []})
+            return jsonify({"response": "", "tools": [], "engine": "none", "pomo": None})
 
-        agent_response, executed_tools = process_agent_request(user_msg, current_mode)
+        agent_response, executed_tools, engine, pomo = process_agent_request(user_msg, current_mode)
         # Skip server TTS when browser is handling speech (avoids double audio)
         if not voice_mode:
-            threading.Thread(target=speak, args=(agent_response,), daemon=True).start()
-        return jsonify({"response": agent_response, "tools": executed_tools})
+            _request_speak(agent_response)
+        return jsonify({"response": agent_response, "tools": executed_tools, "engine": engine, "pomo": pomo})
     except Exception as e:
         logging.error(f"api_chat error: {e}")
-        return jsonify({"response": "Something went wrong.", "tools": []}), 500
+        return jsonify({"response": "Something went wrong.", "tools": [], "engine": "none", "pomo": None}), 500
 
 
 @app.route("/api/stream_chat", methods=["POST"])
@@ -117,14 +250,14 @@ def api_stream_chat():
 
     if not user_msg:
         return Response(
-            "data: " + json.dumps({"done": True, "full": "", "tools": []}) + "\n\n",
+            "data: " + json.dumps({"done": True, "full": "", "tools": [], "engine": "none", "pomo": None}) + "\n\n",
             mimetype="text/event-stream"
         )
 
     def generate():
         try:
             from hachi_agent import process_agent_request_stream
-            for event in process_agent_request_stream(user_msg, mode):
+            for event in process_agent_request_stream(user_msg, mode, voice_mode=False):
                 yield "data: " + json.dumps(event) + "\n\n"
         except GeneratorExit:
             pass
@@ -161,47 +294,54 @@ def api_voice_stream():
 
     if not user_msg:
         return Response(
-            "data: " + json.dumps({"type": "done", "full": "", "tools": []}) + "\n\n",
+            "data: " + json.dumps({"type": "done", "full": "", "tools": [], "engine": "none", "pomo": None}) + "\n\n",
             mimetype="text/event-stream"
         )
 
     def generate():
         _cleanup_tts_cache()
 
+        # Fix 4: instant spoken acknowledgment ("Sige, sandali lang.") while the
+        # LLM thinks — the user hears a reply within ~200ms instead of silence.
+        try:
+            threading.Thread(target=speak_quick, args=(user_msg,), daemon=True).start()
+        except Exception:
+            pass
+
         # Shared state between main thread and TTS worker
-        sentence_queue = []        # sentences waiting for TTS
+        sentence_queue = Queue()   # blocking queue (worker never busy-waits)
         audio_events = []          # completed audio events ready to send
         tts_done = threading.Event()
         llm_done = threading.Event()
-        queue_lock = threading.Lock()
         audio_lock = threading.Lock()
 
         def tts_worker():
-            """Background thread: picks sentences from queue, generates TTS audio."""
+            """Background thread: blocks on the queue, generates TTS audio per sentence."""
             while True:
-                sentence = None
-                with queue_lock:
-                    if sentence_queue:
-                        sentence = sentence_queue.pop(0)
-
-                if sentence:
-                    audio_path = generate_tts_audio(sentence)
-                    if audio_path:
-                        audio_id = str(uuid.uuid4())[:8]
-                        with _tts_cache_lock:
-                            _tts_cache[audio_id] = {"path": audio_path, "created": time.time()}
-                        with audio_lock:
-                            audio_events.append({"type": "audio", "id": audio_id, "sentence": sentence})
-                elif llm_done.is_set():
-                    # No more sentences and LLM is done
+                sentence = sentence_queue.get()
+                if sentence is None:   # sentinel: LLM finished
                     break
-                else:
-                    time.sleep(0.02)  # Brief sleep while waiting for sentences
+                audio_path = generate_tts_audio(sentence)
+                if audio_path:
+                    audio_id = str(uuid.uuid4())[:8]
+                    with _tts_cache_lock:
+                        _tts_cache[audio_id] = {"path": audio_path, "created": time.time()}
+                    with audio_lock:
+                        audio_events.append({"type": "audio", "id": audio_id, "sentence": sentence})
             tts_done.set()
 
         # Start TTS worker thread
         worker = threading.Thread(target=tts_worker, daemon=True)
         worker.start()
+
+        def flush_audio():
+            """Snapshot audio events under lock, return them for yielding OUTSIDE the lock."""
+            events_to_send = []
+            with audio_lock:
+                if audio_events:
+                    events_to_send = list(audio_events)
+                    audio_events.clear()
+            return events_to_send
 
         try:
             from hachi_agent import process_agent_request_stream
@@ -209,68 +349,68 @@ def api_voice_stream():
             token_buffer = ""
             full_text = ""
             tools_list = []
+            engine = "qwen"
+            pomo = None
 
-            for event in process_agent_request_stream(user_msg, mode):
+            for event in process_agent_request_stream(user_msg, mode, voice_mode=True):
                 # Yield token events immediately
                 if not event.get("done") and event.get("token"):
                     token = event["token"]
                     token_buffer += token
                     yield "data: " + json.dumps({"type": "token", "text": token}) + "\n\n"
 
-                    # Eager sentence detection: match text ending with . ! ? or \n (no space needed)
-                    import re
-                    m = re.search(r'([^.!?\n]+[.!?\n])', token_buffer)
-                    if m:
-                        sentence = m.group(1).strip()
-                        # Avoid splitting short abbreviations like "Mr.", "U.S.", or decimals like "3.14"
-                        if len(sentence) > 3 and not (sentence[-1] == '.' and sentence[:-1].isdigit()):
-                            with queue_lock:
-                                sentence_queue.append(sentence)
-                            token_buffer = token_buffer[m.end():]
+                    # Eager sentence detection (handles abbreviations, advances past rejects)
+                    sentence, token_buffer = _pop_sentence(token_buffer)
+                    if not sentence and len(token_buffer.split()) >= 15:
+                        # Fix 6: provisional flush — emit the buffered words even
+                        # without a period so the FIRST audio starts sooner.
+                        sentence = token_buffer.strip()
+                        token_buffer = ""
+                    if sentence:
+                        sentence_queue.put(sentence)
 
                 if event.get("done"):
                     full_text = event.get("full", "")
                     tools_list = event.get("tools", [])
+                    engine = event.get("engine", "qwen")
+                    pomo = event.get("pomo")
                     # Queue remaining buffer as final sentence
                     if token_buffer.strip() and len(token_buffer.strip()) > 3:
-                        with queue_lock:
-                            sentence_queue.append(token_buffer.strip())
+                        sentence_queue.put(token_buffer.strip())
+                    token_buffer = ""
                     break
 
                 # Flush any ready audio events immediately during token streaming
-                with audio_lock:
-                    for ae in audio_events:
-                        yield "data: " + json.dumps(ae) + "\n\n"
-                    audio_events.clear()
+                for ae in flush_audio():
+                    yield "data: " + json.dumps(ae) + "\n\n"
 
-            # Signal LLM is done
+            # Signal LLM is done → worker drains remaining sentences, then exits
             llm_done.set()
+            sentence_queue.put(None)
 
-            # Wait for TTS worker to finish remaining sentences, yielding audio events as they become ready
-            start_wait = time.time()
-            while not tts_done.is_set() and (time.time() - start_wait < 15):
-                with audio_lock:
-                    events_to_send = list(audio_events)
-                    audio_events.clear()
-                for ae in events_to_send:
+            # Fix 5: don't gate `done` behind ALL tail-sentence TTS. Give the worker
+            # a bounded window to flush remaining audio, then end the turn. generate_tts_audio
+            # has its own 10s per-sentence cap, so tts_done always sets within budget.
+            tail_deadline = time.time() + 5.0
+            while not tts_done.is_set() and time.time() < tail_deadline:
+                for ae in flush_audio():
                     yield "data: " + json.dumps(ae) + "\n\n"
                 time.sleep(0.05)
 
             # One final flush of any remaining audio events
-            with audio_lock:
-                events_to_send = list(audio_events)
-                audio_events.clear()
-            for ae in events_to_send:
+            for ae in flush_audio():
                 yield "data: " + json.dumps(ae) + "\n\n"
 
-            yield "data: " + json.dumps({"type": "done", "full": full_text, "tools": tools_list}) + "\n\n"
+            yield "data: " + json.dumps({"type": "done", "full": full_text, "tools": tools_list, "engine": engine, "pomo": pomo}) + "\n\n"
 
         except GeneratorExit:
             llm_done.set()
+            sentence_queue.put(None)
         except Exception as e:
             llm_done.set()
+            sentence_queue.put(None)
             logging.error(f"api_voice_stream error: {e}")
-            yield "data: " + json.dumps({"type": "done", "full": "Stream error.", "tools": [], "error": True}) + "\n\n"
+            yield "data: " + json.dumps({"type": "done", "full": "Stream error.", "tools": [], "error": True, "engine": "none", "pomo": None}) + "\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -334,12 +474,59 @@ def api_wakeword_status():
 @app.route("/api/voice_mode", methods=["POST"])
 def api_voice_mode():
     """Let the frontend tell the backend when the voice overlay is open/closed."""
+    from hachi_speech import voice_mode_active
     data = request.json or {}
     if data.get("active", False):
         _voice_mode_active.set()
+        voice_mode_active.set()
+        # Fix 7: settle so an in-flight pyaudio wakeword listen finishes and
+        # releases the device before the browser mic grabs it.
+        time.sleep(0.3)
     else:
         _voice_mode_active.clear()
+        voice_mode_active.clear()
     return jsonify({"ok": True})
+
+
+@app.route("/api/mic_status", methods=["GET"])
+def api_mic_status():
+    """Report whether a microphone is detected and which one. Lets the user know
+    if the program can see their mic (fixes 'it can't hear my mic' confusion)."""
+    try:
+        import pyaudio
+        pa = pyaudio.PyAudio()
+        try:
+            mics = []
+            for i in range(pa.get_device_count()):
+                info = pa.get_device_info_by_index(i)
+                if info.get("maxInputChannels", 0) > 0:
+                    mics.append({
+                        "index": i,
+                        "name": info.get("name", f"Microphone {i}"),
+                        "channels": info.get("maxInputChannels", 0),
+                        "sample_rate": info.get("defaultSampleRate", 0),
+                    })
+            return jsonify({"ok": True, "mics": mics, "detected": len(mics) > 0})
+        finally:
+            pa.terminate()
+    except Exception as e:
+        logging.warning(f"mic_status error: {e}")
+        return jsonify({"ok": False, "mics": [], "detected": False, "error": str(e)})
+
+
+@app.route("/api/llm_debug", methods=["GET"])
+def api_llm_debug():
+    """Return recent LLM raw outputs and parsed tool_calls for debugging."""
+    try:
+        limit = int(request.args.get("limit", 50))
+    except Exception:
+        limit = 50
+    try:
+        entries = get_llm_debug(limit=limit)
+        return jsonify({"ok": True, "entries": entries})
+    except Exception as e:
+        logging.error(f"api_llm_debug error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
