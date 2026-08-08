@@ -60,6 +60,69 @@ def init_db():
                 action_taken TEXT
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL DEFAULT 'local',
+                agent_id TEXT NOT NULL DEFAULT 'hachi',
+                category TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                content TEXT NOT NULL,
+                embedding TEXT,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                source TEXT NOT NULL DEFAULT 'explicit',
+                status TEXT NOT NULL DEFAULT 'active',
+                supersedes_id INTEGER,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reminders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                due_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                fired_at TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                course TEXT DEFAULT '',
+                due_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                due_at TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assistant_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
         # Indexes for faster date + content searches
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_conv_timestamp ON conversations(timestamp)
@@ -67,6 +130,14 @@ def init_db():
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_tasks_timestamp ON tasks(timestamp)
         """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_memory_scope_subject
+            ON memories(user_id, agent_id, category, subject, status)
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, due_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_assignments_due ON assignments(status, due_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status, due_at)")
         conn.commit()
 
 

@@ -1,5 +1,7 @@
 {
   "model_name": "qwen2.5:3b",
+  "voice_transcription_model": "small",
+  "voice_stt_engine": "openai-whisper",
   "use_deepseek": true,
   "deepseek_model": "deepseek-v4-flash",
   "tagalog_voice": "fil-PH-AngeloNeural",

@@ -12,7 +12,32 @@ import time
 import shutil
 import re
 import winreg
-from hachi_db import search_history, add_task
+import difflib
+import ipaddress
+import socket
+from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse, urlunparse
+from hachi_db import search_history, add_task, get_connection, init_db
+from hachi_memory import format_memory_search, save_memory
+from hachi_productivity import (
+    add_assignment_deadline,
+    add_todo,
+    capture_screenshot,
+    clipboard_get,
+    clipboard_set,
+    daily_recap,
+    list_assignment_deadlines,
+    list_notes,
+    list_reminders,
+    list_todos,
+    open_local_file,
+    read_document,
+    save_note,
+    set_focus_cycle,
+    set_reminder,
+    system_health_report,
+)
 
 # logging is configured by hachi_app.py (only one basicConfig call)
 
@@ -80,6 +105,199 @@ APP_ALIASES = {
     "edge": "msedge",
     "notepad": "notepad",
 }
+
+_start_apps_cache = []
+_start_apps_cache_at = 0.0
+_start_apps_lock = threading.Lock()
+_recent_opened_apps: list[str] = []
+_recent_apps_lock = threading.Lock()
+_recent_apps_loaded = False
+
+
+def _ensure_recent_apps_loaded() -> None:
+    global _recent_apps_loaded
+    with _recent_apps_lock:
+        if _recent_apps_loaded:
+            return
+    restored = []
+    try:
+        init_db()
+        with closing(get_connection()) as conn:
+            row = conn.execute("SELECT value FROM assistant_state WHERE key='recent_opened_apps'").fetchone()
+        if row:
+            value = json.loads(row["value"])
+            if isinstance(value, list):
+                restored = [str(item).strip() for item in value if str(item).strip()][-12:]
+    except Exception as exc:
+        logging.debug("Could not restore recent app state: %s", exc)
+    with _recent_apps_lock:
+        if not _recent_apps_loaded:
+            _recent_opened_apps[:] = restored
+            _recent_apps_loaded = True
+
+
+def _persist_recent_apps() -> None:
+    with _recent_apps_lock:
+        value = json.dumps(_recent_opened_apps[-12:])
+    try:
+        init_db()
+        with closing(get_connection()) as conn:
+            conn.execute(
+                "INSERT INTO assistant_state(key,value,updated_at) VALUES('recent_opened_apps',?,datetime('now','localtime')) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+                (value,),
+            )
+            conn.commit()
+    except Exception as exc:
+        logging.debug("Could not persist recent app state: %s", exc)
+
+
+def _remember_opened_app(app_name: str) -> None:
+    _ensure_recent_apps_loaded()
+    clean = _normalize_app_name(app_name)
+    if not clean:
+        return
+    with _recent_apps_lock:
+        _recent_opened_apps[:] = [name for name in _recent_opened_apps if _normalize_app_name(name) != clean]
+        _recent_opened_apps.append(app_name.strip())
+        del _recent_opened_apps[:-12]
+    _persist_recent_apps()
+
+
+def get_recently_opened_apps(limit: int = 2) -> list[str]:
+    _ensure_recent_apps_loaded()
+    with _recent_apps_lock:
+        return list(_recent_opened_apps[-max(1, min(int(limit or 2), 12)):])
+
+
+def close_recent_apps(count: int = 2) -> str:
+    apps = get_recently_opened_apps(count)
+    if not apps:
+        return "I don't have any recently opened applications to close."
+    results = [(app, close_app(app)) for app in reversed(apps)]
+    closed = [app for app, result in results if result.lower().startswith("closed")]
+    failed = [app for app, result in results if not result.lower().startswith("closed")]
+    parts = []
+    if closed:
+        parts.append("Closed " + ", ".join(reversed(closed)) + ".")
+    if failed:
+        parts.append("Could not find " + ", ".join(reversed(failed)) + " running.")
+    return " ".join(parts)
+
+
+def _normalize_app_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _get_start_apps(force: bool = False) -> list[dict]:
+    """Return Windows Start application display names and AppIDs.
+
+    `Get-StartApps` covers packaged/UWP applications that have no stable exe or
+    Start Menu shortcut. Results are cached because PowerShell startup is slow.
+    """
+    global _start_apps_cache, _start_apps_cache_at
+    with _start_apps_lock:
+        if not force and _start_apps_cache and time.time() - _start_apps_cache_at < 300:
+            return list(_start_apps_cache)
+        try:
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            raw = (completed.stdout or "").strip()
+            parsed = json.loads(raw) if raw else []
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            rows = [
+                {"name": str(row.get("Name") or "").strip(), "app_id": str(row.get("AppID") or "").strip()}
+                for row in parsed
+                if isinstance(row, dict) and row.get("Name") and row.get("AppID")
+            ]
+            _start_apps_cache = rows
+            _start_apps_cache_at = time.time()
+        except Exception as exc:
+            logging.debug("Get-StartApps unavailable: %s", exc)
+        return list(_start_apps_cache)
+
+
+def _resolve_start_app(app_name: str) -> tuple[dict | None, bool]:
+    """Return (match, ambiguous). Fuzzy matching is deliberately conservative."""
+    wanted = _normalize_app_name(app_name)
+    if not wanted:
+        return None, False
+    rows = _get_start_apps()
+    normalized = [(row, _normalize_app_name(row["name"])) for row in rows]
+    for row, name in normalized:
+        if name == wanted:
+            return row, False
+    prefix = [row for row, name in normalized if name.startswith(wanted) or wanted.startswith(name)]
+    if len(prefix) == 1:
+        return prefix[0], False
+    contains = [row for row, name in normalized if wanted in name or name in wanted]
+    if len(contains) == 1:
+        return contains[0], False
+    scored = sorted(
+        ((difflib.SequenceMatcher(None, wanted, name).ratio(), row) for row, name in normalized),
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    if not scored or scored[0][0] < 0.78:
+        return None, False
+    ambiguous = len(scored) > 1 and scored[1][0] >= scored[0][0] - 0.04
+    return (None if ambiguous else scored[0][1]), ambiguous
+
+
+def _visible_window_processes() -> set[tuple[int, str]]:
+    """Best-effort visible top-level window snapshot as (pid, process name)."""
+    found: set[tuple[int, str]] = set()
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+        def visit(hwnd, _lparam):
+            if user32.IsWindowVisible(hwnd):
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                try:
+                    found.add((int(pid.value), psutil.Process(pid.value).name().lower()))
+                except (psutil.Error, OSError):
+                    pass
+            return True
+
+        user32.EnumWindows(enum_proc(visit), 0)
+    except Exception as exc:
+        logging.debug("Window enumeration unavailable: %s", exc)
+    return found
+
+
+def _wait_for_app_window(app_name: str, before: set[tuple[int, str]], timeout: float = 4.0) -> bool:
+    wanted = _normalize_app_name(APP_ALIASES.get(app_name.lower().strip(), app_name))
+    tokens = {token for token in wanted.split() if len(token) > 1}
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        current = _visible_window_processes()
+        new_rows = current - before
+        candidates = new_rows or current
+        for _pid, process_name in candidates:
+            normalized = _normalize_app_name(os.path.splitext(process_name)[0])
+            if wanted and (wanted in normalized or normalized in wanted):
+                return True
+            if tokens and tokens.intersection(normalized.split()):
+                return True
+        time.sleep(0.2)
+    return False
 
 def _resolve_app_paths(app_name: str):
     """Resolve via the Windows 'App Paths' registry — the standard mechanism that
@@ -230,7 +448,7 @@ def find_app_in_start_menu(app_name: str):
 
     return best_match
 
-def launch_app(app_name, args=None):
+def _launch_app_unverified(app_name, args=None):
     """Launch app process with protocol fallbacks for 100% reliability on any PC.
     Returns a user-facing spoken confirmation (not a bare bool)."""
     if not app_name or not app_name.strip():
@@ -349,10 +567,84 @@ def launch_app(app_name, args=None):
         logging.warning(f"Could not open {app_name} via any method: {e}")
         return f"Sorry, I couldn't find or open {app_name}."
 
+
+def launch_app_detailed(app_name: str, args=None, verify_timeout: float = 4.0) -> dict:
+    """Resolve, launch, and verify an application before reporting success."""
+    clean = (app_name or "").strip()
+    if not clean:
+        return {"app": clean, "ok": False, "verified": False, "reason": "missing_app_name"}
+    if any(value in clean for value in ("/", "\\", "://", "\x00")):
+        return {"app": clean, "ok": False, "verified": False, "reason": "display_name_required"}
+
+    before = _visible_window_processes()
+    if clean.lower() == "steam" and args and "-bigpicture" in args:
+        try:
+            os.startfile("steam://open/bigpicture")
+            verified = _wait_for_app_window("steam", before, verify_timeout)
+            return {
+                "app": "Steam Big Picture",
+                "ok": True,
+                "verified": verified,
+                "reason": "window_observed" if verified else "protocol_sent_window_not_observed",
+                "method": "steam_big_picture_protocol",
+            }
+        except Exception as exc:
+            logging.warning("Steam Big Picture protocol failed: %s", exc)
+    start_app, ambiguous = _resolve_start_app(clean)
+    if ambiguous:
+        return {"app": clean, "ok": False, "verified": False, "reason": "ambiguous_app_name"}
+
+    method = "legacy_fallback"
+    if start_app:
+        try:
+            subprocess.Popen(
+                ["explorer.exe", f"shell:AppsFolder\\{start_app['app_id']}"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            launch_result = f"Opening {start_app['name']}."
+            method = "start_app_id"
+        except Exception as exc:
+            logging.warning("AppID launch failed for %s: %s", clean, exc)
+            launch_result = _launch_app_unverified(clean, args=args)
+    else:
+        launch_result = _launch_app_unverified(clean, args=args)
+
+    if launch_result.lower().startswith("sorry") or launch_result.lower().startswith("no application"):
+        return {"app": clean, "ok": False, "verified": False, "reason": "launch_failed", "detail": launch_result}
+
+    verified = _wait_for_app_window(start_app["name"] if start_app else clean, before, verify_timeout)
+    return {
+        "app": start_app["name"] if start_app else clean,
+        "ok": True,
+        "verified": verified,
+        "reason": "window_observed" if verified else "launch_sent_window_not_observed",
+        "method": method,
+    }
+
+
+def launch_app(app_name, args=None):
+    detail = launch_app_detailed(app_name, args=args)
+    if not detail["ok"]:
+        if detail["reason"] == "ambiguous_app_name":
+            return f"I found several apps matching {app_name}; please use a more specific name."
+        return f"Sorry, I couldn't find or open {app_name}."
+    _remember_opened_app("steam" if detail["app"] == "Steam Big Picture" else detail["app"])
+    add_task(
+        f"Open App: {detail['app']}",
+        "Success" if detail["verified"] else "Unverified",
+        detail.get("method", ""),
+    )
+    if detail["verified"]:
+        return f"Opened {detail['app']} successfully."
+    return f"Sent the command to open {detail['app']}, but I could not verify its window."
+
 def close_app(app_name: str):
     """Close ANY application running on Windows by process or app name."""
     if not app_name or not app_name.strip():
         return "No application specified to close."   # CRITICAL: empty name would match every process
+    if re.fullmatch(r"(?:both|all|those|them|both of them|all of them|those apps|the apps)", app_name.strip(), re.IGNORECASE):
+        return close_recent_apps(2 if "both" in app_name.lower() else 12)
     closed_any = False
     app_clean = app_name.lower().replace(".exe", "").strip()
     
@@ -431,6 +723,12 @@ def close_app(app_name: str):
 
     if closed_any:
         msg = f"Closed application(s): {', '.join(set(terminated_list))}."
+        with _recent_apps_lock:
+            _recent_opened_apps[:] = [
+                name for name in _recent_opened_apps
+                if _normalize_app_name(name) not in {_normalize_app_name(app_name), _normalize_app_name(target_pattern)}
+            ]
+        _persist_recent_apps()
     else:
         msg = f"Could not find any active process matching '{app_name}' to close."
         
@@ -464,23 +762,26 @@ def launch_mode(mode_name: str):
     """
     mode_clean = mode_name.lower().strip()
     status_msg = ""
+    mode_success = True
     
     if "game" in mode_clean or "gaming" in mode_clean:
         # Gaming Mode: Steam + Discord only. Spotify is NOT opened automatically.
-        launch_app("steam", args=["-bigpicture"])
-        launch_app("discord")
-        status_msg = "Gaming Mode activated. Launched Steam (Big Picture) and Discord. Ready to game!"
+        steam_result = launch_app("steam", args=["-bigpicture"])
+        discord_result = launch_app("discord")
+        mode_success = not steam_result.lower().startswith("sorry")
+        prefix = "Gaming Mode started" if mode_success else "Gaming Mode could not start Steam Big Picture"
+        status_msg = f"{prefix}. {steam_result} {discord_result}"
         
     elif "study" in mode_clean or "code" in mode_clean or "office" in mode_clean:
-        launch_app("vscode")
-        launch_app("chatgpt")
-        launch_app("spotify")
-        status_msg = "Study Mode activated. Launched VS Code, ChatGPT, and Spotify."
+        results = [(app, launch_app(app)) for app in ("vscode", "chatgpt", "spotify")]
+        mode_success = all(not result.lower().startswith("sorry") for _app, result in results)
+        status_msg = "Study Mode launch results: " + " ".join(result for _app, result in results)
         
     elif "movie" in mode_clean or "watch" in mode_clean:
-        webbrowser.open("https://youtube.com")
-        webbrowser.open("https://netflix.com")
-        status_msg = "Movie Mode activated. Opened YouTube and Netflix in browser."
+        youtube_ok = webbrowser.open("https://youtube.com")
+        netflix_ok = webbrowser.open("https://netflix.com")
+        mode_success = bool(youtube_ok and netflix_ok)
+        status_msg = "Movie Mode opened YouTube and Netflix." if mode_success else "Movie Mode sent browser open commands, but could not verify both pages."
         
     elif "focus" in mode_clean or "timer" in mode_clean:
         # Focus Mode: NO apps are launched automatically — just start the Pomodoro timer.
@@ -492,8 +793,9 @@ def launch_mode(mode_name: str):
         )
     else:
         status_msg = f"Unknown mode '{mode_name}'."
+        mode_success = False
         
-    add_task(f"Mode Request: {mode_name}", "Success", status_msg)
+    add_task(f"Mode Request: {mode_name}", "Success" if mode_success else "Failed", status_msg)
     return status_msg
 
 def close_mode(mode_name: str):
@@ -684,29 +986,133 @@ def get_weather(location: str = "Manila"):
 
     return f"Unable to fetch live weather for {display} right now."
 
-def search_web(query: str):
-    """Perform live web search via DuckDuckGo JSON API (duckduckgo_search)."""
+def _canonical_url(url: str) -> str:
     try:
-        from ddgs import DDGS
-        
-        logging.info(f"[Search Engine] Performing query: '{query}'")
-        results = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=6):
-                title = r.get("title", "")
-                snippet = r.get("body", "")
-                href = r.get("href", "")
-                if title or snippet:
-                    results.append(f"• **{title}**: {snippet}" + (f" ({href})" if href else ""))
-                    
-        if results:
-            summary = f"**Live Web Search results for '{query}':**\n\n" + "\n".join(results)
-            add_task(f"Web Search: {query}", "Success", summary[:300])
-            return summary
-    except Exception as e:
-        logging.error(f"DuckDuckGo search_web API error: {e}")
-        
-    return f"Searched web for '{query}', but could not retrieve live results right now."
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        path = re.sub(r"/$", "", parsed.path or "")
+        return urlunparse((parsed.scheme.lower(), host, path, "", parsed.query, ""))
+    except Exception:
+        return url
+
+
+def _focused_search_queries(query: str) -> list[str]:
+    """Create a bounded deterministic query set and always retain the original."""
+    clean = re.sub(r"\s+", " ", (query or "")).strip()
+    if not clean:
+        return []
+    queries = [clean]
+    lower = clean.lower()
+    if any(word in lower for word in ("latest", "current", "today", "news", "recent")):
+        year = time.localtime().tm_year
+        if str(year) not in clean:
+            queries.append(f"{clean} {year}")
+    comparison = re.split(r"\s+(?:vs\.?|versus)\s+", clean, maxsplit=1, flags=re.IGNORECASE)
+    if len(comparison) == 2 and all(part.strip() for part in comparison):
+        queries.extend(part.strip() for part in comparison)
+    return list(dict.fromkeys(queries))[:3]
+
+
+def _search_ddgs(query: str, limit: int = 6) -> list[dict]:
+    from ddgs import DDGS
+
+    records = []
+    with DDGS(timeout=8) as ddgs:
+        for row in ddgs.text(query, max_results=limit):
+            records.append({
+                "title": str(row.get("title") or "").strip(),
+                "url": str(row.get("href") or "").strip(),
+                "snippet": str(row.get("body") or "").strip(),
+                "provider": "duckduckgo",
+                "query": query,
+            })
+    return records
+
+
+def _search_wikipedia(query: str, limit: int = 5) -> list[dict]:
+    response = requests.get(
+        "https://en.wikipedia.org/w/api.php",
+        params={"action": "query", "list": "search", "srsearch": query, "format": "json", "utf8": 1, "srlimit": limit},
+        headers={"User-Agent": "HachiDesktopAssistant/1.0"},
+        timeout=6,
+    )
+    response.raise_for_status()
+    records = []
+    for row in response.json().get("query", {}).get("search", []):
+        title = str(row.get("title") or "").strip()
+        snippet = re.sub(r"<[^>]+>", " ", str(row.get("snippet") or ""))
+        if title:
+            records.append({
+                "title": title,
+                "url": "https://en.wikipedia.org/wiki/" + requests.utils.quote(title.replace(" ", "_")),
+                "snippet": re.sub(r"\s+", " ", snippet).strip(),
+                "provider": "wikipedia",
+                "query": query,
+            })
+    return records
+
+
+def search_web_records(query: str, max_results: int = 8) -> list[dict]:
+    """Search focused subqueries concurrently, cascade providers, and dedupe URLs."""
+    queries = _focused_search_queries(query)
+    if not queries:
+        return []
+    logging.info("[Search Engine] focused queries=%s", queries)
+    gathered: list[dict] = []
+    with ThreadPoolExecutor(max_workers=min(3, len(queries))) as pool:
+        futures = {pool.submit(_search_ddgs, subquery, 6): subquery for subquery in queries}
+        for future in as_completed(futures):
+            try:
+                gathered.extend(future.result())
+            except Exception as exc:
+                logging.warning("DuckDuckGo query failed for %r: %s", futures[future], exc)
+    if not gathered:
+        try:
+            gathered = _search_wikipedia(query, limit=max_results)
+        except Exception as exc:
+            logging.warning("Wikipedia search fallback failed: %s", exc)
+
+    deduped = []
+    seen = set()
+    query_tokens = {token for token in re.findall(r"[a-z0-9]+", query.lower()) if len(token) > 2}
+    for row in gathered:
+        key = _canonical_url(row.get("url", "")) or row.get("title", "").lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        haystack = f"{row.get('title', '')} {row.get('snippet', '')}".lower()
+        row["relevance"] = len(query_tokens.intersection(re.findall(r"[a-z0-9]+", haystack)))
+        deduped.append(row)
+    deduped.sort(key=lambda item: item.get("relevance", 0), reverse=True)
+    return deduped[:max_results]
+
+
+def search_web(query: str):
+    """Return compact, deduplicated live search evidence with provenance."""
+    records = search_web_records(query)
+    if not records:
+        return f"Searched web for '{query}', but could not retrieve live results right now."
+    lines = [
+        f"• **{row['title']}**: {row['snippet']} ({row['url']}) [source: {row.get('provider', 'web')}]"
+        for row in records
+    ]
+    summary = f"**Live Web Search results for '{query}':**\n\n" + "\n".join(lines)
+    add_task(f"Web Search: {query}", "Success", summary[:300])
+    return summary
+
+
+def _is_public_http_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        host = parsed.hostname.lower().rstrip(".")
+        if host in {"localhost", "localhost.localdomain"}:
+            return False
+        addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)}
+        return all(ipaddress.ip_address(address).is_global for address in addresses)
+    except Exception:
+        return False
 
 def fetch_url(url: str):
     """
@@ -719,11 +1125,26 @@ def fetch_url(url: str):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        # Stream and cap download size so multi-MB pages don't hang or blow memory
-        res = requests.get(url, headers=headers, timeout=10, stream=True)
+        if not _is_public_http_url(url):
+            return f"Could not fetch unsafe or non-public URL: {url}"
+
+        # Validate every redirect target to prevent public-to-private SSRF hops.
+        current_url = url
+        res = None
+        for _redirect in range(4):
+            res = requests.get(current_url, headers=headers, timeout=5, stream=True, allow_redirects=False)
+            if res.status_code not in (301, 302, 303, 307, 308):
+                break
+            next_url = requests.compat.urljoin(current_url, res.headers.get("Location", ""))
+            res.close()
+            if not _is_public_http_url(next_url):
+                return f"Could not follow unsafe redirect from {current_url}."
+            current_url = next_url
+        if res is None:
+            return f"Could not fetch URL: {url}"
         if res.status_code != 200:
             res.close()
-            return f"Could not fetch URL (HTTP {res.status_code}): {url}"
+            return f"Could not fetch URL (HTTP {res.status_code}): {current_url}"
 
         MAX_BYTES = 1_500_000
         chunks = []
@@ -750,11 +1171,19 @@ def fetch_url(url: str):
             text = soup.get_text(separator="\n", strip=True)
 
         # Clean up excess whitespace
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        cleaned = "\n".join(lines)[:2500]
+        lines = [re.sub(r"\s+", " ", l).strip() for l in text.splitlines() if l.strip()]
+        deduped_lines = []
+        seen_lines = set()
+        for line in lines:
+            key = line.lower()
+            if len(line) < 2 or key in seen_lines:
+                continue
+            seen_lines.add(key)
+            deduped_lines.append(line)
+        cleaned = "\n".join(deduped_lines)[:4000]
 
         add_task(f"Fetch URL: {url[:60]}", "Success", f"Retrieved {len(cleaned)} chars")
-        return f"**Content from {url}:**\n\n{cleaned}"
+        return f"**Untrusted web content from {current_url}:**\n\n{cleaned}"
     except Exception as e:
         logging.error(f"fetch_url error for {url}: {e}")
         return f"Could not retrieve content from {url}: {e}"
@@ -931,8 +1360,24 @@ AVAILABLE_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "remember_fact",
+            "description": "Save an explicit durable user fact or preference for future conversations. Use only when the user asks Hachi to remember it.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "The exact fact or preference to remember"},
+                    "category": {"type": "string", "description": "Optional category such as preference, identity, profile, or fact"},
+                    "subject": {"type": "string", "description": "Optional stable subject such as favorite color or home city"}
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_memory",
-            "description": "Check past user conversations, tasks, or activities logged in database",
+            "description": "Recall durable user facts semantically and search past conversations/tasks",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -941,6 +1386,103 @@ AVAILABLE_TOOLS = [
                 }
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "close_recent_apps",
+            "description": "Close the applications Hachi most recently opened. Use for 'close both', 'close them', or 'close those apps'.",
+            "parameters": {"type": "object", "properties": {"count": {"type": "integer", "description": "2 for both; use up to 12 for all"}}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "summarize_document",
+            "description": "Read a local PDF, DOCX, TXT, Markdown, CSV, or JSON document so you can summarize its extracted text.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Filename or path in Desktop, Documents, Downloads, or Hachi"}}, "required": ["path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_local_file",
+            "description": "Open a local user file using its default Windows application.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_reminder",
+            "description": "Set a persistent spoken reminder or alarm. Prefer an absolute local due_at time; minutes_from_now is ideal for timers.",
+            "parameters": {"type": "object", "properties": {
+                "title": {"type": "string"}, "due_at": {"type": "string", "description": "e.g. 2026-08-08 16:30 or 4:30 PM"},
+                "minutes_from_now": {"type": "number"}}, "required": ["title"]}
+        }
+    },
+    {
+        "type": "function", "function": {"name": "list_reminders", "description": "List pending reminders and alarms.", "parameters": {"type": "object", "properties": {}}}
+    },
+    {
+        "type": "function", "function": {
+            "name": "add_assignment_deadline", "description": "Save a homework, project, exam, or assignment deadline.",
+            "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "due_at": {"type": "string"}, "course": {"type": "string"}}, "required": ["title", "due_at"]}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "list_assignment_deadlines", "description": "List assignments due in the next number of days.",
+            "parameters": {"type": "object", "properties": {"days": {"type": "integer"}}}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "save_note", "description": "Save a dictated or typed note to Hachi's SQLite notebook. Clean the content into readable text first.",
+            "parameters": {"type": "object", "properties": {"content": {"type": "string"}, "title": {"type": "string"}}, "required": ["content"]}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "list_notes", "description": "Show saved notes, optionally filtered by date or keywords.",
+            "parameters": {"type": "object", "properties": {"date_str": {"type": "string"}, "query": {"type": "string"}}}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "daily_recap", "description": "Retrieve today's or a date's conversations, tasks, and notes so you can organize them into a timeline recap.",
+            "parameters": {"type": "object", "properties": {"date_str": {"type": "string", "description": "YYYY-MM-DD"}}}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "set_focus_cycle", "description": "Start a configurable Pomodoro work/break cycle.",
+            "parameters": {"type": "object", "properties": {"work_minutes": {"type": "integer"}, "break_minutes": {"type": "integer"}, "cycles": {"type": "integer"}}}
+        }
+    },
+    {
+        "type": "function", "function": {"name": "capture_screenshot", "description": "Capture all screens and save a PNG in Pictures/Hachi Captures.", "parameters": {"type": "object", "properties": {}}}
+    },
+    {
+        "type": "function", "function": {"name": "system_health_report", "description": "Inspect CPU, memory, battery, and disk storage for a laptop health explanation.", "parameters": {"type": "object", "properties": {}}}
+    },
+    {
+        "type": "function", "function": {"name": "clipboard_get", "description": "Read text currently on the Windows clipboard.", "parameters": {"type": "object", "properties": {}}}
+    },
+    {
+        "type": "function", "function": {
+            "name": "clipboard_set", "description": "Copy provided text to the Windows clipboard.",
+            "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "add_todo", "description": "Add an item to the local to-do list.",
+            "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "due_at": {"type": "string"}}, "required": ["title"]}
+        }
+    },
+    {
+        "type": "function", "function": {"name": "list_todos", "description": "List pending local to-do items.", "parameters": {"type": "object", "properties": {}}}
     },
     {
         "type": "function",
@@ -970,6 +1512,14 @@ def execute_tool_call(tool_name: str, arguments: dict):
         "get_weather": "location",
         "search_web": "query",
         "fetch_url": "url",
+        "remember_fact": "content",
+        "summarize_document": "path",
+        "open_local_file": "path",
+        "set_reminder": "title",
+        "add_assignment_deadline": "title",
+        "save_note": "content",
+        "clipboard_set": "text",
+        "add_todo": "title",
     }
     if tool_name in REQUIRED_ARGS and not arguments.get(REQUIRED_ARGS[tool_name]):
         msg = f"Tool {tool_name} needs a value for '{REQUIRED_ARGS[tool_name]}' but none was provided."
@@ -983,6 +1533,8 @@ def execute_tool_call(tool_name: str, arguments: dict):
         return launch_app(arguments.get("app_name", ""))
     elif tool_name == "close_app":
         return close_app(arguments.get("app_name", ""))
+    elif tool_name == "close_recent_apps":
+        return close_recent_apps(arguments.get("count", 2))
     elif tool_name == "shutdown_hachi":
         return shutdown_hachi()
     elif tool_name == "get_weather":
@@ -995,8 +1547,52 @@ def execute_tool_call(tool_name: str, arguments: dict):
         res = fetch_url(arguments.get("url", ""))
         logging.info(f"Tool fetch_url result length: {len(res) if isinstance(res,str) else 'n/a'}")
         return res
+    elif tool_name == "summarize_document":
+        return read_document(arguments.get("path", ""))
+    elif tool_name == "open_local_file":
+        return open_local_file(arguments.get("path", ""))
+    elif tool_name == "set_reminder":
+        return set_reminder(arguments.get("title", ""), arguments.get("due_at", ""), arguments.get("minutes_from_now"))
+    elif tool_name == "list_reminders":
+        return list_reminders()
+    elif tool_name == "add_assignment_deadline":
+        if not arguments.get("due_at"):
+            return "Tool add_assignment_deadline needs a value for 'due_at' but none was provided."
+        return add_assignment_deadline(arguments.get("title", ""), arguments.get("due_at", ""), arguments.get("course", ""))
+    elif tool_name == "list_assignment_deadlines":
+        return list_assignment_deadlines(arguments.get("days", 7))
+    elif tool_name == "save_note":
+        return save_note(arguments.get("content", ""), arguments.get("title", ""))
+    elif tool_name == "list_notes":
+        return list_notes(arguments.get("date_str", ""), arguments.get("query", ""))
+    elif tool_name == "daily_recap":
+        return daily_recap(arguments.get("date_str", ""))
+    elif tool_name == "set_focus_cycle":
+        return set_focus_cycle(arguments.get("work_minutes", 25), arguments.get("break_minutes", 5), arguments.get("cycles", 4))
+    elif tool_name == "capture_screenshot":
+        return capture_screenshot()
+    elif tool_name == "system_health_report":
+        return system_health_report()
+    elif tool_name == "clipboard_get":
+        return clipboard_get()
+    elif tool_name == "clipboard_set":
+        return clipboard_set(arguments.get("text", ""))
+    elif tool_name == "add_todo":
+        return add_todo(arguments.get("title", ""), arguments.get("due_at", ""))
+    elif tool_name == "list_todos":
+        return list_todos()
+    elif tool_name == "remember_fact":
+        saved = save_memory(
+            arguments.get("content", ""),
+            category=arguments.get("category", ""),
+            subject=arguments.get("subject", ""),
+        )
+        return json.dumps(saved, ensure_ascii=False)
     elif tool_name == "search_memory":
-        return search_history(query=arguments.get("query"), date_str=arguments.get("date_str"))
+        query = arguments.get("query") or ""
+        durable = format_memory_search(query, limit=5)
+        history = search_history(query=query, date_str=arguments.get("date_str"), limit=5)
+        return f"Durable memories:\n{durable}\n\nConversation/task history:\n{history}"
     elif tool_name == "get_system_stats":
         res = get_system_stats()
         logging.info(f"Tool get_system_stats: {res}")

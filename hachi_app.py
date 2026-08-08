@@ -48,6 +48,7 @@ logging.basicConfig(
 
 from hachi_web import app, FLASK_PORT, start_wakeword_listener
 from hachi_db import init_db
+from hachi_productivity import start_reminder_scheduler
 
 
 def _wait_for_flask(host="127.0.0.1", port=FLASK_PORT, timeout=15):
@@ -90,6 +91,7 @@ def main():
 
     # Initialize DB once at startup (not on every DB call)
     init_db()
+    start_reminder_scheduler()
 
     # Start background wakeword listener ('Hey Hachi')
     start_wakeword_listener()
