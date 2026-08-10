@@ -1,0 +1,35 @@
+{
+  "routines": {
+    "daily_briefing": {
+      "name": "Daily Briefing",
+      "description": "Checks Manila weather and gives a local system-health snapshot.",
+      "steps": [
+        {"tool": "get_weather", "arguments": {"location": "Manila"}},
+        {"tool": "system_health_report", "arguments": {}}
+      ]
+    },
+    "study_sprint": {
+      "name": "Study Sprint",
+      "description": "Opens VS Code and Spotify, then starts a four-cycle 25/5 focus schedule.",
+      "steps": [
+        {"tool": "launch_app", "arguments": {"app_name": "vscode"}},
+        {"tool": "launch_app", "arguments": {"app_name": "spotify"}},
+        {"tool": "set_focus_cycle", "arguments": {"work_minutes": 25, "break_minutes": 5, "cycles": 4}}
+      ]
+    },
+    "gaming_setup": {
+      "name": "Gaming Setup",
+      "description": "Starts Hachi's verified gaming mode (Steam Big Picture and Discord).",
+      "steps": [
+        {"tool": "launch_mode", "arguments": {"mode_name": "gaming"}}
+      ]
+    },
+    "research_brief": {
+      "name": "Research Brief",
+      "description": "Researches a current topic with multiple sources and page evidence. Supply a topic after the routine name.",
+      "steps": [
+        {"tool": "research_web", "arguments": {"query": "{{input}}"}}
+      ]
+    }
+  }
+}

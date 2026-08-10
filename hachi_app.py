@@ -5,6 +5,7 @@ Desktop Application Launcher using PyWebView
 """
 import os
 import sys
+import json
 # Force UTF-8 output so emoji / non-ASCII chars don't crash the Windows terminal
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -47,6 +48,7 @@ logging.basicConfig(
 )
 
 from hachi_web import app, FLASK_PORT, start_wakeword_listener
+from hachi_web import start_tts_janitor
 from hachi_db import init_db
 from hachi_productivity import start_reminder_scheduler
 
@@ -64,6 +66,16 @@ def _wait_for_flask(host="127.0.0.1", port=FLASK_PORT, timeout=15):
         except OSError:
             time.sleep(0.2)
     return False
+
+
+def _wakeword_is_enabled() -> bool:
+    """Read the optional wake-word setting without making startup fragile."""
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            return bool(json.load(config_file).get("wakeword_enabled", False))
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 def run_flask():
@@ -93,8 +105,13 @@ def main():
     init_db()
     start_reminder_scheduler()
 
-    # Start background wakeword listener ('Hey Hachi')
-    start_wakeword_listener()
+    # Browser voice mode has its own microphone path. Keep the old always-on
+    # wake-word listener opt-in so it cannot contend for the microphone.
+    start_tts_janitor()
+    if _wakeword_is_enabled():
+        start_wakeword_listener()
+    else:
+        logging.info("Wake-word listener is disabled by config.")
 
     print("🌐 Opening native desktop application window...")
     print("\nMake sure Ollama is running! (http://localhost:11434)")

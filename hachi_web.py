@@ -12,7 +12,7 @@ from flask import Flask, render_template, request, jsonify, Response, stream_wit
 from werkzeug.utils import secure_filename
 from hachi_agent import process_agent_request, get_llm_debug
 from hachi_tools import get_tool_capabilities
-from hachi_speech import speak, speak_quick, interrupt_speech, generate_tts_audio, _is_stop_phrase
+from hachi_speech import speak, interrupt_speech, generate_tts_audio, _is_stop_phrase
 from hachi_runtime import TurnCancelled, cancel_turn, create_turn, finish_turn
 
 app = Flask(__name__)
@@ -270,6 +270,33 @@ def api_upload_pdf():
         return jsonify({"error": f"Could not save the PDF: {exc}"}), 500
 
 
+@app.route("/api/transcribe_meeting_audio", methods=["POST"])
+def api_transcribe_meeting_audio():
+    """Transcribe a user-selected meeting recording, retaining no audio copy."""
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "An audio file is required."}), 400
+    if request.content_length and request.content_length > 100_000_000:
+        return jsonify({"error": "Audio files must be 100 MB or smaller."}), 413
+    suffix = os.path.splitext(upload.filename or "meeting.wav")[1].lower() or ".wav"
+    if suffix not in {".wav", ".mp3", ".m4a", ".ogg", ".webm", ".mp4", ".flac"}:
+        return jsonify({"error": "Use WAV, MP3, M4A, OGG, WebM, MP4, or FLAC audio."}), 400
+    path = os.path.join(tempfile.gettempdir(), f"hachi_meeting_{uuid.uuid4().hex}{suffix}")
+    try:
+        upload.save(path)
+        from hachi_whisper import transcribe_audio_file
+        transcript = transcribe_audio_file(path)
+        if not transcript:
+            return jsonify({"error": "Hachi could not transcribe that audio. Check the recording and speech model."}), 422
+        return jsonify({"transcript": transcript, "name": secure_filename(upload.filename or "meeting audio")})
+    except Exception as exc:
+        logging.exception("Meeting audio transcription failed")
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        try: os.remove(path)
+        except OSError: pass
+
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     """Text chat: LLM response with async TTS.
@@ -303,6 +330,7 @@ def api_stream_chat():
     data     = request.json or {}
     user_msg = data.get("message", "").strip()
     mode     = data.get("mode", "default")
+    conversation_id = data.get("conversation_id", "default")
     attachment_id = data.get("attachment_id", "")
     turn_id  = str(data.get("turn_id") or uuid.uuid4())
     turn_ctx = create_turn(turn_id)
@@ -352,7 +380,9 @@ def api_stream_chat():
     def generate():
         try:
             from hachi_agent import process_agent_request_stream
-            for event in process_agent_request_stream(user_msg, mode, voice_mode=False, turn_context=turn_ctx):
+            for event in process_agent_request_stream(
+                user_msg, mode, voice_mode=False, turn_context=turn_ctx, conversation_id=conversation_id
+            ):
                 yield "data: " + json.dumps(event) + "\n\n"
         except GeneratorExit:
             cancel_turn(turn_id)

@@ -8,7 +8,6 @@ import logging
 import re
 import time
 import random
-import speech_recognition as sr
 from typing import Optional
 
 try:
@@ -193,6 +192,8 @@ def _is_stop_phrase(text: str) -> bool:
 
 def _monitor_stop_during_tts(done: threading.Event):
     """Fast native stop listener used only for non-browser TTS playback."""
+    import speech_recognition as sr
+
     while not done.is_set() and not voice_mode_active.is_set():
         if not _mic_lock.acquire(blocking=False):
             done.wait(0.1)
@@ -406,6 +407,8 @@ def listen_voice_input() -> str:
     - Tries fil-PH first, then en-US (best Tagalog/Taglish coverage)
     - BLOCKING acquire (timeout 8 s): waits for wakeword listener to finish its cycle
     """
+    import speech_recognition as sr
+
     global _noise_threshold, _noise_calibrated_at
 
     acquired = _mic_lock.acquire(timeout=8)
@@ -470,6 +473,8 @@ def listen_for_wakeword() -> bool:
     the voice overlay is open (browser owns the mic). Recognizes English then
     Tagalog so Tagalog speakers can wake it too.
     """
+    import speech_recognition as sr
+
     if voice_mode_active.is_set():
         return False
     acquired = _mic_lock.acquire(blocking=False)

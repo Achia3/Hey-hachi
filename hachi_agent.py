@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime
 from typing import Optional
-from hachi_tools import AVAILABLE_TOOLS, execute_tool_call, fetch_url, get_tool_capability, search_web
+from hachi_tools import AVAILABLE_TOOLS, execute_tool_call, fetch_url, get_tool_capability, match_routine_name, search_web
 from hachi_db import add_message, search_history, get_recent_messages
 from hachi_memory import capture_explicit_memory, format_memory_search
 from hachi_runtime import TurnContext, TurnCancelled, classify_provider_error
@@ -196,9 +196,15 @@ LENGTH:
 - For web-search results, explanations, or detailed questions, give a NORMAL, complete answer. Don't truncate it.
 """
 
-# In-session short-term memory (resets on restart)
-_session_history = []
+# In-session short-term memory, isolated per UI conversation (resets on restart).
+# Durable user memories remain shared intentionally; ordinary chat context does not.
+_session_histories = {"default": []}
 _history_lock = threading.Lock()   # protects _session_history (voice + text interleave)
+
+
+def _conversation_key(value: object) -> str:
+    clean = re.sub(r"[^a-zA-Z0-9_-]", "", str(value or ""))[:80]
+    return clean or "default"
 
 
 def _load_db_memory(max_turns: int = 12):
@@ -208,10 +214,11 @@ def _load_db_memory(max_turns: int = 12):
     try:
         msgs = get_recent_messages(max_turns)
         with _history_lock:
+            history = _session_histories.setdefault("default", [])
             for m in msgs:
-                _session_history.append({"role": m["role"], "content": m["content"]})
-            if len(_session_history) > 20:
-                del _session_history[:-20]
+                history.append({"role": m["role"], "content": m["content"]})
+            if len(history) > 20:
+                del history[:-20]
         logging.info(f"[Memory] Preloaded {len(msgs)} recent conversation turns from DB")
     except Exception as e:
         logging.warning(f"[Memory] Could not load DB history: {e}")
@@ -231,19 +238,20 @@ class _EscalateToDeepSeek(Exception):
     """Internal signal: Qwen could not handle this — try DeepSeek."""
 
 
-def _get_history(cap: int) -> list:
+def _get_history(cap: int, conversation_id: str = "default") -> list:
     """Thread-safe slice of the session history."""
     with _history_lock:
-        return list(_session_history[-cap:])
+        return list(_session_histories.get(_conversation_key(conversation_id), [])[-cap:])
 
 
-def _update_history(user_msg: str, assistant_msg: str, cap: int = 20):
+def _update_history(user_msg: str, assistant_msg: str, cap: int = 20, conversation_id: str = "default"):
     """Thread-safe append to session history, trimmed to cap."""
     with _history_lock:
-        _session_history.append({"role": "user", "content": user_msg})
-        _session_history.append({"role": "assistant", "content": assistant_msg})
-        if len(_session_history) > cap:
-            del _session_history[:-cap]
+        history = _session_histories.setdefault(_conversation_key(conversation_id), [])
+        history.append({"role": "user", "content": user_msg})
+        history.append({"role": "assistant", "content": assistant_msg})
+        if len(history) > cap:
+            del history[:-cap]
 
 
 def strip_control_tokens(text: str) -> str:
@@ -886,6 +894,28 @@ def detect_intent_tool_call(user_input: str):
     if is_lookup_request(user_input):
         return _web_tool_for_request(user_input), {"query": build_lookup_query(user_input)}
 
+    if re.search(r"\b(?:turn on|enable|start)\s+(?:global\s+)?dictation\b", lower):
+        return "set_global_dictation", {"enabled": True}
+    if re.search(r"\b(?:turn off|disable|stop)\s+(?:global\s+)?dictation\b", lower):
+        return "set_global_dictation", {"enabled": False}
+    dictionary_match = re.search(r"\badd\s+(.+?)\s+to\s+(?:my\s+|the\s+)?voice\s+dictionary\b", user_input, re.IGNORECASE)
+    if dictionary_match:
+        return "add_voice_dictionary_term", {"term": dictionary_match.group(1).strip()}
+
+    spotify_match = re.search(r"\b(?:play|listen(?:\s+to)?|put\s+on)\s+(.+?)(?:\s+(?:on|in)\s+spotify)?\s*$", user_input, re.IGNORECASE)
+    if "spotify" in lower and spotify_match:
+        query = spotify_match.group(1).strip()
+        return "play_spotify", {"query": "" if query.lower() == "spotify" else query}
+
+    youtube_match = re.search(r"\b(?:play|watch)\s+(.+?)(?:\s+(?:on|in)\s+youtube)?\s*$", user_input, re.IGNORECASE)
+    if ("youtube" in lower or "youtu.be" in lower) and youtube_match:
+        query = youtube_match.group(1).strip()
+        return "play_youtube", {"query": "" if query.lower() in {"youtube", "youtu.be"} else query}
+
+    media_match = re.search(r"\b(play|pause|resume|next|skip|previous|prev|mute|volume up|volume down|louder|quieter)\b", lower)
+    if media_match:
+        return "media_control", {"action": media_match.group(1)}
+
     # Close mode triggers
     if any(p in lower for p in ["stop gaming", "exit game", "close game", "done playing"]):
         return "close_mode", {"mode_name": "gaming"}
@@ -963,6 +993,65 @@ def check_fast_intent(user_input: str, tool_runner=None) -> Optional[tuple[str, 
         return None
     lower = user_input.lower().strip()
     runner = tool_runner or execute_tool_call
+
+    if re.search(r"\b(?:turn on|enable|start)\s+(?:global\s+)?dictation\b", lower):
+        args = {"enabled": True}; res = runner("set_global_dictation", args)
+        return res, [{"tool": "set_global_dictation", "args": args, "output": res}]
+    if re.search(r"\b(?:turn off|disable|stop)\s+(?:global\s+)?dictation\b", lower):
+        args = {"enabled": False}; res = runner("set_global_dictation", args)
+        return res, [{"tool": "set_global_dictation", "args": args, "output": res}]
+    dictionary_match = re.search(r"\badd\s+(.+?)\s+to\s+(?:my\s+|the\s+)?voice\s+dictionary\b", user_input, re.IGNORECASE)
+    if dictionary_match:
+        args = {"term": dictionary_match.group(1).strip()}; res = runner("add_voice_dictionary_term", args)
+        return res, [{"tool": "add_voice_dictionary_term", "args": args, "output": res}]
+
+    # Explicit media requests should never fall through to gaming mode just
+    # because they contain "play".  Run these direct Windows/desktop tools
+    # without asking a small local model to construct a call perfectly.
+    media_match = re.search(r"\b(play|pause|resume|next|skip|previous|prev|mute|volume up|volume down|louder|quieter)\b", lower)
+    if media_match and not any(service in lower for service in ("spotify", "youtube", "youtu.be")):
+        action = media_match.group(1)
+        if action in {"play", "pause", "resume", "next", "skip", "previous", "prev", "mute", "volume up", "volume down", "louder", "quieter"}:
+            args = {"action": action}
+            res = runner("media_control", args)
+            return res, [{"tool": "media_control", "args": args, "output": res}]
+
+    spotify_match = re.search(r"\b(?:play|listen(?:\s+to)?|put\s+on)\s+(.+?)(?:\s+(?:on|in)\s+spotify)?\s*$", user_input, re.IGNORECASE)
+    if "spotify" in lower and spotify_match:
+        query = spotify_match.group(1).strip()
+        # "play Spotify" means resume/open it rather than search Spotify for itself.
+        if query.lower() == "spotify":
+            query = ""
+        args = {"query": query}
+        res = runner("play_spotify", args)
+        return res, [{"tool": "play_spotify", "args": args, "output": res}]
+
+    youtube_match = re.search(r"\b(?:play|watch)\s+(.+?)(?:\s+(?:on|in)\s+youtube)?\s*$", user_input, re.IGNORECASE)
+    if ("youtube" in lower or "youtu.be" in lower) and youtube_match:
+        query = youtube_match.group(1).strip()
+        if query.lower() in {"youtube", "youtu.be"}:
+            query = ""
+        args = {"query": query}
+        res = runner("play_youtube", args)
+        return res, [{"tool": "play_youtube", "args": args, "output": res}]
+
+    if re.search(r"\b(?:show|list|what(?:'s| is| are))\s+(?:my\s+|the\s+)?(?:routines|macros)\b", lower):
+        res = runner("list_routines", {})
+        return res, [{"tool": "list_routines", "args": {}, "output": res}]
+
+    # A named routine is a deliberate, user-requested macro.  Resolve it before
+    # generic mode keywords so "run gaming setup" executes the bounded routine
+    # rather than relying on a small model to infer a chain of tools.
+    if re.search(r"\b(?:run|start|execute|launch)\b", lower):
+        routine_name = match_routine_name(lower)
+        if routine_name:
+            routine_input = ""
+            if routine_name == "research_brief":
+                input_match = re.search(r"research\s+brief(?:ing)?\s*(?:for|on|about)?\s*(.*)$", user_input, re.IGNORECASE)
+                routine_input = input_match.group(1).strip() if input_match else ""
+            args = {"name": routine_name, "routine_input": routine_input}
+            res = runner("run_routine", args)
+            return res, [{"tool": "run_routine", "args": args, "output": res}]
 
     # Deterministic recovery for high-value commands when the model is offline
     # or failed to emit a tool call. These run only after model-first routing.
@@ -1246,6 +1335,7 @@ def classify_intent(user_input: str) -> str:
         "remind", "reminder", "alarm", "assignment", "deadline", "note",
         "recap", "screenshot", "clipboard", "document", "pdf", "docx",
         "file", "todo", "to-do", "storage", "disk health", "pomodoro",
+        "dictation", "voice dictionary", "transcription dictionary",
     }
     if any(m in lower for m in TOOL_MARKERS):
         return "TOOL_NEEDED"
@@ -1265,7 +1355,7 @@ def classify_intent(user_input: str) -> str:
     return "SIMPLE_CHAT"
 
 
-def process_agent_request(user_input: str, current_mode: str = "default"):
+def process_agent_request(user_input: str, current_mode: str = "default", conversation_id: str = "default"):
     """
     Process user input through Local Qwen (Primary Brain for chat/tools).
     DeepSeek API assists only for complex reasoning or when Qwen fails.
@@ -1281,7 +1371,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
     # path as streaming/voice so behavior cannot drift between UI entry points.
     terminal = None
     for event in process_agent_request_stream(
-        user_input, current_mode=current_mode, voice_mode=False, turn_context=None
+        user_input, current_mode=current_mode, voice_mode=False, turn_context=None, conversation_id=conversation_id
     ):
         if event.get("done"):
             terminal = event
@@ -1303,7 +1393,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
         add_message("user", user_input, current_mode)
         capture_explicit_memory(user_input)
         add_message("assistant", spoken, current_mode)
-        _update_history(user_input, spoken)
+        _update_history(user_input, spoken, conversation_id=conversation_id)
         logging.info("[Engine] Qwen (local) — fast bypass")
         return spoken, executed, "qwen", pomo
 
@@ -1312,7 +1402,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
         spoken = "I'll remember that." if saved_memory.get("status") in ("saved", "duplicate") else "I couldn't save that memory."
         add_message("user", user_input, current_mode)
         add_message("assistant", spoken, current_mode)
-        _update_history(user_input, spoken)
+        _update_history(user_input, spoken, conversation_id=conversation_id)
         return spoken, [{"tool": "remember_fact", "args": {}, "output": saved_memory.get("status")}], "qwen", None
 
     # Multi-command handling: split conservative sub-requests and run them
@@ -1323,7 +1413,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
         engines = []
         pomos = []
         for sub in subs:
-            t, tools, eng, pomo = process_agent_request(sub, current_mode)
+            t, tools, eng, pomo = process_agent_request(sub, current_mode, conversation_id=conversation_id)
             if t:
                 combined_texts.append(t)
             if tools:
@@ -1338,7 +1428,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
     logging.info(f"[Router] Intent={intent} for: '{user_input}' (Mode: {current_mode})")
     add_message("user", user_input, current_mode)
 
-    history_slice = _get_history(16)
+    history_slice = _get_history(16, conversation_id)
     sys_content = SYSTEM_PROMPT + get_current_time_context()
     messages = [{"role": "system", "content": sys_content}] + history_slice + [{"role": "user", "content": user_input}]
     executed_tools_info = []
@@ -1351,7 +1441,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
             fast_opts = {"num_predict": 150, "temperature": 0.8}  # brevity: simple chat = 1-2 sentences
             response = ollama.chat(model=MODEL_NAME, messages=messages, options=fast_opts)
             final_text = strip_control_tokens(clean_thinking(response.message.content or ""))
-            _update_history(user_input, final_text)
+            _update_history(user_input, final_text, conversation_id=conversation_id)
             add_message("assistant", final_text, current_mode)
             logging.info("[Engine] Qwen (local)")
             return final_text, [], "qwen", None
@@ -1405,7 +1495,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
 
             pomo = _detect_pomo(final_text, executed_tools_info)
             final_text = strip_control_tokens(final_text)
-            _update_history(user_input, final_text)
+            _update_history(user_input, final_text, conversation_id=conversation_id)
             add_message("assistant", final_text, current_mode)
             logging.info("[Engine] Qwen (local)")
             return final_text, executed_tools_info, "qwen", pomo
@@ -1470,7 +1560,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
 
             pomo = _detect_pomo(final_text, executed_tools_info)
             cleaned_text = strip_control_tokens(strip_dsml(clean_thinking(final_text)))
-            _update_history(user_input, cleaned_text)
+            _update_history(user_input, cleaned_text, conversation_id=conversation_id)
             add_message("assistant", cleaned_text, current_mode)
             logging.info("[Engine] DeepSeek (cloud)")
             return cleaned_text, executed_tools_info, "deepseek", pomo
@@ -1535,7 +1625,7 @@ def process_agent_request(user_input: str, current_mode: str = "default"):
 
         pomo = _detect_pomo(final_text, executed_tools_info)
         cleaned_text = strip_control_tokens(clean_thinking(final_text))
-        _update_history(user_input, cleaned_text)
+        _update_history(user_input, cleaned_text, conversation_id=conversation_id)
         add_message("assistant", cleaned_text, current_mode)
         logging.info("[Engine] Qwen (local)")
         return cleaned_text, executed_tools_info, "qwen", pomo
@@ -1555,6 +1645,7 @@ def process_agent_request_stream(
     current_mode: str = "default",
     voice_mode: bool = False,
     turn_context: TurnContext | None = None,
+    conversation_id: str = "default",
 ):
     """
     Stream for text chat (Qwen-first) and voice (DeepSeek-primary).
@@ -1570,6 +1661,7 @@ def process_agent_request_stream(
     Speed safeguards in both: regex command bypass (~50ms) + token streaming.
     """
     global _last_engine
+    conversation_id = _conversation_key(conversation_id)
 
     def checkpoint():
         if turn_context is not None:
@@ -1604,7 +1696,7 @@ def process_agent_request_stream(
         spoken = "I'll remember that." if status in ("saved", "duplicate") else "I couldn't save that memory."
         add_message("user", user_input, current_mode)
         add_message("assistant", spoken, current_mode)
-        _update_history(user_input, spoken, cap=16)
+        _update_history(user_input, spoken, cap=16, conversation_id=conversation_id)
         yield {
             "done": True,
             "full": spoken,
@@ -1625,7 +1717,7 @@ def process_agent_request_stream(
         add_message("user", user_input, current_mode)
         capture_explicit_memory(user_input)
 
-    history_slice = _get_history(10)
+    history_slice = _get_history(10, conversation_id)
     sys_content = (VOICE_SYSTEM_PROMPT if voice_mode else SYSTEM_PROMPT) + get_current_time_context()
     if voice_mode:
         sys_content += "\n\nCRITICAL VOICE MODE RULE: Keep your response short, natural, and under 25 words (1-2 sentences max). Do NOT use bullet points, markdown formatting, code blocks, or headers so it can be spoken quickly."
@@ -1677,7 +1769,7 @@ def process_agent_request_stream(
                 final = ("Here's what I remember:\n\n" + body)
             else:
                 final = "I don't have any past conversation about that in my memory."
-            _update_history(user_input, final, cap=16)
+            _update_history(user_input, final, cap=16, conversation_id=conversation_id)
             logging.info("[Memory] Direct DB answer (formatted)")
             yield {"done": True, "full": final, "tools": [], "engine": "qwen", "pomo": None}
             return
@@ -1702,7 +1794,7 @@ def process_agent_request_stream(
                 executed_tools_info.extend(model_tools)
                 cleaned = strip_control_tokens(answer)
                 pomo = _detect_pomo(answer, executed_tools_info)
-                _update_history(user_input, cleaned, cap=16)
+                _update_history(user_input, cleaned, cap=16, conversation_id=conversation_id)
                 add_message("assistant", cleaned, current_mode)
                 if cleaned:
                     yield {"token": cleaned, "done": False}
@@ -1727,7 +1819,7 @@ def process_agent_request_stream(
                 cleaned = strip_control_tokens(spoken)
                 pomo = _detect_pomo(spoken, executed_tools_info)
                 _last_engine = "qwen"
-                _update_history(user_input, cleaned, cap=16)
+                _update_history(user_input, cleaned, cap=16, conversation_id=conversation_id)
                 add_message("assistant", cleaned, current_mode)
                 yield {
                     "done": True, "full": cleaned, "tools": executed_tools_info,
@@ -1876,7 +1968,7 @@ def process_agent_request_stream(
 
             pomo = _detect_pomo(full_text, executed_tools_info)
             cleaned_full = strip_control_tokens(clean_thinking(full_text))
-            _update_history(user_input, cleaned_full, cap=16)
+            _update_history(user_input, cleaned_full, cap=16, conversation_id=conversation_id)
             add_message("assistant", cleaned_full, current_mode)
             logging.info("[Engine] DeepSeek (cloud)")
             yield {"done": True, "full": cleaned_full, "tools": executed_tools_info, "engine": "deepseek", "pomo": pomo}
@@ -1891,7 +1983,7 @@ def process_agent_request_stream(
             if _is_memory:
                 # Memory recall must NOT fall back to Qwen — it misclassifies keywords
                 # like "gaming" as a mode command. Give a graceful answer instead.
-                _update_history(user_input, "I couldn't recall that from memory right now.", cap=16)
+                _update_history(user_input, "I couldn't recall that from memory right now.", cap=16, conversation_id=conversation_id)
                 add_message("assistant", "I couldn't recall that from memory right now.", current_mode)
                 yield {"done": True, "full": "I couldn't recall that from memory right now.",
                        "tools": [], "engine": "qwen", "pomo": None}
@@ -1949,7 +2041,7 @@ def process_agent_request_stream(
 
             pomo = _detect_pomo(accumulated, executed_tools_info)
             full_text = strip_control_tokens(clean_thinking(accumulated))
-            _update_history(user_input, full_text, cap=16)
+            _update_history(user_input, full_text, cap=16, conversation_id=conversation_id)
             add_message("assistant", full_text, current_mode)
             logging.info("[Engine] Qwen (local)")
             yield {"done": True, "full": full_text, "tools": executed_tools_info, "engine": "qwen", "pomo": pomo}
@@ -2032,7 +2124,7 @@ def process_agent_request_stream(
 
             pomo = _detect_pomo(full_text, executed_tools_info)
             cleaned_full = strip_control_tokens(clean_thinking(full_text))
-            _update_history(user_input, cleaned_full, cap=16)
+            _update_history(user_input, cleaned_full, cap=16, conversation_id=conversation_id)
             add_message("assistant", cleaned_full, current_mode)
             logging.info("[Engine] DeepSeek (cloud)")
             yield {"done": True, "full": cleaned_full, "tools": executed_tools_info, "engine": "deepseek", "pomo": pomo}
@@ -2095,7 +2187,7 @@ def process_agent_request_stream(
 
         pomo = _detect_pomo(accumulated, executed_tools_info)
         full_text = strip_control_tokens(clean_thinking(accumulated))
-        _update_history(user_input, full_text, cap=16)
+        _update_history(user_input, full_text, cap=16, conversation_id=conversation_id)
         add_message("assistant", full_text, current_mode)
         logging.info("[Engine] Qwen (local)")
         yield {"done": True, "full": full_text, "tools": executed_tools_info, "engine": "qwen", "pomo": pomo}
@@ -2109,7 +2201,9 @@ def process_agent_request_stream(
 
 
 if __name__ == "__main__":
-    text, tools = process_agent_request("What's the weather in Manila today?")
+    text, tools, engine, pomo = process_agent_request("What's the weather in Manila today?")
     print("Text:", text)
     print("Executed Tools:", tools)
+    print("Engine:", engine)
+    print("Pomodoro:", pomo)
 

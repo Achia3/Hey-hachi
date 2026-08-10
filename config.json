@@ -1,7 +1,12 @@
 {
   "model_name": "qwen2.5:3b",
   "voice_transcription_model": "small",
-  "voice_stt_engine": "openai-whisper",
+  "voice_stt_engine": "faster-whisper",
+  "voice_vad_enabled": true,
+  "voice_vad_min_silence_ms": 550,
+  "wakeword_enabled": false,
+  "global_dictation_enabled": false,
+  "global_dictation_hotkey": "ctrl+alt+space",
   "use_deepseek": true,
   "deepseek_model": "deepseek-v4-flash",
   "tagalog_voice": "fil-PH-AngeloNeural",

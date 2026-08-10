@@ -17,9 +17,10 @@ import ipaddress
 import socket
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 from hachi_db import search_history, add_task, get_connection, init_db
 from hachi_memory import format_memory_search, save_memory
+from hachi_voice_dictionary import add_voice_term, get_voice_terms
 from hachi_productivity import (
     add_assignment_deadline,
     add_todo,
@@ -1464,8 +1465,290 @@ def get_system_stats():
         logging.error(f"get_system_stats error: {e}")
         return "Could not retrieve system stats."
 
+
+_MEDIA_VIRTUAL_KEYS = {
+    "play_pause": 0xB3,
+    "next": 0xB0,
+    "previous": 0xB1,
+    "volume_up": 0xAF,
+    "volume_down": 0xAE,
+    "mute": 0xAD,
+}
+
+
+def _send_media_key(key_name: str, presses: int = 1) -> bool:
+    """Send a Windows multimedia key without shelling out or controlling a browser."""
+    if os.name != "nt" or key_name not in _MEDIA_VIRTUAL_KEYS:
+        return False
+    try:
+        import ctypes
+        vk_code = _MEDIA_VIRTUAL_KEYS[key_name]
+        for _ in range(max(1, min(int(presses), 10))):
+            ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(vk_code, 0, 0x0002, 0)
+        return True
+    except Exception as exc:
+        logging.warning("Could not send media key %s: %s", key_name, exc)
+        return False
+
+
+def media_control(action: str) -> str:
+    """Control Windows media playback or volume using native multimedia keys."""
+    normalized = re.sub(r"\s+", " ", str(action or "").lower()).strip()
+    if any(word in normalized for word in ("next", "skip")):
+        key, label, presses = "next", "Skipped to the next track", 1
+    elif any(word in normalized for word in ("previous", "prev", "back")):
+        key, label, presses = "previous", "Went to the previous track", 1
+    elif "volume up" in normalized or "louder" in normalized:
+        key, label, presses = "volume_up", "Raised system volume", 5
+    elif "volume down" in normalized or "quieter" in normalized:
+        key, label, presses = "volume_down", "Lowered system volume", 5
+    elif "mute" in normalized:
+        key, label, presses = "mute", "Toggled system mute", 1
+    elif any(word in normalized for word in ("play", "pause", "resume", "toggle")):
+        key, label, presses = "play_pause", "Toggled media playback", 1
+    else:
+        return "I can play/pause, skip, go previous, raise/lower volume, or mute."
+
+    if not _send_media_key(key, presses):
+        return "I couldn't send the Windows media command on this device."
+    add_task(f"Media control: {normalized}", "Success", label)
+    return f"{label}."
+
+
+def _focus_spotify_window() -> bool:
+    """Best-effort foreground focus before optional Spotify keyboard automation."""
+    script = (
+        "$p = Get-Process -Name Spotify -ErrorAction SilentlyContinue | "
+        "Where-Object {$_.MainWindowHandle -ne 0} | Select-Object -First 1; "
+        "if ($p) {(New-Object -ComObject WScript.Shell).AppActivate($p.Id); exit 0}; exit 1"
+    )
+    try:
+        return subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3,
+        ).returncode == 0
+    except Exception:
+        return False
+
+
+def play_spotify(query: str = "") -> str:
+    """Open Spotify search and, with optional GUI support, attempt top-result playback."""
+    clean_query = _sanitize_search_query(query)[:160]
+    try:
+        os.startfile(f"spotify:search:{quote(clean_query)}" if clean_query else "spotify:")
+    except Exception as exc:
+        logging.warning("Spotify protocol launch failed: %s", exc)
+        return "I couldn't open Spotify. Check that the Spotify desktop app is installed."
+
+    if not clean_query:
+        media_control("play")
+        return "Opened Spotify and sent a play command."
+
+    # GUI automation is deliberately optional: opening the search is reliable;
+    # selecting the top result depends on Spotify's current desktop UI.
+    try:
+        import pyautogui
+        import pyperclip
+    except ImportError:
+        add_task("Spotify search", "Unverified", clean_query)
+        return (
+            f"Opened Spotify search for '{clean_query}'. Install pyautogui and pyperclip "
+            "to enable Hachi's optional top-result playback attempt."
+        )
+
+    time.sleep(2.5)
+    if not _focus_spotify_window():
+        add_task("Spotify search", "Unverified", clean_query)
+        return f"Opened Spotify search for '{clean_query}', but I couldn't safely focus Spotify to start a result."
+    try:
+        pyautogui.press("escape")
+        pyautogui.hotkey("ctrl", "k")
+        pyperclip.copy(clean_query)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(1.2)
+        pyautogui.press("enter")
+        time.sleep(0.5)
+        pyautogui.press("enter")
+        media_control("play")
+        add_task("Spotify playback", "Attempted", clean_query)
+        return f"Opened Spotify and attempted to play the top result for '{clean_query}'."
+    except Exception as exc:
+        logging.warning("Spotify UI automation failed: %s", exc)
+        return f"Opened Spotify search for '{clean_query}', but automatic playback could not be completed."
+
+
+def play_youtube(query: str = "") -> str:
+    """Open a direct YouTube video result when live search finds one, else YouTube search."""
+    clean_query = _sanitize_search_query(query)[:180] or "trending music videos"
+    video_url = ""
+    try:
+        for result in search_web_records(f"site:youtube.com/watch {clean_query}", max_results=5):
+            candidate = str(result.get("url") or "")
+            parsed = urlparse(candidate)
+            if parsed.hostname and "youtube.com" in parsed.hostname.lower() and parsed.path == "/watch":
+                separator = "&" if parsed.query else "?"
+                video_url = f"{candidate}{separator}autoplay=1"
+                break
+    except Exception as exc:
+        logging.info("YouTube live-result lookup failed: %s", exc)
+
+    if video_url:
+        webbrowser.open(video_url, new=2)
+        add_task("YouTube playback", "Opened", clean_query)
+        return f"Opened a live YouTube result for '{clean_query}' with autoplay requested."
+    search_url = f"https://www.youtube.com/results?search_query={quote(clean_query)}"
+    webbrowser.open(search_url, new=2)
+    add_task("YouTube search", "Opened", clean_query)
+    return f"Opened YouTube search for '{clean_query}'. I couldn't reliably select a live video result."
+
+# Named routines are Hachi's safe equivalent of Project Jarvis macros.  They are
+# data, not arbitrary shell commands: every step must call an existing, allow-
+# listed Hachi tool.  This keeps a routine inspectable and prevents a model (or
+# a hand-edited JSON file) from turning a macro into arbitrary code execution.
+_ROUTINES_PATH = os.path.join(os.path.dirname(__file__), "hachi_routines.json")
+_ROUTINE_ALLOWED_TOOLS = {
+    "get_weather", "get_system_stats", "system_health_report",
+    "launch_app", "launch_mode", "set_focus_cycle", "search_web",
+    "research_web",
+}
+
+
+def _load_routines() -> dict:
+    """Read valid named routines from the local JSON manifest."""
+    try:
+        with open(_ROUTINES_PATH, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError, TypeError) as exc:
+        logging.warning("Could not load Hachi routines: %s", exc)
+        return {}
+    routines = data.get("routines", {}) if isinstance(data, dict) else {}
+    return routines if isinstance(routines, dict) else {}
+
+
+def _normalise_routine_name(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_")
+
+
+def match_routine_name(value: object) -> str:
+    """Return a known routine key, allowing spaces instead of underscores."""
+    requested = _normalise_routine_name(value)
+    routines = _load_routines()
+    if requested in routines:
+        return requested
+    matches = [key for key in routines if requested and (requested in key or key in requested)]
+    return matches[0] if len(matches) == 1 else ""
+
+
+def list_routines() -> str:
+    """List routines without executing any desktop or web action."""
+    routines = _load_routines()
+    if not routines:
+        return "No Hachi routines are configured."
+    lines = ["HACHI ROUTINES:"]
+    for key, routine in routines.items():
+        if not isinstance(routine, dict):
+            continue
+        title = routine.get("name") or key.replace("_", " ").title()
+        description = routine.get("description") or "No description."
+        lines.append(f"- {key}: {title} — {description}")
+    return "\n".join(lines)
+
+
+def _substitute_routine_input(value: object, routine_input: str) -> object:
+    if isinstance(value, str):
+        return value.replace("{{input}}", routine_input)
+    if isinstance(value, list):
+        return [_substitute_routine_input(item, routine_input) for item in value]
+    if isinstance(value, dict):
+        return {key: _substitute_routine_input(item, routine_input) for key, item in value.items()}
+    return value
+
+
+def run_routine(name: str, routine_input: str = "") -> str:
+    """Run a bounded sequence of existing Hachi tools from the routine manifest."""
+    key = match_routine_name(name)
+    routines = _load_routines()
+    routine = routines.get(key)
+    if not key or not isinstance(routine, dict):
+        return f"I couldn't find a routine named '{name}'. Ask me to list routines."
+    steps = routine.get("steps", [])
+    if not isinstance(steps, list) or not steps or len(steps) > 8:
+        return f"Routine '{key}' has an invalid number of steps and was not run."
+
+    # Check the original manifest, before substitution turns {{input}} into an
+    # empty string.  A research routine must never silently search for nothing.
+    if "{{input}}" in json.dumps(steps, ensure_ascii=False) and not _sanitize_search_query(routine_input):
+        return f"Routine '{key}' needs an input. For example: run {key} for latest Bandai Namco releases."
+
+    rendered = _substitute_routine_input(steps, _sanitize_search_query(routine_input))
+
+    outputs = []
+    for index, step in enumerate(rendered, start=1):
+        if not isinstance(step, dict):
+            return f"Routine '{key}' step {index} is invalid; nothing further was run."
+        tool_name = str(step.get("tool") or "")
+        arguments = step.get("arguments", {})
+        if tool_name not in _ROUTINE_ALLOWED_TOOLS or not isinstance(arguments, dict):
+            return f"Routine '{key}' step {index} is not an allowed Hachi action; nothing further was run."
+        result = execute_tool_call(tool_name, arguments)
+        outputs.append(f"{index}. {tool_name}: {result}")
+
+    title = routine.get("name") or key.replace("_", " ").title()
+    add_task(f"Run routine: {title}", "Success", f"Completed {len(outputs)} bounded steps.")
+    return f"ROUTINE COMPLETED: {title}\n" + "\n".join(outputs)
+
+
 # Tool definitions for Ollama - MUST use {"type": "function", "function": {...}} wrapper format
 AVAILABLE_TOOLS = [
+    {
+        "type": "function", "function": {
+            "name": "add_voice_dictionary_term",
+            "description": "Add a name, technical term, app, game, or phrase to Hachi's local voice dictionary to improve future transcription.",
+            "parameters": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "list_voice_dictionary",
+            "description": "List words and phrases Hachi uses to improve speech transcription.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function", "function": {
+            "name": "set_global_dictation",
+            "description": "Turn Hachi's opt-in global push-to-talk dictation on or off. When on, hold the configured hotkey, speak, then release to paste text into the active Windows app.",
+            "parameters": {"type": "object", "properties": {"enabled": {"type": "boolean"}}, "required": ["enabled"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_routines",
+            "description": "List Hachi's configured named multi-step routines (safe macros) without running them.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_routine",
+            "description": (
+                "Run one configured named Hachi routine. Use only when the user explicitly asks to run, start, or execute that named routine. "
+                "A routine performs a bounded sequence of existing Hachi tools; it cannot run arbitrary commands. "
+                "Use routine_input for the topic required by a research routine."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Configured routine name, such as study_sprint or daily_briefing."},
+                    "routine_input": {"type": "string", "description": "Optional topic for a routine that needs it, such as a research question."}
+                },
+                "required": ["name"]
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
@@ -1624,6 +1907,30 @@ AVAILABLE_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "play_spotify",
+            "description": "Open Spotify and search for music, an artist, album, or playlist. When optional desktop automation is available, attempt to play the top result. Use only for an explicit request to play or listen on Spotify.",
+            "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "Song, artist, album, playlist, or genre to play."}}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "play_youtube",
+            "description": "Open YouTube for an explicit request to play or watch a video. It tries to open a live matching video; otherwise it opens YouTube search.",
+            "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "Video, song, channel, or topic to play on YouTube."}}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "media_control",
+            "description": "Control Windows media: play, pause, resume, next, previous, volume up, volume down, or mute. Use only when the user explicitly asks to control media.",
+            "parameters": {"type": "object", "properties": {"action": {"type": "string", "description": "One media action: play, pause, next, previous, volume up, volume down, or mute."}}, "required": ["action"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "research_web",
             "description": "Research a current, contested, or detailed question. Searches multiple sources and reads the best public pages. Use this for latest/current releases, news, seasons, dates, or any answer that needs verification. Cite source numbers in the final answer.",
             "parameters": {
@@ -1777,6 +2084,11 @@ AVAILABLE_TOOLS = [
 # One source of truth for the capability layer. The model receives AVAILABLE_TOOLS
 # while the UI/debug API can expose these human-readable safety properties.
 _TOOL_SAFETY = {
+    "add_voice_dictionary_term": ("voice", "user_intent"),
+    "list_voice_dictionary": ("voice", "read_only"),
+    "set_global_dictation": ("voice", "user_intent"),
+    "list_routines": ("automation", "read_only"),
+    "run_routine": ("automation", "user_intent"),
     "search_web": ("research", "read_only"),
     "research_web": ("research", "read_only"),
     "fetch_url": ("research", "read_only"),
@@ -1789,6 +2101,9 @@ _TOOL_SAFETY = {
     "launch_mode": ("desktop", "user_intent"),
     "close_mode": ("desktop", "user_intent"),
     "launch_app": ("desktop", "user_intent"),
+    "play_spotify": ("media", "user_intent"),
+    "play_youtube": ("media", "user_intent"),
+    "media_control": ("media", "user_intent"),
     "close_app": ("desktop", "user_intent"),
     "close_recent_apps": ("desktop", "user_intent"),
     "open_local_file": ("files", "user_intent"),
@@ -1835,9 +2150,12 @@ def execute_tool_call(tool_name: str, arguments: dict):
     # empty/malformed dict — otherwise "close_app" with {} would kill everything,
     # and "launch_mode" with {} would launch gaming unprompted.
     REQUIRED_ARGS = {
+        "run_routine": "name",
+        "add_voice_dictionary_term": "term",
         "launch_mode": "mode_name",
         "close_mode": "mode_name",
         "launch_app": "app_name",
+        "media_control": "action",
         "close_app": "app_name",
         "get_weather": "location",
         "delegate_reasoning": "task",
@@ -1855,12 +2173,32 @@ def execute_tool_call(tool_name: str, arguments: dict):
         msg = f"Tool {tool_name} needs a value for '{REQUIRED_ARGS[tool_name]}' but none was provided."
         logging.warning(msg)
         return msg
-    if tool_name == "launch_mode":
+    if tool_name == "add_voice_dictionary_term":
+        return add_voice_term(arguments.get("term", ""))
+    elif tool_name == "list_voice_dictionary":
+        terms = get_voice_terms()
+        return "Voice dictionary: " + (", ".join(terms) if terms else "empty")
+    elif tool_name == "set_global_dictation":
+        if "enabled" not in arguments or not isinstance(arguments.get("enabled"), bool):
+            return "Tool set_global_dictation needs a true or false 'enabled' value."
+        from hachi_dictation import set_global_dictation
+        return set_global_dictation(arguments["enabled"])
+    elif tool_name == "list_routines":
+        return list_routines()
+    elif tool_name == "run_routine":
+        return run_routine(arguments.get("name", ""), arguments.get("routine_input", ""))
+    elif tool_name == "launch_mode":
         return launch_mode(arguments.get("mode_name", "gaming"))
     elif tool_name == "close_mode":
         return close_mode(arguments.get("mode_name", "gaming"))
     elif tool_name == "launch_app":
         return launch_app(arguments.get("app_name", ""))
+    elif tool_name == "play_spotify":
+        return play_spotify(arguments.get("query", ""))
+    elif tool_name == "play_youtube":
+        return play_youtube(arguments.get("query", ""))
+    elif tool_name == "media_control":
+        return media_control(arguments.get("action", ""))
     elif tool_name == "close_app":
         return close_app(arguments.get("app_name", ""))
     elif tool_name == "close_recent_apps":
