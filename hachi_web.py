@@ -11,6 +11,7 @@ from queue import Queue
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
 from werkzeug.utils import secure_filename
 from hachi_agent import process_agent_request, get_llm_debug
+from hachi_tools import get_tool_capabilities
 from hachi_speech import speak, speak_quick, interrupt_speech, generate_tts_audio, _is_stop_phrase
 from hachi_runtime import TurnCancelled, cancel_turn, create_turn, finish_turn
 
@@ -798,6 +799,12 @@ def api_llm_debug():
     except Exception as e:
         logging.error(f"api_llm_debug error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/capabilities", methods=["GET"])
+def api_capabilities():
+    """Expose Hachi's model-visible tools and their safety categories."""
+    return jsonify({"ok": True, "capabilities": get_tool_capabilities()})
 
 
 if __name__ == "__main__":

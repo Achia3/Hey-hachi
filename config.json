@@ -5,5 +5,8 @@
   "use_deepseek": true,
   "deepseek_model": "deepseek-v4-flash",
   "tagalog_voice": "fil-PH-AngeloNeural",
-  "english_voice": "en-US-AvaNeural"
+  "english_voice": "en-US-AvaNeural",
+  "web_search_provider": "duckduckgo",
+  "web_search_max_results": 8,
+  "web_search_timeout_seconds": 8
 }

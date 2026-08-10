@@ -64,6 +64,20 @@ Edit `config.json` to change the Ollama model or TTS voices dynamically:
 
 ### 🧠 Dual-Mode Engine Routing
 
+### Web research providers
+
+Hachi keeps Qwen as the local decision-maker. `search_web` can search up to three focused queries concurrently, then Qwen answers from returned evidence with numbered citations and source URLs.
+
+The default is free DuckDuckGo. Set `web_search_provider` to `brave`, `tavily`, or `searxng` to use a different provider. Put credentials only in `.env`:
+
+```env
+BRAVE_SEARCH_API_KEY=...
+# or TAVILY_API_KEY=...
+# or SEARXNG_BASE_URL=https://search.example.com
+```
+
+If an optional provider is unavailable, Hachi falls back to DuckDuckGo. Search-result content and fetched pages are treated as untrusted evidence, never as instructions.
+
 Hachi uses a **Qwen-first dual mode**: the local LLM (Qwen via Ollama) is the primary brain and handles every request. DeepSeek (cloud) escalates only when Qwen can't handle it.
 
 | Intent | Qwen (local) | DeepSeek (cloud) |

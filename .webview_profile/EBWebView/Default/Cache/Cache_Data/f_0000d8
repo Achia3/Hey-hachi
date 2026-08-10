@@ -1070,12 +1070,15 @@ function addMessage(text, role, tools, engine) {
                 close_app: '❌ App closed',
                 get_weather: '🌤 Weather fetched',
                 search_web: '🔍 Web searched',
+                research_web: '📚 Web research completed',
+                delegate_reasoning: '☁ Cloud reasoning used',
                 fetch_url: '🌐 URL fetched',
                 get_system_stats: '💻 System check',
                 search_memory: '🧠 Memory searched',
                 shutdown_hachi: '🔴 Shutting down'
             };
             badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
+            badge.title = String(t.output || `${t.tool} completed`);
             wrap.appendChild(badge);
         });
     }
@@ -1338,12 +1341,15 @@ async function sendMessage() {
                                     close_app: '❌ App closed',
                                     get_weather: '🌤 Weather fetched',
                                     search_web: '🔍 Web searched',
+                                    research_web: '📚 Web research completed',
+                                    delegate_reasoning: '☁ Cloud reasoning used',
                                     fetch_url: '🌐 URL fetched',
                                     get_system_stats: '💻 System check',
                                     search_memory: '🧠 Memory searched',
                                     shutdown_hachi: '🔴 Shutting down'
                                 };
                                 badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
+                                badge.title = String(t.output || `${t.tool} completed`);
                                 wrap.appendChild(badge);
                             });
                         }

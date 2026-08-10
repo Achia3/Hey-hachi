@@ -116,8 +116,8 @@ class ModelToolLoopTests(unittest.TestCase):
             )
         self.assertTrue(handled)
         self.assertEqual(answer, "I found the current answer.")
-        self.assertEqual(calls, ["search_web"])
-        self.assertEqual(executed[0]["tool"], "search_web")
+        self.assertEqual(calls, ["research_web"])
+        self.assertEqual(executed[0]["tool"], "research_web")
 
 
 class RuntimeTests(unittest.TestCase):
