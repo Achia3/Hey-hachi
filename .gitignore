@@ -1,7 +1,32 @@
+# Local secrets and environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Hachi runtime data
 hachi_memory.db
 hachi_memory.db-wal
 hachi_memory.db-shm
 *.sqlite-wal
 *.sqlite-shm
-__pycache__/
-*.py[cod]
+*.log
+
+# Embedded browser profile, cache, cookies, and session data
+.webview_profile/
+
+# Graphify-generated analysis artifacts
+graphify-out/
+.graphify_*.json
+.graphify_*.txt
