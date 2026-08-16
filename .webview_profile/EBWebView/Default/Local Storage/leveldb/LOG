@@ -1,3 +1,6 @@
-2026/08/10-12:43:18.854 85a4 Reusing MANIFEST C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default\Local Storage\leveldb/MANIFEST-000001
-2026/08/10-12:43:18.862 85a4 Recovering log #3
-2026/08/10-12:43:18.865 85a4 Reusing old log C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default\Local Storage\leveldb/000003.log 
+2026/08/15-08:50:53.337 2f0 Reusing MANIFEST C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default\Local Storage\leveldb/MANIFEST-000001
+2026/08/15-08:50:53.345 2f0 Recovering log #38
+2026/08/15-08:50:53.348 2f0 Reusing old log C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default\Local Storage\leveldb/000038.log 
+2026/08/15-08:58:04.785 4f1c Level-0 table #41: started
+2026/08/15-08:58:04.791 4f1c Level-0 table #41: 19675 bytes OK
+2026/08/15-08:58:04.792 4f1c Delete type=0 #38

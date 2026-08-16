@@ -48,7 +48,7 @@ class LookupRoutingTests(unittest.TestCase):
     @patch("hachi_agent.DEEPSEEK_API_KEY", "test-key")
     @patch("hachi_agent._qwen_tool_decide")
     def test_unknown_non_web_answer_delegates_to_cloud_reasoning(self, decide):
-        query = "Explain an unfamiliar abstract concept"
+        query = "An unfamiliar abstract concept"
         decide.side_effect = [
             (SimpleNamespace(content="I do not know."), []),
             (SimpleNamespace(content="Here is the delegated explanation."), []),

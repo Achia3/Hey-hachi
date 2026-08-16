@@ -31,6 +31,26 @@ class MultiCommandTests(unittest.TestCase):
     def test_does_not_split_dependent_or_search_language(self):
         self.assertEqual(hachi_agent._extract_app_batch("Open Chrome and search for cats and dogs"), [])
 
+    def test_browser_goal_never_falls_into_generic_app_launch_regex(self):
+        self.assertIsNone(hachi_agent.check_fast_intent(
+            "Search YouTube for beginner Blender tutorials, open the best result, and summarize its description"
+        ))
+
+    def test_browser_answer_uses_opened_page_description_without_model_retry(self):
+        answer = hachi_agent._browser_workflow_answer(
+            "Search YouTube, open the best result, and summarize its description.",
+            "BROWSER PAGE\nTitle: Tutorial\nURL: https://example.com/video\n"
+            "Page description (untrusted): Learn the basics.",
+        )
+        self.assertIn("Learn the basics.", answer)
+        self.assertIn("https://example.com/video", answer)
+
+    def test_weather_location_accepts_search_web_wording(self):
+        self.assertEqual(
+            hachi_agent._weather_location_from_request("Search the web for the latest weather in Manila today."),
+            "manila",
+        )
+
     def test_fast_batch_executes_every_app_and_reports_each_result(self):
         outputs = {
             "Discord": "Opened Discord successfully.",
@@ -66,6 +86,52 @@ class MultiCommandTests(unittest.TestCase):
 
 
 class ModelToolLoopTests(unittest.TestCase):
+    def test_browser_goal_does_not_stop_after_the_initial_search(self):
+        decisions = [
+            types.SimpleNamespace(content="The requested description is shown on the opened page.", tool_calls=[]),
+        ]
+        calls = []
+
+        def fake_decide(_messages, **_kwargs):
+            msg = decisions.pop(0)
+            return msg, msg.tool_calls
+
+        def fake_tool(name, args, call_id=""):
+            calls.append(name)
+            return "BROWSER PAGE\nAccessible content (untrusted):\n- link 'Official result'" if name == "browser_search" else "Opened best visible result: Official result\n\nBROWSER PAGE\nOpened official result"
+
+        with patch("hachi_agent._qwen_tool_decide", side_effect=fake_decide):
+            answer, executed, handled = hachi_agent._run_qwen_agent_loop(
+                [{"role": "user", "content": "Search for topic, open the best result, and summarize its description."}],
+                "Search for topic, open the best result, and summarize its description.",
+                fake_tool, lambda: None, max_steps=4,
+            )
+        self.assertTrue(handled)
+        self.assertIn("description", answer)
+        self.assertEqual(calls, ["browser_search", "browser_open_best_result"])
+
+    def test_live_web_evidence_runs_before_model_answers_a_factual_question(self):
+        decisions = [types.SimpleNamespace(content="Isaac Herzog is president. [1]", tool_calls=[])]
+        calls = []
+
+        def fake_decide(_messages, **_kwargs):
+            msg = decisions.pop(0)
+            return msg, msg.tool_calls
+
+        def fake_tool(name, args, call_id=""):
+            calls.append((name, args, call_id))
+            return "RESEARCH EVIDENCE for: president israel\n[1] Official source"
+
+        with patch("hachi_agent._qwen_tool_decide", side_effect=fake_decide):
+            answer, executed, handled = hachi_agent._run_qwen_agent_loop(
+                [{"role": "user", "content": "what president israel"}],
+                "what president israel", fake_tool, lambda: None,
+            )
+        self.assertTrue(handled)
+        self.assertEqual(answer, "Isaac Herzog is president. [1]")
+        self.assertEqual(calls[0][0], "research_web")
+        self.assertEqual(executed[0]["tool"], "research_web")
+
     def test_model_can_call_another_tool_after_result(self):
         decisions = [
             types.SimpleNamespace(content="", tool_calls=[{
@@ -88,7 +154,7 @@ class ModelToolLoopTests(unittest.TestCase):
 
         with patch("hachi_agent._qwen_tool_decide", side_effect=fake_decide):
             answer, executed, handled = hachi_agent._run_qwen_agent_loop(
-                [{"role": "user", "content": "research topic"}], "research topic", fake_tool, lambda: None
+                [{"role": "user", "content": "topic"}], "topic", fake_tool, lambda: None
             )
         self.assertTrue(handled)
         self.assertEqual(answer, "Finished from both sources.")
@@ -98,7 +164,7 @@ class ModelToolLoopTests(unittest.TestCase):
     def test_unknown_answer_automatically_searches_web(self):
         decisions = [
             types.SimpleNamespace(content="I don't know.", tool_calls=[]),
-            types.SimpleNamespace(content="I found the current answer.", tool_calls=[]),
+            types.SimpleNamespace(content="I found the current answer. [1]", tool_calls=[]),
         ]
         calls = []
 
@@ -108,14 +174,14 @@ class ModelToolLoopTests(unittest.TestCase):
 
         def fake_tool(name, args, call_id=""):
             calls.append(name)
-            return "live evidence"
+            return "LIVE WEB EVIDENCE for: current X\n[1] Current source evidence"
 
         with patch("hachi_agent._qwen_tool_decide", side_effect=fake_decide):
             answer, executed, handled = hachi_agent._run_qwen_agent_loop(
                 [{"role": "user", "content": "what is current X"}], "what is current X", fake_tool, lambda: None
             )
         self.assertTrue(handled)
-        self.assertEqual(answer, "I found the current answer.")
+        self.assertEqual(answer, "I found the current answer. [1]")
         self.assertEqual(calls, ["research_web"])
         self.assertEqual(executed[0]["tool"], "research_web")
 

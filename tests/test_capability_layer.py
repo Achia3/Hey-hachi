@@ -3,7 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from hachi_tools import delegate_reasoning, get_tool_capabilities, run_routine
-from hachi_agent import check_fast_intent
+from hachi_agent import check_fast_intent, select_tools_for_request
+from hachi_browser import browser_action
 
 
 class CapabilityLayerTests(unittest.TestCase):
@@ -75,6 +76,21 @@ class CapabilityLayerTests(unittest.TestCase):
             ("add_voice_dictionary_term", {"term": "Tekken 8"}),
             ("set_global_dictation", {"enabled": True}),
         ])
+
+    def test_tool_router_hides_unrelated_and_raw_fetch_tools(self):
+        names = [tool["function"]["name"] for tool in select_tools_for_request(
+            "Research the latest Qwen release from official sources"
+        )]
+        self.assertEqual(names, ["research_web", "search_web"])
+        self.assertNotIn("fetch_url", names)
+        self.assertLessEqual(len(names), 8)
+
+    def test_browser_tools_are_exposed_for_a_browser_goal_and_block_submit(self):
+        names = [tool["function"]["name"] for tool in select_tools_for_request(
+            "Open Chrome and search the official Python documentation"
+        )]
+        self.assertTrue({"browser_search", "browser_navigate", "browser_read", "browser_action"}.issubset(names))
+        self.assertIn("requires explicit confirmation", browser_action("submit"))
 
 
 if __name__ == "__main__":

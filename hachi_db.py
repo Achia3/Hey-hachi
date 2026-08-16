@@ -2,10 +2,34 @@ import sqlite3
 import os
 import re
 import threading
+import shutil
 from datetime import datetime
 from contextlib import closing
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "hachi_memory.db")
+
+def _default_db_path() -> str:
+    """Keep mutable user data outside the source checkout.
+
+    Older Hachi versions wrote a tracked ``hachi_memory.db`` next to the code.
+    On the first run of this version, copy that database into the user's local
+    application-data directory so existing conversations are retained.  The
+    copy is deliberately non-destructive: the legacy file remains untouched.
+    """
+    app_dir = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Hachi")
+    path = os.path.join(app_dir, "hachi_memory.db")
+    legacy = os.path.join(os.path.dirname(__file__), "hachi_memory.db")
+    try:
+        if not os.path.exists(path):
+            os.makedirs(app_dir, exist_ok=True)
+            if os.path.exists(legacy):
+                shutil.copy2(legacy, path)
+    except OSError:
+        # A read-only profile should not prevent the application from opening.
+        return legacy
+    return path
+
+
+DB_PATH = _default_db_path()
 
 # Shared write connection (WAL) + lock — avoids open/close + fsync per message.
 _write_conn = None
@@ -48,18 +72,27 @@ def init_db():
                 timestamp TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
-                mode TEXT DEFAULT 'default'
+                mode TEXT DEFAULT 'default',
+                conversation_id TEXT NOT NULL DEFAULT 'default'
             )
         """)
+        # Safe schema migration for databases made by earlier Hachi versions.
+        columns = {row["name"] for row in cursor.execute("PRAGMA table_info(conversations)")}
+        if "conversation_id" not in columns:
+            cursor.execute("ALTER TABLE conversations ADD COLUMN conversation_id TEXT NOT NULL DEFAULT 'default'")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
                 task_description TEXT NOT NULL,
                 status TEXT NOT NULL,
-                action_taken TEXT
+                action_taken TEXT,
+                conversation_id TEXT NOT NULL DEFAULT 'default'
             )
         """)
+        task_columns = {row["name"] for row in cursor.execute("PRAGMA table_info(tasks)")}
+        if "conversation_id" not in task_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN conversation_id TEXT NOT NULL DEFAULT 'default'")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS memories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,7 +161,15 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_conv_timestamp ON conversations(timestamp)
         """)
         cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_conv_conversation_timestamp
+            ON conversations(conversation_id, timestamp, id)
+        """)
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_tasks_timestamp ON tasks(timestamp)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_conversation_timestamp
+            ON tasks(conversation_id, timestamp, id)
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_memory_scope_subject
@@ -141,15 +182,15 @@ def init_db():
         conn.commit()
 
 
-def add_message(role: str, content: str, mode: str = "default"):
+def add_message(role: str, content: str, mode: str = "default", conversation_id: str = "default"):
     """Log a user or assistant message with timestamp."""
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _write_conn_lock:
         try:
             conn = _get_write_conn()
             conn.execute(
-                "INSERT INTO conversations (timestamp, role, content, mode) VALUES (?, ?, ?, ?)",
-                (now_str, role, content, mode)
+                "INSERT INTO conversations (timestamp, role, content, mode, conversation_id) VALUES (?, ?, ?, ?, ?)",
+                (now_str, role, content, mode, _conversation_id(conversation_id))
             )
             conn.commit()
         except sqlite3.Error as e:
@@ -157,8 +198,8 @@ def add_message(role: str, content: str, mode: str = "default"):
             try:
                 with closing(get_connection()) as conn2:
                     conn2.execute(
-                        "INSERT INTO conversations (timestamp, role, content, mode) VALUES (?, ?, ?, ?)",
-                        (now_str, role, content, mode)
+                        "INSERT INTO conversations (timestamp, role, content, mode, conversation_id) VALUES (?, ?, ?, ?, ?)",
+                        (now_str, role, content, mode, _conversation_id(conversation_id))
                     )
                     conn2.commit()
             except sqlite3.Error:
@@ -166,23 +207,23 @@ def add_message(role: str, content: str, mode: str = "default"):
             logging_error(e)
 
 
-def add_task(task_description: str, status: str, action_taken: str = ""):
+def add_task(task_description: str, status: str, action_taken: str = "", conversation_id: str = "default"):
     """Log a task or system action executed by Hachi."""
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _write_conn_lock:
         try:
             conn = _get_write_conn()
             conn.execute(
-                "INSERT INTO tasks (timestamp, task_description, status, action_taken) VALUES (?, ?, ?, ?)",
-                (now_str, task_description, status, action_taken)
+                "INSERT INTO tasks (timestamp, task_description, status, action_taken, conversation_id) VALUES (?, ?, ?, ?, ?)",
+                (now_str, task_description, status, action_taken, _conversation_id(conversation_id))
             )
             conn.commit()
         except sqlite3.Error as e:
             try:
                 with closing(get_connection()) as conn2:
                     conn2.execute(
-                        "INSERT INTO tasks (timestamp, task_description, status, action_taken) VALUES (?, ?, ?, ?)",
-                        (now_str, task_description, status, action_taken)
+                        "INSERT INTO tasks (timestamp, task_description, status, action_taken, conversation_id) VALUES (?, ?, ?, ?, ?)",
+                        (now_str, task_description, status, action_taken, _conversation_id(conversation_id))
                     )
                     conn2.commit()
             except sqlite3.Error:
@@ -195,18 +236,25 @@ def _like_escape(term: str) -> str:
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _conversation_id(value: object) -> str:
+    """Constrain an external UI identifier before persisting it."""
+    clean = re.sub(r"[^a-zA-Z0-9_-]", "", str(value or ""))[:80]
+    return clean or "default"
+
+
 def _valid_date(date_str: str) -> bool:
     """Accept only YYYY-MM-DD; anything else is treated as no date filter."""
     return bool(date_str and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str.strip()))
 
 
-def search_history(query: str = None, date_str: str = None, limit: int = 10):
+def search_history(query: str = None, date_str: str = None, limit: int = 10, conversation_id: str = None):
     """
     Search conversation and task history by text query and/or specific date (YYYY-MM-DD).
     Text queries search BOTH conversations and tasks. LIKE wildcards are escaped.
     Fetches N most recent rows (DESC), then reverses for chronological display.
     Returns formatted summary string for LLM context.
     """
+    init_db()
     try:
         limit = max(1, min(int(limit or 10), 50))
     except (TypeError, ValueError):
@@ -227,6 +275,9 @@ def search_history(query: str = None, date_str: str = None, limit: int = 10):
         sql = "SELECT timestamp, role, content, mode FROM conversations"
         params = []
         where = []
+        if conversation_id is not None:
+            where.append("conversation_id = ?")
+            params.append(_conversation_id(conversation_id))
         if date_str:
             where.append("timestamp LIKE ?")
             params.append(f"{date_str}%")
@@ -251,6 +302,9 @@ def search_history(query: str = None, date_str: str = None, limit: int = 10):
         t_sql = "SELECT timestamp, task_description, status, action_taken FROM tasks"
         t_params = []
         t_where = []
+        if conversation_id is not None:
+            t_where.append("conversation_id = ?")
+            t_params.append(_conversation_id(conversation_id))
         if date_str:
             t_where.append("timestamp LIKE ?")
             t_params.append(f"{date_str}%")
@@ -278,10 +332,11 @@ def search_history(query: str = None, date_str: str = None, limit: int = 10):
     return "\n".join(results)
 
 
-def get_recent_messages(limit: int = 8):
+def get_recent_messages(limit: int = 8, conversation_id: str = "default"):
     """Return the most recent conversation turns as [{'role','content'}, ...]
     in chronological order — used to preload cross-session memory so the model
     can 'remember' past chats. limit is the number of turns (default 8)."""
+    init_db()
     try:
         limit = max(2, min(int(limit or 8), 30))
     except (TypeError, ValueError):
@@ -291,9 +346,9 @@ def get_recent_messages(limit: int = 8):
         cursor = conn.cursor()
         cursor.execute(
             "SELECT role, content FROM conversations "
-            "WHERE content <> '' AND role IN ('user','assistant') "
+            "WHERE content <> '' AND role IN ('user','assistant') AND conversation_id = ? "
             "ORDER BY id DESC LIMIT ?",
-            (limit,)
+            (_conversation_id(conversation_id), limit),
         )
         rows = cursor.fetchall()
         # reverse to chronological

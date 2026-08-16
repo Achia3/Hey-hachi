@@ -430,3 +430,223 @@
 2026-08-10 04:43:18.790: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-08-10 04:43:18.790: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
 2026-08-10 04:46:42.491: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:41:58.405: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:41:58.405: [INFO] Profiles total count: 1
+2026-08-14 03:41:58.405: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-10T04:45:20.014Z
+2026-08-14 03:41:58.405: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:41:58.405: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-10T04:45:20.014Z
+2026-08-14 03:41:58.405: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 03:41:58.405: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 03:41:58.405: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 03:41:58.405: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:44:11.587: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:44:34.264: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:44:34.264: [INFO] Profiles total count: 1
+2026-08-14 03:44:34.264: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:43:58.139Z
+2026-08-14 03:44:34.264: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:44:34.264: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:43:58.139Z
+2026-08-14 03:44:34.264: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 03:44:34.264: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 03:44:34.264: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 03:44:34.264: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:54:27.829: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:54:50.559: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:54:50.559: [INFO] Profiles total count: 1
+2026-08-14 03:54:50.559: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:54:19.360Z
+2026-08-14 03:54:50.559: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:54:50.559: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:54:19.360Z
+2026-08-14 03:54:50.559: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 03:54:50.559: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 03:54:50.559: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 03:54:50.559: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:55:35.766: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:55:58.201: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:55:58.201: [INFO] Profiles total count: 1
+2026-08-14 03:55:58.201: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:55:23.311Z
+2026-08-14 03:55:58.201: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:55:58.201: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:55:23.311Z
+2026-08-14 03:55:58.201: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 03:55:58.201: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 03:55:58.201: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 03:55:58.201: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:57:31.564: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:58:16.017: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:58:16.018: [INFO] Profiles total count: 1
+2026-08-14 03:58:16.018: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:55:58.313Z
+2026-08-14 03:58:16.018: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 03:58:16.018: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:55:58.313Z
+2026-08-14 03:58:16.018: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 03:58:16.018: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 03:58:16.018: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 03:58:16.018: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 03:59:41.915: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 04:24:14.482: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 04:24:14.482: [INFO] Profiles total count: 1
+2026-08-14 04:24:14.483: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:59:36.207Z
+2026-08-14 04:24:14.483: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 04:24:14.483: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T03:59:36.207Z
+2026-08-14 04:24:14.483: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 04:24:14.483: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 04:24:14.483: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 04:24:14.483: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 04:28:39.970: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 04:45:48.435: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 04:45:48.435: [INFO] Profiles total count: 1
+2026-08-14 04:45:48.435: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T04:28:23.280Z
+2026-08-14 04:45:48.435: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 04:45:48.435: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T04:28:23.280Z
+2026-08-14 04:45:48.435: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 04:45:48.435: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 04:45:48.435: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 04:45:48.435: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 05:03:43.805: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 05:04:12.572: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 05:04:12.572: [INFO] Profiles total count: 1
+2026-08-14 05:04:12.572: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T05:03:42.762Z
+2026-08-14 05:04:12.572: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 05:04:12.572: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T05:03:42.762Z
+2026-08-14 05:04:12.572: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 05:04:12.572: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 05:04:12.572: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 05:04:12.572: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 05:08:30.744: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 07:35:20.192: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 07:35:20.192: [INFO] Profiles total count: 1
+2026-08-14 07:35:20.193: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T05:08:29.790Z
+2026-08-14 07:35:20.193: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 07:35:20.193: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T05:08:29.790Z
+2026-08-14 07:35:20.193: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 07:35:20.193: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 07:35:20.193: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 07:35:20.193: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 08:19:43.513: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 23:34:36.420: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 23:34:36.420: [INFO] Profiles total count: 1
+2026-08-14 23:34:36.420: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T08:19:41.209Z
+2026-08-14 23:34:36.420: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-14 23:34:36.420: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T08:19:41.209Z
+2026-08-14 23:34:36.420: [INFO] OnDoneLoading sync enabled: 0
+2026-08-14 23:34:36.420: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-14 23:34:36.420: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-14 23:34:36.420: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-14 23:36:22.462: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:04:19.865: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:04:19.865: [INFO] Profiles total count: 1
+2026-08-15 00:04:19.866: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T23:36:22.107Z
+2026-08-15 00:04:19.866: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:04:19.866: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-14T23:36:22.107Z
+2026-08-15 00:04:19.866: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:04:19.866: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:04:19.866: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:04:19.866: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:14:15.965: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:14:58.624: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:14:58.624: [INFO] Profiles total count: 1
+2026-08-15 00:14:58.624: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:13:59.655Z
+2026-08-15 00:14:58.624: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:14:58.624: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:13:59.655Z
+2026-08-15 00:14:58.624: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:14:58.624: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:14:58.624: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:14:58.624: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:15:10.022: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:21:21.843: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:21:21.843: [INFO] Profiles total count: 1
+2026-08-15 00:21:21.844: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:14:58.753Z
+2026-08-15 00:21:21.844: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:21:21.844: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:14:58.753Z
+2026-08-15 00:21:21.844: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:21:21.844: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:21:21.844: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:21:21.844: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:27:49.298: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:28:26.124: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:28:26.124: [INFO] Profiles total count: 1
+2026-08-15 00:28:26.124: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:27:10.080Z
+2026-08-15 00:28:26.124: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:28:26.125: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:27:10.080Z
+2026-08-15 00:28:26.125: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:28:26.125: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:28:26.125: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:28:26.125: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:29:46.188: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:30:36.089: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:30:36.089: [INFO] Profiles total count: 1
+2026-08-15 00:30:36.089: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:29:44.250Z
+2026-08-15 00:30:36.089: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:30:36.089: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:29:44.250Z
+2026-08-15 00:30:36.089: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:30:36.089: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:30:36.089: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:30:36.089: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:32:06.739: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:32:31.969: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:32:31.969: [INFO] Profiles total count: 1
+2026-08-15 00:32:31.969: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:32:00.771Z
+2026-08-15 00:32:31.969: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:32:31.969: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:32:00.771Z
+2026-08-15 00:32:31.969: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:32:31.969: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:32:31.969: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:32:31.969: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:35:03.588: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:37:28.653: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:37:28.653: [INFO] Profiles total count: 1
+2026-08-15 00:37:28.653: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:35:02.975Z
+2026-08-15 00:37:28.653: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:37:28.653: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:35:02.975Z
+2026-08-15 00:37:28.653: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:37:28.653: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:37:28.653: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:37:28.653: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:39:45.796: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:40:17.650: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:40:17.651: [INFO] Profiles total count: 1
+2026-08-15 00:40:17.651: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:39:43.247Z
+2026-08-15 00:40:17.651: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:40:17.651: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:39:43.247Z
+2026-08-15 00:40:17.651: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:40:17.651: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:40:17.651: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:40:17.651: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:43:53.121: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:44:11.618: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:44:11.618: [INFO] Profiles total count: 1
+2026-08-15 00:44:11.618: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:43:49.092Z
+2026-08-15 00:44:11.618: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:44:11.618: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:43:49.092Z
+2026-08-15 00:44:11.618: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:44:11.618: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:44:11.618: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:44:11.618: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:44:44.830: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:45:03.653: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:45:03.653: [INFO] Profiles total count: 1
+2026-08-15 00:45:03.653: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:44:39.407Z
+2026-08-15 00:45:03.653: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:45:03.654: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:44:39.407Z
+2026-08-15 00:45:03.654: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:45:03.654: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:45:03.654: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:45:03.654: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:45:45.935: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:46:05.582: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:46:05.582: [INFO] Profiles total count: 1
+2026-08-15 00:46:05.583: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:45:44.118Z
+2026-08-15 00:46:05.583: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:46:05.583: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:45:44.118Z
+2026-08-15 00:46:05.583: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:46:05.583: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:46:05.583: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:46:05.583: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:49:20.503: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 00:50:53.185: [INFO] CurrentProfilePath: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:50:53.185: [INFO] Profiles total count: 1
+2026-08-15 00:50:53.185: [INFO] Profile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:48:43.871Z
+2026-08-15 00:50:53.185: [INFO] LastUsedProfileDir: C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default
+2026-08-15 00:50:53.185: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\AxeilAchia\Desktop\HEY hachi\Hey-hachi\.webview_profile\EBWebView\Default lastActive=2026-08-15T00:48:43.871Z
+2026-08-15 00:50:53.185: [INFO] OnDoneLoading sync enabled: 0
+2026-08-15 00:50:53.185: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-08-15 00:50:53.185: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-08-15 00:50:53.185: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-08-15 01:27:06.724: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1

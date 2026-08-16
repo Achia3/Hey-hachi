@@ -1,0 +1,7 @@
+hachi_memory.db
+hachi_memory.db-wal
+hachi_memory.db-shm
+*.sqlite-wal
+*.sqlite-shm
+__pycache__/
+*.py[cod]
