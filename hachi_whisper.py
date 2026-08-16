@@ -109,6 +109,19 @@ def get_whisper_model():
     return _whisper_model
 
 
+def warm_transcription_model():
+    """Load the transcription engine selected in config.json into memory/cache."""
+    global _faster_whisper_model
+    if _voice_engine() != "faster-whisper":
+        return get_whisper_model()
+    from faster_whisper import WhisperModel
+    with _model_lock:
+        if _faster_whisper_model is None:
+            logging.info("Loading faster-whisper model (%s, CPU int8)...", _voice_model_name())
+            _faster_whisper_model = WhisperModel(_voice_model_name(), device="cpu", compute_type="int8")
+    return _faster_whisper_model
+
+
 def _transcribe_with_faster_whisper(audio_path: str, language: Optional[str]) -> str:
     """Optional faster-whisper engine. It is selected only in config.json."""
     global _faster_whisper_model
@@ -117,12 +130,10 @@ def _transcribe_with_faster_whisper(audio_path: str, language: Optional[str]) ->
     except ImportError:
         logging.warning("faster-whisper selected but not installed; using OpenAI Whisper instead")
         return ""
-    with _model_lock:
-        if _faster_whisper_model is None:
-            _faster_whisper_model = WhisperModel(_voice_model_name(), device="cpu", compute_type="int8")
     try:
+        model = warm_transcription_model()
         vad_enabled, vad_parameters = _voice_vad_options()
-        segments, _info = _faster_whisper_model.transcribe(
+        segments, _info = model.transcribe(
             audio_path,
             language=language,
             initial_prompt=transcription_prompt(),

@@ -1,5 +1,5 @@
 {
-  "model_name": "qwen2.5:3b",
+  "model_name": "qwen3.5:2b",
   "voice_transcription_model": "small",
   "voice_stt_engine": "faster-whisper",
   "voice_vad_enabled": true,
@@ -7,10 +7,11 @@
   "wakeword_enabled": false,
   "global_dictation_enabled": false,
   "global_dictation_hotkey": "ctrl+alt+space",
-  "use_deepseek": true,
+  "use_deepseek": false,
   "deepseek_model": "deepseek-v4-flash",
   "tagalog_voice": "fil-PH-AngeloNeural",
   "english_voice": "en-US-AvaNeural",
+  "offline_tts_only": true,
   "web_search_provider": "duckduckgo",
   "web_search_max_results": 8,
   "web_search_timeout_seconds": 8

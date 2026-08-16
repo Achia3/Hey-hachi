@@ -25,7 +25,7 @@ A fully autonomous, voice-enabled **Agentic AI Desktop Assistant** built for loc
 
 - **Python 3.8+**
 - **Ollama** running locally (`http://localhost:11434`)
-- **Qwen Model** (configured with `qwen2.5:3b` in `config.json`)
+- **Qwen Model** (configured with `qwen3.5:2b` in `config.json`)
 - **Microphone & Speaker**
 - **Windows OS**
 
@@ -54,8 +54,8 @@ Edit `config.json` to change the Ollama model or TTS voices dynamically:
 
 ```json
 {
-  "model_name": "qwen2.5:3b",
-  "use_deepseek": true,
+  "model_name": "qwen3.5:2b",
+  "use_deepseek": false,
   "deepseek_model": "deepseek-chat",
   "tagalog_voice": "fil-PH-AngeloNeural",
   "english_voice": "en-US-AvaNeural"
@@ -78,7 +78,7 @@ BRAVE_SEARCH_API_KEY=...
 
 If an optional provider is unavailable, Hachi falls back to DuckDuckGo. Search-result content and fetched pages are treated as untrusted evidence, never as instructions.
 
-Hachi uses a **Qwen-first dual mode**: the local LLM (Qwen via Ollama) is the primary brain and handles every request. DeepSeek (cloud) escalates only when Qwen can't handle it.
+Hachi now defaults to **Qwen-only local mode**. The legacy DeepSeek integration remains disabled for compatibility, while Qwen via Ollama handles requests and tool selection.
 
 | Intent | Qwen (local) | DeepSeek (cloud) |
 |--------|--------------|------------------|

@@ -1112,6 +1112,35 @@ function removeChat(chatId) {
     else renderChatList();
 }
 
+let smartHomeBrowserPopup = null;
+const SMART_HOME_POPUP_PATTERN = /\b(?:smart\s*home|thermostat|temperature|degrees?|lights?|bulb|front door|door lock|lock the door|unlock the door|living room|kitchen|freez(?:e|ing)|warmer|cooler|too (?:hot|cold|dark|bright)|getting dark|secure (?:the )?(?:house|home|door)|movie night|study music|entertainment)\b/i;
+
+function prepareSmartHomePopup(message) {
+    // Browser popups must originate directly from the user's Send click. This
+    // only reserves the visual simulator; Qwen still decides every action.
+    if (SMART_HOME_POPUP_PATTERN.test(String(message || ''))) openSmartHomeSimulator();
+}
+
+async function openSmartHomeSimulator() {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_smart_home) {
+            const result = await window.pywebview.api.open_smart_home();
+            if (result && result.opened === false) throw new Error(result.error || 'Could not open simulator.');
+            return;
+        }
+        if (smartHomeBrowserPopup && !smartHomeBrowserPopup.closed) {
+            smartHomeBrowserPopup.focus();
+            try { smartHomeBrowserPopup.hachiSmartHomeBegin?.(); } catch (_) {}
+            return;
+        }
+        smartHomeBrowserPopup = window.open('/smart-home?auto=1', 'hachi-smart-home-simulator', 'popup=yes,width=1160,height=820,resizable=yes');
+        if (!smartHomeBrowserPopup) throw new Error('Your browser blocked the simulator popup. Allow popups for Hachi and retry the command.');
+        smartHomeBrowserPopup.focus();
+    } catch (error) {
+        alert(error.message || 'Could not open the Smart Home simulation window.');
+    }
+}
+
 function nameActiveChatFromMessage(text) {
     const chat = activeChat();
     const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
@@ -1243,6 +1272,8 @@ function addMessage(text, role, tools, engine) {
                 fetch_url: '🌐 URL fetched',
                 get_system_stats: '💻 System check',
                 search_memory: '🧠 Memory searched',
+                get_smart_home_state: '🏠 Home state checked',
+                control_smart_home: '🏠 Smart home updated',
                 shutdown_hachi: '🔴 Shutting down'
             };
             badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
@@ -1438,6 +1469,7 @@ async function sendMessage() {
 
     // Check intent on user text locally before sending
     detectUserIntent(messageText);
+    prepareSmartHomePopup(messageText);
     nameActiveChatFromMessage(chatTitleText);
 
     const attachmentLabel = attachedKind === 'audio' ? `[Meeting audio transcribed: ${pdf?.name}]` : `[Attached PDF: ${pdf?.name}]`;
@@ -1505,6 +1537,9 @@ async function sendMessage() {
                 if (!jsonStr) continue;
                 try {
                     const evt = JSON.parse(jsonStr);
+                    if (evt.open_smart_home) {
+                        openSmartHomeSimulator();
+                    }
                     if (!evt.done && evt.token) {
                         ensureAssistantMessage();
                         accumulatedText += evt.token;
@@ -1544,6 +1579,8 @@ async function sendMessage() {
                                     fetch_url: '🌐 URL fetched',
                                     get_system_stats: '💻 System check',
                                     search_memory: '🧠 Memory searched',
+                                    get_smart_home_state: '🏠 Home state checked',
+                                    control_smart_home: '🏠 Smart home updated',
                                     shutdown_hachi: '🔴 Shutting down'
                                 };
                                 badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
@@ -1943,12 +1980,12 @@ function openVoice() {
     transcriptEl.textContent = "Speak whenever you're ready…";
     transcriptEl.className   = 'voice-transcript';
 
-    sttBadge.textContent = '🎤 Browser STT · Edge-TTS Audio';
+    sttBadge.textContent = 'Local Whisper · Offline SAPI Audio';
     setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
     if (wakewordPoll) { clearInterval(wakewordPoll); wakewordPoll = null; }
     // Load the local multilingual model while the user begins the first turn.
     fetch('/api/voice_ready', { method: 'POST' }).catch(() => {});
-    sttBadge.textContent = 'Local Whisper · Edge-TTS Audio';
+    sttBadge.textContent = 'Local Whisper · Offline SAPI Audio';
     startVoiceConversation();
 }
 
@@ -2701,6 +2738,10 @@ async function streamAndSpeakResponse(userText) {
                 if (!jsonStr) continue;
                 try {
                     const evt = JSON.parse(jsonStr);
+
+                    if (evt.type === 'open_smart_home') {
+                        openSmartHomeSimulator();
+                    }
 
                     if (evt.type === 'token') {
                         // Update thinking display

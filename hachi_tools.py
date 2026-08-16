@@ -1324,7 +1324,7 @@ def delegate_reasoning(task: str, context: str = "") -> str:
         config_path = os.path.join(os.path.dirname(__file__), "config.json")
         with open(config_path, "r", encoding="utf-8") as handle:
             config = json.load(handle)
-        if not config.get("use_deepseek", True):
+        if not config.get("use_deepseek", False):
             return "Cloud reasoning is disabled in config.json."
         api_key = os.getenv("DEEPSEEK_API_KEY", "").strip() or str(config.get("deepseek_api_key", "")).strip()
         if not api_key:
@@ -2112,6 +2112,43 @@ AVAILABLE_TOOLS = [
         }
     },
     {
+        "type": "function",
+        "function": {
+            "name": "get_smart_home_state",
+            "description": "Read the current simulated lights, thermostat, front-door lock, entertainment state, and recent verified actions.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "control_smart_home",
+            "description": "Apply one or more validated actions to Hachi's simulated smart home. Infer useful actions from indirect needs such as being cold or a dark room, but ask for clarification if the target or desired result is genuinely unclear.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "Short statement of the user's intended outcome."},
+                    "actions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 6,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {"type": "string", "enum": ["turn_on", "turn_off", "set_temperature", "increase_temperature", "decrease_temperature", "lock", "unlock", "play_media", "pause_media", "stop_media"]},
+                                "target": {"type": "string", "enum": ["living_room_light", "kitchen_light", "living_room_thermostat", "front_door_lock", "entertainment"]},
+                                "value": {"type": "number", "description": "Required for temperature actions only."},
+                                "title": {"type": "string", "description": "Optional media title for play_media."}
+                            },
+                            "required": ["action", "target"]
+                        }
+                    }
+                },
+                "required": ["actions"]
+            }
+        }
+    },
+    {
         "type": "function", "function": {
             "name": "browser_navigate",
             "description": "Open a public website in Hachi's visible agent browser. Use this for a user request to visit a website; then inspect it with browser_read before acting.",
@@ -2172,6 +2209,8 @@ _TOOL_SAFETY = {
     "delegate_reasoning": ("reasoning", "cloud_read_only"),
     "get_weather": ("information", "read_only"),
     "get_system_stats": ("information", "read_only"),
+    "get_smart_home_state": ("smart_home", "read_only"),
+    "control_smart_home": ("smart_home", "user_intent"),
     "system_health_report": ("information", "read_only"),
     "search_memory": ("memory", "read_only"),
     "clipboard_get": ("desktop", "read_only"),
@@ -2239,6 +2278,7 @@ def execute_tool_call(tool_name: str, arguments: dict):
         "fetch_url": "url",
         "browser_navigate": "url",
         "browser_search": "query",
+        "control_smart_home": "actions",
         "remember_fact": "content",
         "summarize_document": "path",
         "open_local_file": "path",
@@ -2286,6 +2326,27 @@ def execute_tool_call(tool_name: str, arguments: dict):
         return shutdown_hachi()
     elif tool_name == "get_weather":
         return get_weather(arguments.get("location", "Manila"))
+    elif tool_name == "get_smart_home_state":
+        from hachi_home import get_smart_home_state
+        return json.dumps(get_smart_home_state(), ensure_ascii=False)
+    elif tool_name == "control_smart_home":
+        from hachi_home import apply_smart_home_actions, record_smart_home_rejection
+        try:
+            result = apply_smart_home_actions(
+                actions=arguments.get("actions", []),
+                goal=arguments.get("goal", "Update the smart home"),
+                original_command=arguments.get("_original_command", ""),
+                request_started_at=arguments.get("_request_started_at"),
+            )
+        except Exception as exc:
+            record_smart_home_rejection(
+                actions=arguments.get("actions", []),
+                goal=arguments.get("goal", "Update the smart home"),
+                original_command=arguments.get("_original_command", ""),
+                error=exc,
+            )
+            result = {"success": False, "error": str(exc), "state_unchanged": True}
+        return json.dumps(result, ensure_ascii=False)
     elif tool_name == "search_web":
         if not arguments.get("query") and not arguments.get("queries"):
             return "Tool search_web needs a non-empty 'query' or 'queries' value."

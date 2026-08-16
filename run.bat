@@ -73,7 +73,7 @@ echo [OK] Ollama engine is ready.
 :ensure_model
 echo [*] Checking config.json for configured model...
 for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-Content config.json -ErrorAction SilentlyContinue | ConvertFrom-Json).model_name"') do set "MODEL_NAME=%%i"
-if "%MODEL_NAME%"=="" set "MODEL_NAME=qwen2.5:3b"
+if "%MODEL_NAME%"=="" set "MODEL_NAME=qwen3.5:2b"
 echo [*] Ensuring model: %MODEL_NAME% (pulling if missing)...
 "%OLLAMA_EXE%" pull %MODEL_NAME%
 

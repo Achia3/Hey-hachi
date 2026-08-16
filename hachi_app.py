@@ -78,6 +78,53 @@ def _wakeword_is_enabled() -> bool:
         return False
 
 
+class DesktopApi:
+    """Native-window actions exposed only to Hachi's trusted local frontend."""
+
+    def __init__(self):
+        self._smart_home_window = None
+        self._window_lock = threading.Lock()
+
+    def _clear_smart_home_window(self):
+        with self._window_lock:
+            self._smart_home_window = None
+
+    def open_smart_home(self):
+        """Focus an existing simulator or create it as a separate native window."""
+        with self._window_lock:
+            existing = self._smart_home_window
+            if existing is not None and not existing.events.closed.is_set():
+                try:
+                    existing.restore()
+                    existing.show()
+                    try:
+                        existing.evaluate_js(
+                            "window.hachiSmartHomeBegin && window.hachiSmartHomeBegin()"
+                        )
+                    except Exception:
+                        # Focusing the already-open window is still useful if its
+                        # page has not finished registering the animation hook.
+                        pass
+                    return {"opened": True, "reused": True}
+                except Exception:
+                    self._smart_home_window = None
+
+            simulator = webview.create_window(
+                title="Hachi — Smart Home Simulation",
+                url=f"http://127.0.0.1:{FLASK_PORT}/smart-home?auto=1",
+                width=1160,
+                height=820,
+                min_size=(820, 620),
+                background_color="#f5f1e8",
+                text_select=True,
+            )
+            if simulator is None:
+                return {"opened": False, "error": "Could not create the simulator window."}
+            simulator.events.closed += self._clear_smart_home_window
+            self._smart_home_window = simulator
+            return {"opened": True, "reused": False}
+
+
 def run_flask():
     """Run Flask server in background thread. Errors are logged but won't crash the main thread."""
     try:
@@ -137,6 +184,7 @@ def main():
     _storage = os.path.join(os.path.dirname(__file__), ".webview_profile")
     os.makedirs(_storage, exist_ok=True)
     try:
+        desktop_api = DesktopApi()
         webview.create_window(
             title='Hachi — Agentic Voice Assistant',
             url=f'http://127.0.0.1:{FLASK_PORT}',
@@ -144,7 +192,7 @@ def main():
             height=820,
             min_size=(700, 500),
             background_color='#0f172a',
-            js_api=None
+            js_api=desktop_api
         )
         webview.start(
             debug=False,

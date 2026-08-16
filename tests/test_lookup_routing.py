@@ -45,6 +45,7 @@ class LookupRoutingTests(unittest.TestCase):
         self.assertEqual(calls[0][0], "research_web")
         self.assertEqual(tools[0]["tool"], "research_web")
 
+    @patch("hachi_agent.USE_DEEPSEEK", True)
     @patch("hachi_agent.DEEPSEEK_API_KEY", "test-key")
     @patch("hachi_agent._qwen_tool_decide")
     def test_unknown_non_web_answer_delegates_to_cloud_reasoning(self, decide):

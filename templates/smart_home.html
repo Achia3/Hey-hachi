@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hachi Smart Home Simulation</title>
+  <style>
+    :root {
+      --ink:#24221d; --muted:#736f65; --faint:#aaa498; --paper:#f5f1e8;
+      --card:#fffdf8; --line:#ddd6c8; --honey:#c8912f; --honey-soft:#f7e7bd;
+      --green:#327a51; --red:#b95142; --blue:#477ba5; --shadow:0 18px 45px -30px rgba(42,35,23,.5);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+    body{overflow-x:hidden}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.28;background-image:linear-gradient(30deg,rgba(200,145,47,.12) 12%,transparent 12.5%,transparent 87%,rgba(200,145,47,.12) 87.5%),linear-gradient(150deg,rgba(200,145,47,.12) 12%,transparent 12.5%,transparent 87%,rgba(200,145,47,.12) 87.5%);background-size:70px 122px;animation:gridDrift 18s linear infinite}
+    @keyframes gridDrift{to{background-position:140px 122px}}
+    .shell{position:relative;max-width:1180px;margin:auto;padding:24px 28px 120px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;animation:drop .45s ease both}
+    @keyframes drop{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+    .brand{display:flex;align-items:center;gap:12px}.mark{width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--line);border-radius:13px;background:var(--card);box-shadow:var(--shadow);font-size:20px;animation:float 3s ease-in-out infinite}
+    @keyframes float{50%{transform:translateY(-3px) rotate(3deg)}}
+    h1{font-family:Georgia,serif;font-size:22px;margin:0}.sub{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+    .runtime{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:999px;padding:8px 12px;background:rgba(255,253,248,.85);font-size:12px;color:var(--muted)}
+    .runtime-dot{width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 0 rgba(50,122,81,.4)}
+    .runtime.ready .runtime-dot{background:var(--green);animation:ping 1.7s infinite}.runtime.error .runtime-dot{background:var(--red)}
+    @keyframes ping{60%{box-shadow:0 0 0 8px rgba(50,122,81,0)}100%{box-shadow:0 0 0 0 rgba(50,122,81,0)}}
+    .command{display:grid;grid-template-columns:1fr auto;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:15px;box-shadow:var(--shadow);margin-bottom:18px;animation:rise .5s .08s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    .command-copy{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px}.command-label{font-size:12px;font-weight:700}.hint{font-size:11px;color:var(--muted)}
+    #commandInput{width:100%;border:1px solid var(--line);border-radius:13px;background:#faf8f2;padding:13px 14px;font:14px inherit;color:var(--ink);outline:none;transition:.2s}
+    #commandInput:focus{border-color:var(--honey);box-shadow:0 0 0 4px rgba(200,145,47,.12);transform:translateY(-1px)}
+    .send,.ghost{border:0;border-radius:13px;padding:0 18px;font-weight:700;cursor:pointer;transition:.2s;min-height:46px}.send{background:var(--ink);color:white;min-width:150px}.send:hover{transform:translateY(-2px);box-shadow:0 10px 20px -12px #000}.send:disabled{opacity:.55;cursor:wait}.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);min-height:36px;padding:0 12px}.ghost:hover{color:var(--honey);border-color:var(--honey)}
+    .thinking-strip{grid-column:1/-1;display:none;align-items:center;gap:10px;color:var(--honey);font-size:12px}.thinking .thinking-strip{display:flex}.brain{width:18px;height:18px;border:2px solid var(--honey-soft);border-top-color:var(--honey);border-radius:50%;animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    .thinking .device-card{animation:listen 1.3s ease-in-out infinite alternate}@keyframes listen{to{border-color:rgba(200,145,47,.55);transform:translateY(-2px)}}
+    .status-line{grid-column:1/-1;min-height:20px;font-size:12px;color:var(--muted);padding:0 2px}.status-line.ok{color:var(--green)}.status-line.bad{color:var(--red)}
+    .summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 2px 12px}.summary h2{font:700 14px Georgia,serif;margin:0}.revision{font:11px Consolas,monospace;color:var(--honey)}
+    .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:13px}
+    .device-card{position:relative;grid-column:span 2;min-height:228px;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:17px;box-shadow:var(--shadow);transition:transform .35s,border-color .35s,box-shadow .35s;animation:rise .5s ease both}
+    .device-card:nth-child(2){animation-delay:.05s}.device-card:nth-child(3){animation-delay:.1s}.device-card:nth-child(4){animation-delay:.15s}.device-card:nth-child(5){animation-delay:.2s}
+    .device-card.wide{grid-column:span 3}.device-card::after{content:"";position:absolute;inset:-40%;background:radial-gradient(circle,rgba(200,145,47,.22),transparent 45%);opacity:0;transform:scale(.3);pointer-events:none}
+    .device-card.changed{border-color:var(--honey);box-shadow:0 18px 50px -24px rgba(200,145,47,.8);animation:cardConfirm .9s ease}
+    .device-card.changed::after{animation:flash .9s ease}@keyframes flash{45%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.4)}}
+    @keyframes cardConfirm{30%{transform:translateY(-7px) scale(1.018)}60%{transform:translateY(1px) scale(.995)}}
+    .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-name{font-size:12px;color:var(--muted)}.baseline{display:inline-flex;margin-top:5px;font:9px Consolas,monospace;color:var(--faint);background:#f4f1e9;border-radius:999px;padding:3px 7px}
+    .current{font:700 27px Georgia,serif;margin:17px 0 15px;transition:.35s}.changed .current{animation:valuePop .75s ease}@keyframes valuePop{40%{color:var(--honey);transform:scale(1.08);transform-origin:left}}
+    .visual{height:55px;display:flex;align-items:center;justify-content:center;position:relative}
+    .bulb{font-size:33px;filter:grayscale(1);opacity:.45;transition:.5s}.light-on .bulb{filter:none;opacity:1;transform:scale(1.14);animation:bulbGlow 1.6s infinite alternate}@keyframes bulbGlow{to{filter:drop-shadow(0 0 13px #f1bd36)}}
+    .ray{position:absolute;width:4px;height:13px;background:#e9b73e;border-radius:4px;opacity:0;transform-origin:2px 42px}.light-on .ray{opacity:.8;animation:rayPulse 1.5s infinite alternate}.ray.r1{transform:rotate(-60deg) translateY(-35px)}.ray.r2{transform:rotate(0) translateY(-35px)}.ray.r3{transform:rotate(60deg) translateY(-35px)}@keyframes rayPulse{to{opacity:.2;height:19px}}
+    .thermo-track{position:relative;width:75%;height:12px;background:#e7e2d8;border-radius:20px;overflow:hidden}.thermo-fill{height:100%;width:28%;border-radius:inherit;background:linear-gradient(90deg,#66a8d5,#e4a43a,#d55e48);transition:width .8s cubic-bezier(.2,.9,.2,1)}.thermo-dot{position:absolute;top:50%;left:28%;width:20px;height:20px;border:4px solid white;border-radius:50%;background:var(--honey);box-shadow:0 2px 8px #9c7b44;transform:translate(-50%,-50%);transition:left .8s cubic-bezier(.2,.9,.2,1)}
+    .lock-shape{position:relative;width:44px;height:39px;border-radius:8px;background:var(--red);transition:.55s}.lock-shape::before{content:"";position:absolute;width:25px;height:25px;border:6px solid var(--red);border-bottom:0;border-radius:20px 20px 0 0;left:4px;top:-24px;transform:translateX(11px) rotate(25deg);transform-origin:left bottom;transition:.55s}.locked .lock-shape{background:var(--green)}.locked .lock-shape::before{border-color:var(--green);transform:none}
+    .equalizer{display:flex;align-items:flex-end;gap:5px;height:44px}.equalizer span{width:7px;height:8px;background:var(--faint);border-radius:5px;transition:.4s}.playing .equalizer span{background:var(--honey);animation:eq .7s ease-in-out infinite alternate}.playing .equalizer span:nth-child(2){animation-delay:.18s}.playing .equalizer span:nth-child(3){animation-delay:.35s}.playing .equalizer span:nth-child(4){animation-delay:.1s}@keyframes eq{to{height:40px}}
+    .manual{position:relative;z-index:2;display:flex;gap:7px;margin-top:12px}.manual button{flex:1;border:1px solid var(--line);background:#fbf9f3;color:var(--muted);border-radius:9px;padding:7px 5px;font-size:10px;cursor:pointer;transition:.2s}.manual button:hover{background:var(--honey-soft);color:#805817;transform:translateY(-2px)}
+    .activity{grid-column:1/-1;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:17px;box-shadow:var(--shadow);animation:rise .5s .25s ease both}.activity-head{display:flex;justify-content:space-between;align-items:center}.activity-title{font:700 14px Georgia,serif}.verified{font:10px Consolas,monospace;color:var(--faint)}.verified.ok{color:var(--green)}.verified.bad{color:var(--red)}
+    .activity-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.panel{border:1px solid var(--line);background:#faf8f2;border-radius:13px;padding:12px;min-height:95px}.panel-label{font:9px Consolas,monospace;text-transform:uppercase;letter-spacing:.09em;color:var(--faint);margin-bottom:7px}.panel-value{font-size:12px;line-height:1.55;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}.activity.updated .panel{animation:panelSweep .8s ease}@keyframes panelSweep{50%{background:#fff1c9;border-color:var(--honey)}}
+    .toast{position:fixed;left:50%;bottom:25px;transform:translate(-50%,120px);opacity:0;z-index:20;background:var(--ink);color:white;border-radius:999px;padding:10px 17px;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);transition:.4s}.toast.show{transform:translate(-50%,0);opacity:1}
+    .screen-flash{position:fixed;inset:0;pointer-events:none;z-index:15;border:0 solid rgba(200,145,47,.8)}.screen-flash.go{animation:screenConfirm .7s ease}@keyframes screenConfirm{35%{border-width:8px}100%{border-width:0}}
+    @media(max-width:850px){.device-card,.device-card.wide{grid-column:span 3}.shell{padding-inline:18px}.activity-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="screen-flash" id="screenFlash"></div>
+  <main class="shell" id="shell">
+    <header class="top">
+      <div class="brand"><div class="mark">⌂</div><div><h1>Smart Home Simulation</h1><div class="sub">Separate live demonstration window</div></div></div>
+      <div class="runtime" id="runtime"><span class="runtime-dot"></span><span id="runtimeText">Checking local Qwen…</span></div>
+    </header>
+
+    <section class="command" id="commandBox">
+      <div class="command-copy"><span class="command-label">Tell local Qwen what you need</span><span class="hint">The model decides; Pydantic validates; the simulator executes.</span></div>
+      <input id="commandInput" autocomplete="off" placeholder="Example: It is getting dark and I am freezing." aria-label="Smart-home command">
+      <button class="send" id="sendCommand" type="button">Run with Qwen</button>
+      <div class="thinking-strip"><span class="brain"></span><span>Qwen is interpreting the need and preparing validated actions…</span></div>
+      <div class="status-line" id="statusLine" aria-live="polite">Ready for a manual control or an AI command.</div>
+    </section>
+
+    <div class="summary"><h2>Live device state</h2><span class="revision" id="revision">REVISION 0</span></div>
+    <section class="grid">
+      <article class="device-card" id="card-living_room_light">
+        <div class="card-head"><div><div class="device-name">Living-room light</div><span class="baseline">INITIAL: OFF</span></div></div>
+        <div class="current" id="livingValue">OFF</div>
+        <div class="visual"><span class="ray r1"></span><span class="ray r2"></span><span class="ray r3"></span><span class="bulb">💡</span></div>
+        <div class="manual"><button data-action="turn_on" data-target="living_room_light">Turn on</button><button data-action="turn_off" data-target="living_room_light">Turn off</button></div>
+      </article>
+      <article class="device-card" id="card-kitchen_light">
+        <div class="card-head"><div><div class="device-name">Kitchen light</div><span class="baseline">INITIAL: ON</span></div></div>
+        <div class="current" id="kitchenValue">ON</div>
+        <div class="visual"><span class="ray r1"></span><span class="ray r2"></span><span class="ray r3"></span><span class="bulb">💡</span></div>
+        <div class="manual"><button data-action="turn_on" data-target="kitchen_light">Turn on</button><button data-action="turn_off" data-target="kitchen_light">Turn off</button></div>
+      </article>
+      <article class="device-card" id="card-living_room_thermostat">
+        <div class="card-head"><div><div class="device-name">Living-room thermostat</div><span class="baseline">INITIAL: 20 °C</span></div></div>
+        <div class="current" id="temperatureValue">20 °C</div>
+        <div class="visual"><div class="thermo-track"><div class="thermo-fill" id="thermoFill"></div><div class="thermo-dot" id="thermoDot"></div></div></div>
+        <div class="manual"><button data-action="decrease_temperature" data-target="living_room_thermostat" data-value="1">−1 °C</button><button data-action="increase_temperature" data-target="living_room_thermostat" data-value="1">+1 °C</button></div>
+      </article>
+      <article class="device-card wide" id="card-front_door_lock">
+        <div class="card-head"><div><div class="device-name">Front-door lock</div><span class="baseline">INITIAL: UNLOCKED</span></div></div>
+        <div class="current" id="lockValue">UNLOCKED</div>
+        <div class="visual"><div class="lock-shape"></div></div>
+        <div class="manual"><button data-action="lock" data-target="front_door_lock">Lock</button><button data-action="unlock" data-target="front_door_lock">Unlock</button></div>
+      </article>
+      <article class="device-card wide" id="card-entertainment">
+        <div class="card-head"><div><div class="device-name">Entertainment</div><span class="baseline">INITIAL: STOPPED</span></div></div>
+        <div class="current" id="mediaValue">STOPPED</div>
+        <div class="visual"><div class="equalizer"><span></span><span></span><span></span><span></span></div></div>
+        <div class="manual"><button data-action="play_media" data-target="entertainment" data-title="Study Music">Play study music</button><button data-action="pause_media" data-target="entertainment">Pause</button><button data-action="stop_media" data-target="entertainment">Stop</button></div>
+      </article>
+
+      <section class="activity" id="activity">
+        <div class="activity-head"><span class="activity-title">Latest execution evidence</span><span class="verified" id="verified">WAITING FOR ACTION</span></div>
+        <div class="activity-grid">
+          <div class="panel"><div class="panel-label">User need and observed change</div><div class="panel-value" id="eventText">No action has run in this process yet.</div></div>
+          <div class="panel"><div class="panel-label">Validation and timing</div><div class="panel-value" id="eventMeta">All controls use the same validated actuator.</div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="ghost" id="resetButton" type="button">Reset to initial values</button></div>
+      </section>
+    </section>
+  </main>
+  <div class="toast" id="toast">State changed and verified</div>
+
+  <script>
+    const shell = document.getElementById('shell');
+    const commandBox = document.getElementById('commandBox');
+    const commandInput = document.getElementById('commandInput');
+    const sendCommand = document.getElementById('sendCommand');
+    const statusLine = document.getElementById('statusLine');
+    const runtime = document.getElementById('runtime');
+    const runtimeText = document.getElementById('runtimeText');
+    const activity = document.getElementById('activity');
+    let previousDevices = null;
+    let latestRevision = -1;
+    let toastTimer = null;
+    let agentWasPending = false;
+    let localCommandRunning = false;
+
+    const cardIds = {
+      living_room_light:'card-living_room_light', kitchen_light:'card-kitchen_light',
+      living_room_thermostat:'card-living_room_thermostat', front_door_lock:'card-front_door_lock',
+      entertainment:'card-entertainment'
+    };
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function animateTarget(target) {
+      const card = document.getElementById(cardIds[target]);
+      if (!card) return;
+      card.classList.remove('changed');
+      void card.offsetWidth;
+      card.classList.add('changed');
+      setTimeout(() => card.classList.remove('changed'), 1100);
+    }
+
+    function beginAgentAnimation(message='Hachi recognized a smart-home request. Waiting for local Qwen…') {
+      shell.classList.add('thinking'); commandBox.classList.add('thinking'); sendCommand.disabled=true;
+      statusLine.className='status-line'; statusLine.textContent=message;
+    }
+
+    window.hachiSmartHomeBegin = beginAgentAnimation;
+
+    function renderAgentActivity(agent) {
+      if (agent && agent.pending) {
+        agentWasPending = true;
+        beginAgentAnimation('Hachi recognized the request. Local Qwen is choosing validated actions…');
+      } else if (agentWasPending && !localCommandRunning) {
+        agentWasPending = false;
+        shell.classList.remove('thinking'); commandBox.classList.remove('thinking'); sendCommand.disabled=false;
+        statusLine.className='status-line ok';
+        statusLine.textContent='Qwen finished. The latest validated result is shown below.';
+      }
+    }
+
+    function renderEvent(event, animate) {
+      if (!event) return;
+      const transcript = event.transcript || event.goal || event.event || 'Simulator action';
+      const changes = Array.isArray(event.changes) && event.changes.length
+        ? event.changes.map(change => change.summary).join('\n') : 'No value needed to change.';
+      document.getElementById('eventText').textContent = `${transcript}\n${changes}`;
+      const valid = Boolean(event.validation_success && event.execution_verified);
+      const verified = document.getElementById('verified');
+      verified.textContent = valid ? '✓ VALIDATED + VERIFIED' : '✕ REJECTED — STATE UNCHANGED';
+      verified.className = `verified ${valid ? 'ok' : 'bad'}`;
+      document.getElementById('eventMeta').textContent = `Engine: ${event.engine || 'local'}\nExecution: ${event.execution_ms ?? 0} ms\nTotal: ${event.total_ms ?? 0} ms\nRevision: ${event.revision ?? 0}`;
+      if (animate) {
+        activity.classList.remove('updated'); void activity.offsetWidth; activity.classList.add('updated');
+        setTimeout(() => activity.classList.remove('updated'), 1000);
+      }
+    }
+
+    function renderState(state, animate=true) {
+      if (!state || !state.devices) return;
+      renderAgentActivity(state.agent_activity);
+      const d = state.devices;
+      document.getElementById('livingValue').textContent = d.living_room_light.on ? 'ON' : 'OFF';
+      document.getElementById('kitchenValue').textContent = d.kitchen_light.on ? 'ON' : 'OFF';
+      document.getElementById('card-living_room_light').classList.toggle('light-on', d.living_room_light.on);
+      document.getElementById('card-kitchen_light').classList.toggle('light-on', d.kitchen_light.on);
+      const temp = Number(d.living_room_thermostat.temperature_c);
+      document.getElementById('temperatureValue').textContent = `${temp} °C`;
+      const tempPosition = Math.max(0, Math.min(100, ((temp - 16) / 14) * 100));
+      document.getElementById('thermoFill').style.width = `${tempPosition}%`;
+      document.getElementById('thermoDot').style.left = `${tempPosition}%`;
+      const locked = Boolean(d.front_door_lock.locked);
+      document.getElementById('lockValue').textContent = locked ? 'LOCKED' : 'UNLOCKED';
+      document.getElementById('card-front_door_lock').classList.toggle('locked', locked);
+      const media = d.entertainment;
+      document.getElementById('mediaValue').textContent = media.status === 'playing' && media.title ? `PLAYING · ${media.title}` : media.status.toUpperCase();
+      document.getElementById('card-entertainment').classList.toggle('playing', media.status === 'playing');
+      document.getElementById('revision').textContent = `REVISION ${state.revision}`;
+
+      if (animate && previousDevices) {
+        Object.keys(cardIds).forEach(target => {
+          if (JSON.stringify(previousDevices[target]) !== JSON.stringify(d[target])) animateTarget(target);
+        });
+      }
+      const revisionChanged = latestRevision >= 0 && state.revision !== latestRevision;
+      const event = Array.isArray(state.events) ? state.events[0] : null;
+      renderEvent(event, animate && revisionChanged);
+      previousDevices = JSON.parse(JSON.stringify(d));
+      latestRevision = state.revision;
+    }
+
+    async function refreshState(animate=true) {
+      try {
+        const response = await fetch('/api/smart_home/state', {cache:'no-store'});
+        if (response.ok) renderState(await response.json(), animate);
+      } catch (_) {}
+    }
+
+    async function refreshRuntime() {
+      try {
+        const response = await fetch('/api/smart_home/runtime', {cache:'no-store'});
+        const result = await response.json();
+        const ready = result.ollama_running && result.model_installed;
+        runtime.className = `runtime ${ready ? 'ready' : 'error'}`;
+        runtimeText.textContent = ready ? `${result.model} ready locally` : result.message;
+      } catch (_) {
+        runtime.className = 'runtime error'; runtimeText.textContent = 'Local runtime unavailable';
+      }
+    }
+
+    async function manualAction(action, target, value, title) {
+      const item = {action, target};
+      if (value !== undefined && value !== null && value !== '') item.value = Number(value);
+      if (title) item.title = title;
+      statusLine.className = 'status-line'; statusLine.textContent = `Executing manual simulation action: ${action}…`;
+      const response = await fetch('/api/smart_home/action', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal:'Manual simulator control',original_command:`Manual control: ${action} ${target}`,actions:[item]})});
+      const result = await response.json();
+      if (!response.ok) { statusLine.className='status-line bad'; statusLine.textContent=result.error || 'Action rejected.'; return; }
+      renderState(result.state, true);
+      statusLine.className='status-line ok'; statusLine.textContent=result.message || 'State changed and verified.';
+      document.getElementById('screenFlash').classList.remove('go'); void document.getElementById('screenFlash').offsetWidth; document.getElementById('screenFlash').classList.add('go');
+      showToast('State changed and verified');
+    }
+
+    async function runCommand() {
+      const message = commandInput.value.trim();
+      if (!message) return;
+      localCommandRunning=true;
+      shell.classList.add('thinking'); commandBox.classList.add('thinking'); sendCommand.disabled=true;
+      statusLine.className='status-line'; statusLine.textContent='Waiting for local Qwen tool selection…';
+      try {
+        const response = await fetch('/api/smart_home/command', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+        const result = await response.json();
+        if (result.state) renderState(result.state, true);
+        if (result.success) {
+          statusLine.className='status-line ok'; statusLine.textContent=result.response || 'Command completed and verified.';
+          commandInput.value=''; showToast('Qwen action completed and verified');
+          const flash=document.getElementById('screenFlash'); flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+        } else if (result.clarification) {
+          statusLine.className='status-line'; statusLine.textContent=result.response;
+        } else {
+          statusLine.className='status-line bad'; statusLine.textContent=result.error || 'Command could not be executed.';
+          showToast('No state changed');
+        }
+        refreshRuntime();
+      } catch (_) {
+        statusLine.className='status-line bad'; statusLine.textContent='Could not reach Hachi’s local backend.';
+      } finally {
+        localCommandRunning=false; agentWasPending=false;
+        shell.classList.remove('thinking'); commandBox.classList.remove('thinking'); sendCommand.disabled=false;
+      }
+    }
+
+    document.querySelectorAll('.manual button').forEach(button => button.addEventListener('click', () => manualAction(button.dataset.action, button.dataset.target, button.dataset.value, button.dataset.title)));
+    sendCommand.addEventListener('click', runCommand);
+    commandInput.addEventListener('keydown', event => { if (event.key === 'Enter') runCommand(); });
+    document.getElementById('resetButton').addEventListener('click', async () => {
+      const response = await fetch('/api/smart_home/reset', {method:'POST'}); const result = await response.json();
+      if (response.ok) { renderState(result.state, true); statusLine.className='status-line ok'; statusLine.textContent='Restored all devices to the clearly labeled initial values.'; showToast('Simulation reset to initial values'); }
+    });
+
+    if (new URLSearchParams(window.location.search).get('auto') === '1') beginAgentAnimation();
+    refreshState(false); refreshRuntime();
+    setInterval(() => refreshState(true), 800);
+    setInterval(refreshRuntime, 5000);
+  </script>
+</body>
+</html>

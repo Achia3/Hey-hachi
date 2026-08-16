@@ -49,11 +49,11 @@ where ollama >nul 2>&1
 if %errorlevel% neq 0 (
     echo [!] WARNING: Ollama executable not found in system PATH.
     echo     Please install it from https://ollama.com and pull the model:
-    echo       ollama pull qwen2.5:3b
+    echo       ollama pull qwen3.5:2b
 ) else (
     echo [OK] Ollama detected.
-    echo [*] Pulling model qwen2.5:3b (skips if already present)...
-    ollama pull qwen2.5:3b
+    echo [*] Pulling model qwen3.5:2b (skips if already present)...
+    ollama pull qwen3.5:2b
 )
 echo.
 

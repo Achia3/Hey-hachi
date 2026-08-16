@@ -231,6 +231,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/smart-home")
+def smart_home_simulator():
+    return render_template("smart_home.html")
+
+
 @app.route("/api/upload_pdf", methods=["POST"])
 def api_upload_pdf():
     """Accept one PDF attachment and return an opaque ID for the next chat turn."""
@@ -318,6 +323,62 @@ def api_chat():
     except Exception as e:
         logging.error(f"api_chat error: {e}")
         return jsonify({"response": "Something went wrong.", "tools": [], "engine": "none", "pomo": None}), 500
+
+
+@app.route("/api/smart_home/state", methods=["GET"])
+def api_smart_home_state():
+    """Current software-simulated device state for the live dashboard."""
+    from hachi_home import get_smart_home_state
+    from hachi_home_agent import get_smart_home_activity
+    state = get_smart_home_state()
+    state["agent_activity"] = get_smart_home_activity()
+    return jsonify(state)
+
+
+@app.route("/api/smart_home/runtime", methods=["GET"])
+def api_smart_home_runtime():
+    from hachi_home_agent import get_smart_home_runtime_status
+    return jsonify(get_smart_home_runtime_status())
+
+
+@app.route("/api/smart_home/command", methods=["POST"])
+def api_smart_home_command():
+    from hachi_home_agent import run_smart_home_command
+    data = request.json or {}
+    result = run_smart_home_command(data.get("message", ""))
+    return jsonify(result), (200 if result.get("success") or result.get("clarification") else 503)
+
+
+@app.route("/api/smart_home/action", methods=["POST"])
+def api_smart_home_action():
+    """Manual dashboard controls share the same validated actuator as Qwen."""
+    try:
+        from hachi_home import apply_smart_home_actions
+        data = request.json or {}
+        result = apply_smart_home_actions(
+            actions=data.get("actions", []),
+            goal=data.get("goal", "Manual dashboard control"),
+            original_command=data.get("original_command", "Manual dashboard control"),
+            engine="dashboard",
+        )
+        return jsonify(result)
+    except Exception as exc:
+        logging.warning("Smart-home action rejected: %s", exc)
+        from hachi_home import record_smart_home_rejection
+        record_smart_home_rejection(
+            actions=data.get("actions", []),
+            goal=data.get("goal", "Manual dashboard control"),
+            original_command=data.get("original_command", "Manual dashboard control"),
+            error=exc,
+            engine="dashboard",
+        )
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+
+@app.route("/api/smart_home/reset", methods=["POST"])
+def api_smart_home_reset():
+    from hachi_home import reset_smart_home
+    return jsonify(reset_smart_home())
 
 
 @app.route("/api/stream_chat", methods=["POST"])
@@ -489,6 +550,9 @@ def api_voice_stream():
             saw_token = False
             for event in process_agent_request_stream(user_msg, mode, voice_mode=True, turn_context=turn_ctx):
                 turn_ctx.checkpoint()
+                if event.get("open_smart_home"):
+                    yield "data: " + json.dumps({"type": "open_smart_home"}) + "\n\n"
+
                 # Yield token events immediately
                 if not event.get("done") and event.get("token"):
                     saw_token = True
@@ -721,8 +785,8 @@ def api_transcribe_voice_turn():
 def api_voice_ready():
     """Warm the transcription model while the user begins their first turn."""
     try:
-        from hachi_whisper import get_whisper_model
-        get_whisper_model()
+        from hachi_whisper import warm_transcription_model
+        warm_transcription_model()
         return jsonify({"ready": True})
     except Exception as exc:
         logging.warning("Voice model warmup failed: %s", exc)

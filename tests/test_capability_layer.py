@@ -23,7 +23,8 @@ class CapabilityLayerTests(unittest.TestCase):
             json=lambda: {"choices": [{"message": {"content": "A reasoned second opinion."}}]},
         )
         post.return_value = response
-        with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test-key"}):
+        with patch("hachi_tools.json.load", return_value={"use_deepseek": True, "deepseek_model": "deepseek-v4-flash"}), \
+             patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test-key"}):
             result = delegate_reasoning("Explain a difficult concept", "User provided context")
 
         self.assertIn("CLOUD REASONING", result)

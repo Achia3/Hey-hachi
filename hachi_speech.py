@@ -22,6 +22,7 @@ except ImportError:
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 DEFAULT_TAGALOG_VOICE = "fil-PH-AngeloNeural"
 DEFAULT_ENGLISH_VOICE = "en-US-AvaNeural"
+OFFLINE_TTS_ONLY = True
 
 if os.path.exists(_CONFIG_PATH):
     try:
@@ -29,6 +30,7 @@ if os.path.exists(_CONFIG_PATH):
             _cfg = json.load(_f)
             DEFAULT_TAGALOG_VOICE = _cfg.get("tagalog_voice", DEFAULT_TAGALOG_VOICE)
             DEFAULT_ENGLISH_VOICE = _cfg.get("english_voice", DEFAULT_ENGLISH_VOICE)
+            OFFLINE_TTS_ONLY = bool(_cfg.get("offline_tts_only", OFFLINE_TTS_ONLY))
     except Exception:
         pass
 
@@ -145,7 +147,7 @@ def generate_tts_audio(text: str) -> Optional[str]:
     if not clean:
         return None
 
-    if HAS_EDGE_TTS:
+    if HAS_EDGE_TTS and not OFFLINE_TTS_ONLY:
         try:
             voice = _pick_voice(clean)
             tmp = os.path.join(
@@ -362,7 +364,7 @@ def speak(text: str):
 
     tmp = None
     # Primary: edge-tts neural voices (requires internet) — generate outside the lock
-    if HAS_EDGE_TTS:
+    if HAS_EDGE_TTS and not OFFLINE_TTS_ONLY:
         try:
             tmp = os.path.join(
                 tempfile.gettempdir(),
