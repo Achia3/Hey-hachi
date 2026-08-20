@@ -30,3 +30,18 @@ hachi_memory.db-shm
 graphify-out/
 .graphify_*.json
 .graphify_*.txt
+
+# Local/cloud model-training artifacts and intermediate materials
+*.gguf
+*.safetensors
+*.bin
+*.tar.gz
+llama_cpp_converter/
+convert_hf_to_gguf_latest.py
+
+training/
+training_v*/
+training_master_*/
+
+# Downloaded model exports and evaluation bundles
+gguf/

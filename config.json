@@ -1,5 +1,5 @@
 {
-  "model_name": "qwen3.5:2b",
+  "model_name": "hachi-master",
   "voice_transcription_model": "small",
   "voice_stt_engine": "faster-whisper",
   "voice_vad_enabled": true,

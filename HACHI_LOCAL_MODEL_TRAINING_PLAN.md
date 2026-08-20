@@ -4,7 +4,7 @@
 
 Hachi now uses the stock Ollama model `qwen3.5:2b` as its default local model. We will measure that baseline before training anything.
 
-If the stock model does not meet the acceptance targets below—or if the class must demonstrate model training—we will fine-tune **one Qwen3.5-0.8B LoRA adapter locally** for smart-home intent and tool selection. We will not train a language model from scratch, automatically train on private conversations, or depend on a paid/cloud notebook.
+If the stock model does not meet the acceptance targets below—or if the class must demonstrate model training—we will fine-tune **one Qwen3.5-0.8B LoRA adapter on a private free Kaggle GPU notebook** for smart-home intent and tool selection. We will not train a language model from scratch, automatically train on private conversations, use either laptop for sustained LLM training, or depend on paid compute.
 
 The trained 0.8B specialist remains experimental until it meets the held-out accuracy targets and improves smart-home latency. Stock Qwen3.5-2B remains Hachi's general/default model and smart-home fallback. Hachi's Pydantic validation and deterministic executor remain mandatory because model training cannot guarantee safe or correct actions.
 
@@ -29,38 +29,39 @@ The model is responsible for understanding the need. Application code remains re
 
 ## Hardware and free software plan
 
-The development laptop has an RTX 2050 with 4 GB VRAM and approximately 16 GB system RAM. Qwen3.5-2B inference is appropriate for it, but local 2B BF16 LoRA training is not expected to fit reliably: the current published estimate is about 5 GB VRAM before desktop and training overhead. Qwen3.5-0.8B BF16 LoRA is estimated at about 3 GB, making it the only realistic Qwen3.5 LoRA target for this laptop, although the margin remains tight.
+Both development laptops have only 4 GB VRAM. They are suitable for quantized inference but must not be used for sustained LLM training because of memory and thermal risk. The verified private Kaggle notebook provides two Tesla T4 GPUs with 15 GB VRAM each. This experiment deliberately uses only one T4; Qwen3.5-0.8B BF16/FP16 LoRA is estimated at about 3 GB VRAM.
 
 Use the following free components:
 
 | Component | Purpose |
 |---|---|
 | Qwen/Qwen3.5-0.8B-Base | Official small base weights for the local specialist |
-| Unsloth local Windows/WSL installation | LoRA supervised fine-tuning and GGUF export |
-| RTX 2050 4 GB | Local training GPU; no account, payment, or cloud runtime |
+| Unsloth in a private Kaggle notebook | LoRA supervised fine-tuning and GGUF export |
+| One Kaggle Tesla T4 15 GB | Free training GPU; no credit card or local thermal load |
 | Ollama | Local deployment and comparison with the stock model |
 | Pydantic and pytest | Output validation and repeatable evaluation |
 | Git/GitHub | Version the dataset, training configuration, tests, and report—not large model weights |
 
-Training must be performed locally. Before training, close Hachi, Ollama, games, browsers using GPU acceleration, and other GPU-heavy applications. Start with the lowest-memory settings in this plan. If 0.8B still runs out of memory, do not force CPU offloading for the deadline; use the CPU-trained classifier fallback described below and retain stock Qwen3.5-2B for final tool selection.
+Training must be performed in the private Kaggle notebook, not on either laptop GPU. Upload only the training package—never Hachi's database, conversations, `.env`, or secrets. Start with the two-step smoke run, then restart the Kaggle session and perform the full run. Stop the Kaggle session immediately after downloading outputs. If the notebook still fails, do not use local CPU/GPU offloading for the deadline; use the CPU-trained classifier fallback described below and retain stock Qwen3.5-2B for final tool selection.
 
 ## Dataset specification
 
 ### Target size
 
-Prepare approximately **900 reviewed examples**:
+The first experiment uses **300 schema-validated draft examples**. Human language review remains required before claiming the dataset is reviewed:
 
 | Category | Target examples |
 |---|---:|
-| Direct single-device commands | 120 |
-| Indirect needs and paraphrases | 160 |
-| Multiple actions in one request | 100 |
-| State questions | 80 |
-| Truly ambiguous requests requiring clarification | 100 |
-| Invalid, unsafe, out-of-range, or prompt-injection requests | 100 |
-| Unrelated negative examples that must not call a home tool | 120 |
-| Filipino and Taglish examples across all categories | 120 |
-| **Total** | **900** |
+| Direct single-device commands | 95 |
+| Indirect needs and paraphrases | 35 |
+| Multiple actions in one request | 35 |
+| State questions | 30 |
+| Truly ambiguous requests requiring clarification | 35 |
+| Invalid, unsafe, out-of-range, or prompt-injection requests | 30 |
+| Unrelated negative examples that must not call a home tool | 40 |
+| **Total** | **300** |
+
+English, Filipino, and Taglish examples appear across every split. The generated package contains 180 English, 60 Filipino, and 60 Taglish records.
 
 Each action example should be generated under several starting states so the model does not memorize one default house configuration.
 
@@ -117,9 +118,9 @@ The training preparation script must convert this review-friendly record into Qw
 
 ## Dataset split
 
-- Training: 70% or about 630 examples
-- Validation: 15% or about 135 examples
-- Held-out test: 15% or about 135 examples
+- Training: 70% or 210 examples
+- Validation: 15% or 45 examples
+- Held-out test: 15% or 45 examples
 
 The held-out test file must be frozen before the first training run. Neither partner should move failed test examples into training without creating a new, separately versioned evaluation set.
 
@@ -159,7 +160,7 @@ The trained 0.8B specialist may handle the smart-home path only if it achieves a
 | False activation on unrelated requests | At most 2% |
 | Invalid or unsafe action executed | 0% after validation |
 | Malformed tool-call output | At most 1% |
-| Median latency | Faster than stock 2B and the current 4B baseline |
+| Median latency | Faster than stock 2B |
 
 If the adapter improves training accuracy but fails these held-out targets, it is overfitting and must not be used in the final demonstration.
 
@@ -191,11 +192,11 @@ Treat these as starting values, not guaranteed optimal settings. Stop early if v
 
 1. Freeze and version `train.jsonl`, `validation.jsonl`, and `test.jsonl`.
 2. Validate every expected action with Hachi's existing Pydantic models.
-3. Run and save the stock 2B and 4B baselines.
-4. Install Unsloth in an isolated local Windows/WSL environment and adapt its official Qwen3.5-0.8B notebook/script.
+3. Run and save the stock 0.8B and 2B baselines; treat 4B as an optional comparison only.
+4. Import `training/hachi_qwen35_08b_kaggle.ipynb` into a private Kaggle notebook and attach `training/hachi-smart-home-data.zip`.
 5. Disable vision training and keep the sequence length small.
 6. Load the reviewed training and validation splits.
-7. Train LoRA for two epochs and save metrics and the best checkpoint.
+7. Run the two-step smoke test first. After it succeeds, restart the session and train LoRA for two epochs.
 8. Evaluate the untouched test split with deterministic decoding.
 9. If needed, correct the dataset—not the test answers—and run one controlled retraining experiment.
 10. Merge/export the selected adapter to GGUF and create an Ollama model such as `hachi-home-qwen3.5:0.8b`.
@@ -240,21 +241,21 @@ Do not commit GGUF files, merged weights, Ollama blobs, or model caches to Git. 
 - Confirm stock 2B inference and record latency.
 - Freeze the two smart-home tool schemas.
 - Build the dataset validator and evaluation runner.
-- Write the first 200 reviewed examples.
+- Review the first 100 schema-validated draft examples.
 
 ### Day 2 — Dataset completion
 
-- Complete approximately 900 examples.
+- Complete human review of the 300-example dataset.
 - Validate all actions automatically.
 - Deduplicate and split by paraphrase family.
 - Freeze the held-out test set.
-- Run stock 2B and 4B baselines.
+- Run stock 0.8B and 2B baselines.
 
 ### Day 3 — First training run
 
-- Install and verify the isolated local Unsloth environment.
-- Close Ollama and other GPU-heavy applications.
-- Run the local Qwen3.5-0.8B LoRA experiment.
+- Import and verify the private Kaggle/Unsloth notebook.
+- Run the two-step T4 smoke test and inspect peak memory.
+- Restart the Kaggle session and run the full Qwen3.5-0.8B LoRA experiment.
 - Save training and validation curves.
 - Export the best checkpoint.
 - Run the frozen evaluation suite.
@@ -284,7 +285,7 @@ Do not commit GGUF files, merged weights, Ollama blobs, or model caches to Git. 
 
 ### Partner B — Training and deployment
 
-- Own the isolated local Unsloth environment, LoRA configuration, checkpoints, and metrics.
+- Own the private Kaggle/Unsloth notebook, LoRA configuration, checkpoints, and metrics.
 - Export the chosen checkpoint to GGUF/Ollama.
 - Document the model checksum and reproduction steps.
 
@@ -292,14 +293,14 @@ Both partners must review at least 20% of the other partner's labeled examples a
 
 ## Expected time
 
-- Dataset and evaluation preparation: 4–10 hours
-- First local 0.8B LoRA run: approximately 2–6 hours after setup
+- Dataset language review and evaluation preparation: 3–8 hours
+- First Kaggle 0.8B LoRA run: approximately 1–3 hours after setup, including kernel compilation
 - Export and Ollama packaging: 1–2 hours
 - Evaluation and one correction cycle: 6–12 hours
-- Local environment setup and troubleshooting: 2–6 hours
-- Realistic end-to-end effort: 2–3 working days
+- Kaggle environment setup and troubleshooting: 1–3 hours
+- Realistic end-to-end effort: 1–2 working days
 
-VRAM limits, Windows/CUDA setup, model download, laptop cooling, and evaluation—not just the training loop—are the main schedule risks. Training-time estimates are planning ranges and must be replaced with measured times from the first run.
+Kaggle availability, package compatibility, model download, kernel compilation, and evaluation—not just the training loop—are the main schedule risks. Training-time estimates are planning ranges and must be replaced with measured times from the first run. Neither laptop should perform sustained LLM training.
 
 ## Final demonstration evidence
 
@@ -316,7 +317,7 @@ Show at least one success and one safe rejection. Explain that Qwen interprets t
 
 ## Go/no-go rule
 
-Proceed with local training only after the baseline dataset and evaluator work. Use the trained 0.8B specialist in the final demo only if it passes every acceptance target. If it does not fit or does not pass, use the small CPU classifier experiment for the machine-learning comparison, demonstrate stock 2B for tool selection, and keep the validated simulator working reliably.
+Proceed with Kaggle training only after the baseline dataset and evaluator work. Use the trained 0.8B specialist in the final demo only if it passes every acceptance target. If it does not run or does not pass, use the small CPU classifier experiment for the machine-learning comparison, demonstrate stock 2B for tool selection, and keep the validated simulator working reliably.
 
 ## Official references
 
@@ -325,3 +326,4 @@ Proceed with local training only after the baseline dataset and evaluator work. 
 - Ollama Qwen3.5 model tags and quantizations: https://ollama.com/library/qwen3.5/tags
 - Unsloth Qwen3.5 fine-tuning guide and VRAM estimates: https://unsloth.ai/docs/models/qwen3.5/fine-tune
 - Unsloth local Windows installation guide: https://unsloth.ai/docs/get-started/install-and-update/windows-installation
+- Kaggle free-GPU usage guidance: https://www.kaggle.com/docs/efficient-gpu-usage
