@@ -62,19 +62,10 @@
   <div class="screen-flash" id="screenFlash"></div>
   <main class="shell" id="shell">
     <header class="top">
-      <div class="brand"><div class="mark">⌂</div><div><h1>Smart Home Simulation</h1><div class="sub">Separate live demonstration window</div></div></div>
-      <div class="runtime" id="runtime"><span class="runtime-dot"></span><span id="runtimeText">Checking local Qwen…</span></div>
+      <div class="brand"><div><h1>Smart Home Simulation</h1><div class="sub">Separate live demonstration window</div></div></div>
     </header>
 
-    <section class="command" id="commandBox">
-      <div class="command-copy"><span class="command-label">Tell local Qwen what you need</span><span class="hint">The model decides; Pydantic validates; the simulator executes.</span></div>
-      <input id="commandInput" autocomplete="off" placeholder="Example: It is getting dark and I am freezing." aria-label="Smart-home command">
-      <button class="send" id="sendCommand" type="button">Run with Qwen</button>
-      <div class="thinking-strip"><span class="brain"></span><span>Qwen is interpreting the need and preparing validated actions…</span></div>
-      <div class="status-line" id="statusLine" aria-live="polite">Ready for a manual control or an AI command.</div>
-    </section>
-
-    <div class="summary"><h2>Live device state</h2><span class="revision" id="revision">REVISION 0</span></div>
+    <div class="summary"><h2>Live device state</h2></div>
     <section class="grid">
       <article class="device-card" id="card-living_room_light">
         <div class="card-head"><div><div class="device-name">Living-room light</div><span class="baseline">INITIAL: OFF</span></div></div>
@@ -106,33 +97,18 @@
         <div class="visual"><div class="equalizer"><span></span><span></span><span></span><span></span></div></div>
         <div class="manual"><button data-action="play_media" data-target="entertainment" data-title="Study Music">Play study music</button><button data-action="pause_media" data-target="entertainment">Pause</button><button data-action="stop_media" data-target="entertainment">Stop</button></div>
       </article>
-
-      <section class="activity" id="activity">
-        <div class="activity-head"><span class="activity-title">Latest execution evidence</span><span class="verified" id="verified">WAITING FOR ACTION</span></div>
-        <div class="activity-grid">
-          <div class="panel"><div class="panel-label">User need and observed change</div><div class="panel-value" id="eventText">No action has run in this process yet.</div></div>
-          <div class="panel"><div class="panel-label">Validation and timing</div><div class="panel-value" id="eventMeta">All controls use the same validated actuator.</div></div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="ghost" id="resetButton" type="button">Reset to initial values</button></div>
-      </section>
     </section>
   </main>
   <div class="toast" id="toast">State changed and verified</div>
 
   <script>
     const shell = document.getElementById('shell');
-    const commandBox = document.getElementById('commandBox');
-    const commandInput = document.getElementById('commandInput');
-    const sendCommand = document.getElementById('sendCommand');
-    const statusLine = document.getElementById('statusLine');
     const runtime = document.getElementById('runtime');
     const runtimeText = document.getElementById('runtimeText');
-    const activity = document.getElementById('activity');
     let previousDevices = null;
     let latestRevision = -1;
     let toastTimer = null;
     let agentWasPending = false;
-    let localCommandRunning = false;
 
     const cardIds = {
       living_room_light:'card-living_room_light', kitchen_light:'card-kitchen_light',
@@ -142,6 +118,7 @@
 
     function showToast(message) {
       const toast = document.getElementById('toast');
+      if (!toast) return;
       toast.textContent = message;
       toast.classList.add('show');
       clearTimeout(toastTimer);
@@ -158,8 +135,7 @@
     }
 
     function beginAgentAnimation(message='Hachi recognized a smart-home request. Waiting for local Qwen…') {
-      shell.classList.add('thinking'); commandBox.classList.add('thinking'); sendCommand.disabled=true;
-      statusLine.className='status-line'; statusLine.textContent=message;
+      if (shell) shell.classList.add('thinking');
     }
 
     window.hachiSmartHomeBegin = beginAgentAnimation;
@@ -167,29 +143,31 @@
     function renderAgentActivity(agent) {
       if (agent && agent.pending) {
         agentWasPending = true;
-        beginAgentAnimation('Hachi recognized the request. Local Qwen is choosing validated actions…');
-      } else if (agentWasPending && !localCommandRunning) {
+        beginAgentAnimation();
+      } else if (agentWasPending) {
         agentWasPending = false;
-        shell.classList.remove('thinking'); commandBox.classList.remove('thinking'); sendCommand.disabled=false;
-        statusLine.className='status-line ok';
-        statusLine.textContent='Qwen finished. The latest validated result is shown below.';
+        if (shell) shell.classList.remove('thinking');
       }
     }
 
     function renderEvent(event, animate) {
       if (!event) return;
-      const transcript = event.transcript || event.goal || event.event || 'Simulator action';
-      const changes = Array.isArray(event.changes) && event.changes.length
-        ? event.changes.map(change => change.summary).join('\n') : 'No value needed to change.';
-      document.getElementById('eventText').textContent = `${transcript}\n${changes}`;
-      const valid = Boolean(event.validation_success && event.execution_verified);
+      const elText = document.getElementById('eventText');
+      if (elText) {
+        const transcript = event.transcript || event.goal || event.event || 'Simulator action';
+        const changes = Array.isArray(event.changes) && event.changes.length
+          ? event.changes.map(change => change.summary).join('\n') : 'No value needed to change.';
+        elText.textContent = `${transcript}\n${changes}`;
+      }
       const verified = document.getElementById('verified');
-      verified.textContent = valid ? '✓ VALIDATED + VERIFIED' : '✕ REJECTED — STATE UNCHANGED';
-      verified.className = `verified ${valid ? 'ok' : 'bad'}`;
-      document.getElementById('eventMeta').textContent = `Engine: ${event.engine || 'local'}\nExecution: ${event.execution_ms ?? 0} ms\nTotal: ${event.total_ms ?? 0} ms\nRevision: ${event.revision ?? 0}`;
-      if (animate) {
-        activity.classList.remove('updated'); void activity.offsetWidth; activity.classList.add('updated');
-        setTimeout(() => activity.classList.remove('updated'), 1000);
+      if (verified) {
+        const valid = Boolean(event.validation_success && event.execution_verified);
+        verified.textContent = valid ? '✓ VALIDATED + VERIFIED' : '✕ REJECTED — STATE UNCHANGED';
+        verified.className = `verified ${valid ? 'ok' : 'bad'}`;
+      }
+      const elMeta = document.getElementById('eventMeta');
+      if (elMeta) {
+        elMeta.textContent = `Engine: ${event.engine || 'local'}\nExecution: ${event.execution_ms ?? 0} ms\nTotal: ${event.total_ms ?? 0} ms\nRevision: ${event.revision ?? 0}`;
       }
     }
 
@@ -212,7 +190,8 @@
       const media = d.entertainment;
       document.getElementById('mediaValue').textContent = media.status === 'playing' && media.title ? `PLAYING · ${media.title}` : media.status.toUpperCase();
       document.getElementById('card-entertainment').classList.toggle('playing', media.status === 'playing');
-      document.getElementById('revision').textContent = `REVISION ${state.revision}`;
+      const revEl = document.getElementById('revision');
+      if (revEl) revEl.textContent = `REVISION ${state.revision}`;
 
       if (animate && previousDevices) {
         Object.keys(cardIds).forEach(target => {
@@ -238,10 +217,14 @@
         const response = await fetch('/api/smart_home/runtime', {cache:'no-store'});
         const result = await response.json();
         const ready = result.ollama_running && result.model_installed;
-        runtime.className = `runtime ${ready ? 'ready' : 'error'}`;
-        runtimeText.textContent = ready ? `${result.model} ready locally` : result.message;
+        if (runtime && runtimeText) {
+          runtime.className = `runtime ${ready ? 'ready' : 'error'}`;
+          runtimeText.textContent = ready ? `${result.model} ready locally` : result.message;
+        }
       } catch (_) {
-        runtime.className = 'runtime error'; runtimeText.textContent = 'Local runtime unavailable';
+        if (runtime && runtimeText) {
+          runtime.className = 'runtime error'; runtimeText.textContent = 'Local runtime unavailable';
+        }
       }
     }
 
@@ -249,52 +232,35 @@
       const item = {action, target};
       if (value !== undefined && value !== null && value !== '') item.value = Number(value);
       if (title) item.title = title;
-      statusLine.className = 'status-line'; statusLine.textContent = `Executing manual simulation action: ${action}…`;
-      const response = await fetch('/api/smart_home/action', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal:'Manual simulator control',original_command:`Manual control: ${action} ${target}`,actions:[item]})});
+      const response = await fetch('/api/smart_home/action', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          goal:'Manual simulator control',
+          original_command:`Manual control: ${action} ${target}`,
+          actions:[item]
+        })
+      });
       const result = await response.json();
-      if (!response.ok) { statusLine.className='status-line bad'; statusLine.textContent=result.error || 'Action rejected.'; return; }
+      if (!response.ok) { showToast(result.error || 'Action rejected.'); return; }
       renderState(result.state, true);
-      statusLine.className='status-line ok'; statusLine.textContent=result.message || 'State changed and verified.';
-      document.getElementById('screenFlash').classList.remove('go'); void document.getElementById('screenFlash').offsetWidth; document.getElementById('screenFlash').classList.add('go');
+      const flash = document.getElementById('screenFlash');
+      if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
       showToast('State changed and verified');
     }
 
-    async function runCommand() {
-      const message = commandInput.value.trim();
-      if (!message) return;
-      localCommandRunning=true;
-      shell.classList.add('thinking'); commandBox.classList.add('thinking'); sendCommand.disabled=true;
-      statusLine.className='status-line'; statusLine.textContent='Waiting for local Qwen tool selection…';
-      try {
-        const response = await fetch('/api/smart_home/command', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
-        const result = await response.json();
-        if (result.state) renderState(result.state, true);
-        if (result.success) {
-          statusLine.className='status-line ok'; statusLine.textContent=result.response || 'Command completed and verified.';
-          commandInput.value=''; showToast('Qwen action completed and verified');
-          const flash=document.getElementById('screenFlash'); flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
-        } else if (result.clarification) {
-          statusLine.className='status-line'; statusLine.textContent=result.response;
-        } else {
-          statusLine.className='status-line bad'; statusLine.textContent=result.error || 'Command could not be executed.';
-          showToast('No state changed');
-        }
-        refreshRuntime();
-      } catch (_) {
-        statusLine.className='status-line bad'; statusLine.textContent='Could not reach Hachi’s local backend.';
-      } finally {
-        localCommandRunning=false; agentWasPending=false;
-        shell.classList.remove('thinking'); commandBox.classList.remove('thinking'); sendCommand.disabled=false;
-      }
-    }
-
     document.querySelectorAll('.manual button').forEach(button => button.addEventListener('click', () => manualAction(button.dataset.action, button.dataset.target, button.dataset.value, button.dataset.title)));
-    sendCommand.addEventListener('click', runCommand);
-    commandInput.addEventListener('keydown', event => { if (event.key === 'Enter') runCommand(); });
-    document.getElementById('resetButton').addEventListener('click', async () => {
-      const response = await fetch('/api/smart_home/reset', {method:'POST'}); const result = await response.json();
-      if (response.ok) { renderState(result.state, true); statusLine.className='status-line ok'; statusLine.textContent='Restored all devices to the clearly labeled initial values.'; showToast('Simulation reset to initial values'); }
-    });
+    const resetBtn = document.getElementById('resetButton');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        const response = await fetch('/api/smart_home/reset', {method:'POST'});
+        const result = await response.json();
+        if (response.ok) {
+          renderState(result.state, true);
+          showToast('Simulation reset to initial values');
+        }
+      });
+    }
 
     if (new URLSearchParams(window.location.search).get('auto') === '1') beginAgentAnimation();
     refreshState(false); refreshRuntime();

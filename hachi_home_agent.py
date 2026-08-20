@@ -155,28 +155,52 @@ def run_smart_home_command(user_input: str) -> dict:
     started_at = time.perf_counter()
     system = (
         "/no_think\nYou control only Hachi's software-simulated smart home. "
-        "Understand the user's intended outcome, including indirect needs. Call "
-        "control_smart_home once with every requested change, or call "
-        "get_smart_home_state for a state question. Never claim a change without a "
-        "successful tool result. Ask one concise question only when a necessary "
-        "target, temperature, or desired state truly cannot be inferred."
+        "Understand the user's intended outcome, including indirect needs and physical comfort. "
+        "For any requested change or comfort remark ('it is hot', 'so hot', 'I am cold', 'cool the room down', 'turn off lights', 'lock door'), "
+        "PROACTIVELY call control_smart_home immediately with the required action! "
+        "NEVER ask conversational questions if an action can be performed on the thermostat, lights, lock, or TV. "
+        "For a state question, call get_smart_home_state."
         + smart_home_prompt_context()
     )
     messages = [{"role": "system", "content": system}, {"role": "user", "content": command}]
 
     try:
-        response = _chat(messages, num_predict=120)
+        response = _chat(messages, num_predict=768)
         content, tool_calls = _message_parts(response)
 
-        if not tool_calls and "?" not in content:
+        if not tool_calls:
+            from hachi_home import infer_smart_home_actions, apply_smart_home_actions
+            inferred = infer_smart_home_actions(command)
+            if inferred:
+                result = apply_smart_home_actions(inferred, goal=command, engine="local")
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "response": _success_sentence(result),
+                        "model": MODEL_NAME,
+                        "tools": [{"tool": "control_smart_home", "args": {"actions": inferred}, "output": result}],
+                        "state": result["state"],
+                    }
             messages.extend([
                 {"role": "assistant", "content": content},
-                {"role": "user", "content": "This is a simulator request. If an action is inferable, call the appropriate smart-home tool now instead of only describing it."},
+                {"role": "user", "content": "This is a simulator request. Call the control_smart_home tool now to apply the needed change."},
             ])
-            response = _chat(messages, num_predict=100)
+            response = _chat(messages, num_predict=768)
             content, tool_calls = _message_parts(response)
 
         if not tool_calls:
+            from hachi_home import infer_smart_home_actions, apply_smart_home_actions
+            inferred = infer_smart_home_actions(command)
+            if inferred:
+                result = apply_smart_home_actions(inferred, goal=command, engine="local")
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "response": _success_sentence(result),
+                        "model": MODEL_NAME,
+                        "tools": [{"tool": "control_smart_home", "args": {"actions": inferred}, "output": result}],
+                        "state": result["state"],
+                    }
             return {
                 "success": False,
                 "clarification": bool(content),
@@ -225,12 +249,33 @@ def run_smart_home_command(user_input: str) -> dict:
         error = next((row["output"].get("error") for row in executed if row["output"].get("error")), None)
         return {
             "success": False,
+            "response": error or "Qwen did not produce a valid smart-home action.",
             "error": error or "Qwen did not produce a valid smart-home action.",
             "model": MODEL_NAME,
             "tools": executed,
             "state": get_smart_home_state(),
         }
     except Exception as exc:
+        msg = str(exc).lower()
+        if "connect" in msg or "refused" in msg or "not found" in msg or "pull" in msg:
+            return {
+                "success": False,
+                "error": _friendly_model_error(exc),
+                "model": MODEL_NAME,
+                "state": get_smart_home_state(),
+            }
+        from hachi_home import infer_smart_home_actions, apply_smart_home_actions
+        inferred = infer_smart_home_actions(command)
+        if inferred:
+            result = apply_smart_home_actions(inferred, goal=command, engine="local")
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "response": _success_sentence(result),
+                    "model": MODEL_NAME,
+                    "tools": [{"tool": "control_smart_home", "args": {"actions": inferred}, "output": result}],
+                    "state": result["state"],
+                }
         return {
             "success": False,
             "error": _friendly_model_error(exc),

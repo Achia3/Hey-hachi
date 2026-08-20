@@ -82,7 +82,7 @@ def get_current_time_context() -> str:
 
 # Load configuration
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-MODEL_NAME = "qwen3.5:2b"
+MODEL_NAME = "hachi-master"
 USE_DEEPSEEK = False
 DEEPSEEK_API_KEY = ""
 DEEPSEEK_MODEL = "deepseek-v4-flash"
@@ -92,7 +92,7 @@ if os.path.exists(CONFIG_PATH):
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-            MODEL_NAME = cfg.get("model_name", "qwen3.5:2b")
+            MODEL_NAME = cfg.get("model_name", "hachi-master")
             USE_DEEPSEEK = cfg.get("use_deepseek", False)
             DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip() or cfg.get("deepseek_api_key", "").strip()
             DEEPSEEK_MODEL = cfg.get("deepseek_model", "deepseek-v4-flash")
@@ -187,15 +187,13 @@ TOOL CALLING RULES (follow these strictly):
 MEMORY:
 - You have a memory database of all past conversations and tasks. Use it when the user asks about something you discussed before, their history, or wants to continue a past topic.
 
-FORMATTING:
-- Use **bold**, bullet points, numbered lists, and headers (##) for structured responses.
+FORMATTING & DETAIL RULES:
+- Provide comprehensive, thorough, in-depth, and well-explained answers to all questions, inquiries, comparisons, and topics. Never truncate, oversimplify, or give bare 1-sentence summaries unless the user specifically requests brevity.
+- For explanations, tutorials, science, history, concepts, advice, or general knowledge: provide structured, engaging, and complete answers using Markdown headers (###), bullet points, and practical examples.
+- For programming, coding, algorithms, HTML/CSS, or technical tasks: ALWAYS provide COMPLETE, fully-written, working code blocks (with syntax highlighting like ```html, ```css, ```python, ```javascript, etc.) along with step-by-step walkthroughs.
+- For structured data and comparisons: format with Markdown tables, bold terms, and lists for readability.
 - When using web-search evidence, cite factual claims with the supplied [number] and include the relevant URL in a short Sources section.
-- For short answers, plain sentences are fine.
-- Keep responses well-structured and easy to scan.
-
-LENGTH:
-- Be concise for simple questions — one sentence is ideal.
-- For web-search results, explanations, or detailed questions, give a NORMAL, complete answer. Don't truncate it.
+- For simple greetings ("hello", "hey", "how are you"): 1-2 warm, friendly sentences.
 """
 
 # In-session short-term memory, isolated per UI conversation (resets on restart).
@@ -408,21 +406,19 @@ def is_lookup_request(user_input: str) -> bool:
 
 
 def should_search_before_answer(user_input: str) -> bool:
-    """Identify questions that should be grounded in live web evidence first.
-
-    Desktop actions and personal-memory requests are answered by their own
-    deterministic systems.  For ordinary factual/informational requests, web
-    evidence wins; the language model is only the fallback when search fails.
-    """
+    """Identify questions that genuinely need live web evidence."""
     text = (user_input or "").strip()
     lower = text.lower()
-    if not text or _is_memory_request(text) or _is_action_request(text):
+    if not text or _is_memory_request(text) or _is_memory_store_request(text) or _is_action_request(text):
+        return False
+    # Coding, programming, HTML/CSS, conceptual questions are answered directly
+    if re.search(r"\b(?:html|css|javascript|python|div|function|class|code|algorithm|loop|sql|docker|git|react|vue)\b", lower):
         return False
     if is_lookup_request(text):
         return True
-    if re.match(r"^(?:what|who|when|where|why|how|which|is|are|does|do)\b", lower):
+    if any(k in lower for k in ("search", "google", "look up", "latest", "recent", "release date", "price of", "weather", "who is the current")):
         return True
-    return bool(re.match(r"^(?:explain|define|compare|tell me about|give me information on)\b", lower))
+    return False
 
 
 def requires_web_research(user_input: str) -> bool:
@@ -642,10 +638,16 @@ def _qwen_summarize_search(query: str, results_text: str, timeout: float = 12.0)
 
     def _call_qwen(system_msg: str, user_msg: str, opts: dict, out_dict: dict):
         try:
-            resp = ollama.chat(model=MODEL_NAME, messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ], options=opts)
+            resp = ollama.chat(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                think=False,
+                keep_alive="10m",
+                options=opts
+            )
             out_dict["text"] = resp.message.content or ""
             out_dict["raw_resp"] = resp
         except Exception as e:
@@ -707,22 +709,61 @@ def _qwen_summarize_search(query: str, results_text: str, timeout: float = 12.0)
     return results_text
 
 
-def _qwen_tool_decide(messages, timeout: float = _QWEN_DECIDE_TIMEOUT,
-                      escalate_on_timeout: bool = True, tools=None):
+def _extract_model_tool_calls(msg) -> tuple[str, list]:
+    """Extract tool calls from native Ollama structure OR raw XML / function tags in message content."""
+    tool_calls = list(getattr(msg, "tool_calls", []) or [])
+    content = str(getattr(msg, "content", "") or "")
+    if tool_calls:
+        return content, tool_calls
+
+    if "<tool_call>" in content or "<function=" in content:
+        blocks = re.findall(r"<tool_call>(.*?)(?:</tool_call>|$)", content, flags=re.DOTALL)
+        if not blocks and "<function=" in content:
+            blocks = [content]
+        for idx, block in enumerate(blocks):
+            fn_match = re.search(r"<function=([a-zA-Z0-9_]+)>(.*?)(?:</function>|$)", block, flags=re.DOTALL)
+            if fn_match:
+                fn_name = fn_match.group(1).strip()
+                body = fn_match.group(2)
+                params = {}
+                for p_match in re.finditer(r"<parameter=([a-zA-Z0-9_]+)>(.*?)(?:</parameter>|$)", body, flags=re.DOTALL):
+                    p_name = p_match.group(1).strip()
+                    p_val_str = p_match.group(2).strip()
+                    try:
+                        p_val = json.loads(p_val_str)
+                    except Exception:
+                        p_val = p_val_str
+                    params[p_name] = p_val
+                tool_calls.append({
+                    "id": f"xml_call_{idx}_{fn_name}",
+                    "function": {"name": fn_name, "arguments": params}
+                })
+        content = re.sub(r"<tool_call>.*?(?:</tool_call>|$)", "", content, flags=re.DOTALL).strip()
+        content = re.sub(r"<function=.*?>(?:</function>|$)", "", content, flags=re.DOTALL).strip()
+
+    return content, tool_calls
+
+
+def _qwen_tool_decide(messages, timeout: float = 6.0, escalate_on_timeout: bool = True, tools=None):
     """
-    Run Qwen's tool-decide step in a time-boxed thread.
-    Returns (msg, tool_calls). On timeout escalates to DeepSeek (raises
-    _EscalateToDeepSeek) unless escalate_on_timeout=False, in which case it
-    returns (None, []). On model error it propagates the exception so the
-    caller's existing except-handler decides the fallback.
+    Run Qwen's tool-decide step with ultra-fast latency (think=False, bounded tokens).
+    Returns (msg, tool_calls).
     """
     result = {}
 
     def _decide():
         try:
             result["resp"] = ollama.chat(
-                model=MODEL_NAME, messages=messages, tools=(AVAILABLE_TOOLS if tools is None else tools),
-                options={"num_predict": 200, "temperature": 0.7},
+                model=MODEL_NAME,
+                messages=messages,
+                tools=(AVAILABLE_TOOLS if tools is None else tools),
+                think=False,
+                keep_alive="10m",
+                options={
+                    "num_predict": 180,
+                    "temperature": 0.1,
+                    "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+                },
             )
         except Exception as e:
             result["error"] = e
@@ -733,12 +774,15 @@ def _qwen_tool_decide(messages, timeout: float = _QWEN_DECIDE_TIMEOUT,
 
     if "resp" in result:
         msg = result["resp"].message
-        return msg, (msg.tool_calls or [])
+        clean_content, tool_calls = _extract_model_tool_calls(msg)
+        if hasattr(msg, "content"):
+            msg.content = clean_content
+        return msg, tool_calls
     if "error" in result:
         if escalate_on_timeout:
             raise result["error"]
         return None, []
-    # Timed out — the daemon thread keeps running but we move on
+    # Timed out — daemon thread moves on
     logging.info("[Qwen] Tool-decide timed out after %.1fs", timeout)
     if escalate_on_timeout:
         raise _EscalateToDeepSeek()
@@ -861,26 +905,84 @@ def _weather_location_from_request(user_input: str) -> str | None:
 
 
 def _is_action_request(user_input: str) -> bool:
+    lower = (user_input or "").lower().strip()
+    if re.match(r"^(?:what|how|why|where|who|when|which|is there|can you tell me|tell me (?:what|how|why|about))\b", lower):
+        if not re.search(r"\b(?:can you\s+)?(?:open|launch|start|close|play|turn on|turn off|set)\s+(?:the\s+)?[a-z0-9_-]+\b", lower):
+            return False
     return bool(re.search(
         r"\b(?:open|launch|start|close|stop|set|remind|alarm|save|take a note|show my notes|"
         r"assignment|deadline|todo|to-do|capture|screenshot|clipboard|read|summarize|summarise|"
         r"focus|pomodoro|remember|play|gaming|study|movie|watch)\b",
-        user_input,
+        user_input or "",
         flags=re.IGNORECASE,
     ))
 
 
+def _get_memory_prompt_context(user_input: str) -> str:
+    """Retrieve durable facts, codes, and credentials from SQLite to inject into system prompt.
+    Ensures memory persists across all chat sessions, restarts, and new conversations."""
+    try:
+        from hachi_memory import search_memories
+        from hachi_db import get_connection
+        from contextlib import closing
+
+        # 1. Semantic/lexical matches for current query
+        matched = search_memories(user_input, limit=6, min_score=0.08)
+        facts = []
+        for m in matched:
+            if m.get("content") and m["content"] not in facts:
+                facts.append(m["content"])
+
+        # 2. General active durable memories from SQLite
+        with closing(get_connection()) as conn:
+            rows = conn.execute(
+                "SELECT content FROM memories WHERE status='active' ORDER BY updated_at DESC LIMIT 10"
+            ).fetchall()
+            for r in rows:
+                c = r["content"]
+                if c and c not in facts:
+                    facts.append(c)
+
+        if facts:
+            bullet_lines = "\n".join(f"• {f}" for f in facts[:12])
+            return (
+                f"\n\n--- PERMANENT USER MEMORIES (SAVED IN SQLITE ACROSS ALL CHAT SESSIONS) ---\n"
+                f"{bullet_lines}\n"
+                f"--- When the user asks or references any of these facts, codes, secrets, or details, use this stored memory to answer accurately ---"
+            )
+    except Exception as err:
+        logging.debug("[Memory Context] Failed to build memory context: %s", err)
+    return ""
+
+
+def _is_memory_store_request(user_input: str) -> bool:
+    lower = (user_input or "").lower().strip()
+    if re.search(r"\b(?:remember\b|make\s+sure\s+you\s+remember|don't\s+forget|keep\s+in\s+mind|note\s+that|save\s+(?:this\s+)?memory|memorize)\b", lower):
+        return True
+    if re.search(r"\b(?:tell\s+you\s+something|tell\s+you\s+a\s+secret|ima\s+tell\s+you|im\s+gonna\s+tell\s+you|let\s+me\s+tell\s+you)\b", lower):
+        return True
+    return False
+
+
 def _is_memory_request(user_input: str) -> bool:
-    lower = (user_input or "").lower()
+    """Return True if user is querying past memory or conversation history."""
+    lower = (user_input or "").lower().strip()
+    if _is_memory_store_request(user_input):
+        return False
     if any(k in lower for k in (
-        "remember", "what did i ask", "what did i say", "what did we discuss",
+        "what did i ask", "what did i say", "what did we discuss",
         "our past conversation", "what did we talk about", "do you remember",
         "recall", "what happened before", "earlier", "tell me about myself",
-        "my preferences", "what are my preferences",
+        "my preferences", "what are my preferences", "tell me my secret",
+        "what is my secret", "what's my secret", "my secret",
+        "what was the code", "what is the code", "what's the code",
+        "what was the password", "what is the password", "what's the password",
+        "code of the safe", "code for the safe", "code to the safe",
+        "password of the safe", "password for the safe",
     )):
         return True
     return bool(re.search(
-        r"\b(?:what(?:'s| is) my (?:name|favorite|favourite)|what (?:am i allergic to|do i (?:like|love|prefer))|"
+        r"\b(?:what(?:'s| is| was) (?:the|my) (?:name|favorite|favourite|secret|code|password|pin|birthday)|what (?:am i allergic to|do i (?:like|love|prefer))|"
         r"where do i (?:live|work|study)|who am i)\b",
         lower,
     ))
@@ -1023,7 +1125,6 @@ def _run_qwen_agent_loop(messages, user_input: str, run_tool, checkpoint, max_st
                     "role": "tool", "tool_call_id": call["id"], "name": name, "content": str(output)
                 })
             continue
-
         answer = clean_thinking(getattr(msg, "content", "") or "").strip()
         if _browser_follow_up_required(user_input, executed) and step < max_steps - 1:
             messages.append({"role": "assistant", "content": answer})
@@ -1119,8 +1220,14 @@ def _run_qwen_agent_loop(messages, user_input: str, run_tool, checkpoint, max_st
 
 
 def clean_thinking(response_text: str) -> str:
-    """Strip out Qwen internal reasoning thinking blocks."""
+    """Strip out Qwen internal reasoning thinking blocks and leaked tool calls."""
+    if not response_text:
+        return ""
     cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+    if "<think>" in cleaned and "</think>" not in cleaned:
+        cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
+    cleaned = re.sub(r'<tool_call>.*?(?:</tool_call>|$)', '', cleaned, flags=re.DOTALL)
+    cleaned = re.sub(r'</?(?:function|parameter)[^>]*>', '', cleaned)
     return cleaned.strip()
 
 def parse_dsml_tool_calls(text: str) -> list[dict]:
@@ -1263,9 +1370,9 @@ def detect_intent_tool_call(user_input: str):
 # (finish_reason='length' with empty content). So: small cap ONLY for simple
 # one-liners and tool-decide; any non-simple intent gets room for a full answer.
 def _answer_budget(intent: str, user_input: str) -> int:
-    if intent in ("GREETING", "SIMPLE_CHAT"):
-        return 150      # simple chat → short
-    return 700          # tool calls, web search, explanations, reasoning → full answer
+    if intent == "GREETING":
+        return 150
+    return 1500
 
 def call_deepseek_chat(messages, tools=None, max_tokens=None, temperature=0.7, timeout=25):
     """Call DeepSeek API (OpenAI-compatible) synchronously with tool support."""
@@ -1557,13 +1664,13 @@ def check_fast_intent(user_input: str, tool_runner=None) -> Optional[tuple[str, 
         return res, [{"tool": "get_system_stats", "args": {}, "output": res}]
 
     # 5. Dynamic App Launching ("open [app]")
-    m_launch = re.search(r"\b(?:open|launch|start|run)\s+(.+?)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower)
-    if m_launch:
-        app_name = m_launch.group(1).strip()
-        # ignore mode names
-        if app_name not in ["gaming", "study", "movie", "focus", "timer", "pomodoro", "hachi"]:
-            res = execute_tool_call("launch_app", {"app_name": app_name})
-            return res, [{"tool": "launch_app", "args": {"app_name": app_name}, "output": res}]
+    if not re.match(r"^(?:what|how|why|where|who|when|which|is there|can you tell me|tell me)\b", lower):
+        m_launch = re.match(r"^(?:please\s+|can you\s+)?(?:open|launch|start|run)\s+(.+?)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower)
+        if m_launch:
+            app_name = m_launch.group(1).strip()
+            if app_name not in ["gaming", "study", "movie", "focus", "timer", "pomodoro", "hachi"]:
+                res = execute_tool_call("launch_app", {"app_name": app_name})
+                return res, [{"tool": "launch_app", "args": {"app_name": app_name}, "output": res}]
 
     # 6. Dynamic App Closing ("close [app]" or "kill [app]")
     m_close = re.search(r"\b(?:close|kill|exit|quit)\s+(.+?)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower)
@@ -1747,7 +1854,7 @@ def process_agent_request(user_input: str, current_mode: str = "default", conver
     add_message("user", user_input, current_mode)
 
     history_slice = _get_history(16, conversation_id)
-    sys_content = SYSTEM_PROMPT + get_current_time_context()
+    sys_content = SYSTEM_PROMPT + get_current_time_context() + _get_memory_prompt_context(user_input)
     messages = [{"role": "system", "content": sys_content}] + history_slice + [{"role": "user", "content": user_input}]
     executed_tools_info = []
 
@@ -1756,8 +1863,12 @@ def process_agent_request(user_input: str, current_mode: str = "default", conver
         try:
             _last_engine = "qwen"
             logging.info(f"[Qwen Fast] Simple chat/greeting — skipping DeepSeek")
-            fast_opts = {"num_predict": 150, "temperature": 0.8}  # brevity: simple chat = 1-2 sentences
-            response = ollama.chat(model=MODEL_NAME, messages=messages, options=fast_opts)
+            fast_opts = {
+                "num_predict": 150 if intent == "GREETING" else 1500,
+                "temperature": 0.4,
+                "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+            }
+            response = ollama.chat(model=MODEL_NAME, messages=messages, think=False, keep_alive="10m", options=fast_opts)
             final_text = strip_control_tokens(clean_thinking(response.message.content or ""))
             _update_history(user_input, final_text, conversation_id=conversation_id)
             add_message("assistant", final_text, current_mode)
@@ -1806,7 +1917,13 @@ def process_agent_request(user_input: str, current_mode: str = "default", conver
                     executed_tools_info.append({"tool": fn, "args": args, "output": str(result)})
                     messages.append({"role": "tool", "name": fn, "content": str(result)})
 
-                final_res = ollama.chat(model=MODEL_NAME, messages=messages)
+                final_res = ollama.chat(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    think=False,
+                    keep_alive="10m",
+                    options={"num_predict": 250, "temperature": 0.1, "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]}
+                )
                 final_text = clean_thinking(final_res.message.content or "")
             else:
                 final_text = clean_thinking(msg.content or "")
@@ -1930,15 +2047,26 @@ def process_agent_request(user_input: str, current_mode: str = "default", conver
                 executed_tools_info.append({"tool": func_name, "args": func_args, "output": str(tool_output)})
                 messages.append({"role": "tool", "name": func_name, "content": str(tool_output)})
 
-            final_res = ollama.chat(model=MODEL_NAME, messages=messages)
+            final_res = ollama.chat(
+                model=MODEL_NAME,
+                messages=messages,
+                think=False,
+                keep_alive="10m",
+                options={"num_predict": 1200, "temperature": 0.4, "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]}
+            )
             final_text = final_res.message.content or ""
         elif msg is not None:
             final_text = msg.content or ""
         else:
             # Qwen tool-decide unavailable (timeout/error) — get a plain reply
             try:
-                resp = ollama.chat(model=MODEL_NAME, messages=messages,
-                                   options={"num_predict": 250, "temperature": 0.75})
+                resp = ollama.chat(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    think=False,
+                    keep_alive="10m",
+                    options={"num_predict": 1200, "temperature": 0.4, "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]}
+                )
                 final_text = resp.message.content or ""
             except Exception:
                 final_text = ""
@@ -2030,6 +2158,7 @@ def process_agent_request_stream(
         add_message("user", user_input, current_mode, conversation_id)
         add_message("assistant", spoken, current_mode, conversation_id)
         _update_history(user_input, spoken, cap=16, conversation_id=conversation_id)
+        yield {"token": spoken, "done": False}
         yield {
             "done": True,
             "full": spoken,
@@ -2099,7 +2228,7 @@ def process_agent_request_stream(
             logging.warning("[Weather] direct live lookup failed: %s", weather_error)
 
     history_slice = _get_history(10, conversation_id)
-    sys_content = (VOICE_SYSTEM_PROMPT if voice_mode else SYSTEM_PROMPT) + get_current_time_context()
+    sys_content = (VOICE_SYSTEM_PROMPT if voice_mode else SYSTEM_PROMPT) + get_current_time_context() + _get_memory_prompt_context(user_input)
     if home_mode:
         from hachi_home import smart_home_prompt_context
         sys_content += smart_home_prompt_context()
@@ -2116,13 +2245,19 @@ def process_agent_request_stream(
     _is_lookup = intent in ("TOOL_NEEDED", "COMPLEX") and is_lookup_request(user_input)
 
     # ── MEMORY RECALL: direct DB answer, formatted conversationally ──
-    # Query the DB directly (deterministic, can't hallucinate) but PRESENT the
-    # results as natural "You said / I said" lines instead of a raw transcript.
     if _is_memory:
         try:
             _last_engine = "qwen"
+            from hachi_memory import search_memories
             from hachi_db import search_history
-            durable = format_memory_search(user_input, limit=5)
+
+            durable_list = search_memories(user_input, limit=5)
+            if not durable_list:
+                for term in _memory_search_terms(user_input, limit=5):
+                    durable_list = search_memories(term, limit=5)
+                    if durable_list:
+                        break
+
             mem_terms = _memory_search_terms(user_input, limit=5)
             found = ""
             for term in mem_terms:
@@ -2130,8 +2265,8 @@ def process_agent_request_stream(
                 if hit and "No history" not in hit:
                     found = hit
                     break
-            if found or "No durable memories" not in durable:
-                # Turn "[ts] (mode) User: X" → "You: X" ; "Assistant: X" → "I: X"
+
+            if durable_list or found:
                 clean_lines = []
                 for line in found.splitlines():
                     line = line.strip()
@@ -2143,18 +2278,20 @@ def process_agent_request_stream(
                         speaker = "You" if role == "User" else "I"
                         clean_lines.append(f"{speaker}: {content}")
                     elif "Task:" in line:
-                        # tasks: keep only meaningful ones (skip noisy web-search logs)
                         t = re.search(r"Task:\s*([^|]*)", line)
                         if t and "Web Search" not in t.group(1):
                             clean_lines.append(f"• {t.group(1).strip()}")
-                history_body = "\n".join(clean_lines).strip() if clean_lines else found
-                durable_body = "" if "No durable memories" in durable else durable
+                history_body = "\n".join(clean_lines).strip() if clean_lines else ""
+                durable_body = "\n".join(f"• {row['content']}" for row in durable_list) if durable_list else ""
                 body = "\n".join(part for part in (durable_body, history_body) if part).strip()
-                final = ("Here's what I remember:\n\n" + body)
+                final = ("Here's what I remember:\n\n" + body) if body else "I don't have any past conversation about that in my memory."
             else:
                 final = "I don't have any past conversation about that in my memory."
+
             _update_history(user_input, final, cap=16, conversation_id=conversation_id)
+            add_message("assistant", final, current_mode, conversation_id)
             logging.info("[Memory] Direct DB answer (formatted)")
+            yield {"token": final, "done": False}
             yield {"done": True, "full": final, "tools": [], "engine": "qwen", "pomo": None}
             return
         except TurnCancelled:
@@ -2162,12 +2299,8 @@ def process_agent_request_stream(
         except Exception as me:
             logging.error(f"[Memory] local recall failed: {me}")
 
-    # Primary agent loop: let the model choose and chain tools before any
-    # keyword router. A request may produce several calls in a round and may
-    # call a second tool after seeing the first result (bounded to three rounds).
-    model_first = home_mode or _is_action_request(user_input) or (
-        not voice_mode and intent in ("TOOL_NEEDED", "COMPLEX")
-    )
+    # Primary agent loop: let the model choose and chain tools for actions/home
+    model_first = home_mode or _is_action_request(user_input)
     if model_first:
         try:
             _last_engine = "qwen"
@@ -2417,8 +2550,18 @@ def process_agent_request_stream(
 
             # Speed safeguard: stream Qwen tokens as they arrive
             accumulated = ""
-            for chunk in ollama.chat(model=MODEL_NAME, messages=messages, stream=True,
-                                     options={"num_predict": 250, "temperature": 0.75}):
+            for chunk in ollama.chat(
+                model=MODEL_NAME,
+                messages=messages,
+                stream=True,
+                think=False,
+                keep_alive="10m",
+                options={
+                    "num_predict": 1500,
+                    "temperature": 0.4,
+                    "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+                },
+            ):
                 checkpoint()
                 token = chunk.message.content or ""
                 if token:
@@ -2565,8 +2708,18 @@ def process_agent_request_stream(
                 messages.append({"role": "tool", "name": fn, "content": str(result)})
 
         accumulated = ""
-        for chunk in ollama.chat(model=MODEL_NAME, messages=messages, stream=True,
-                                 options={"num_predict": 250, "temperature": 0.75}):
+        for chunk in ollama.chat(
+            model=MODEL_NAME,
+            messages=messages,
+            stream=True,
+            think=False,
+            keep_alive="10m",
+            options={
+                "num_predict": 1500,
+                "temperature": 0.4,
+                "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+            },
+        ):
             checkpoint()
             token = chunk.message.content or ""
             if token:

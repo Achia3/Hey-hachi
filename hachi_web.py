@@ -562,11 +562,6 @@ def api_voice_stream():
 
                     # Eager sentence detection (handles abbreviations, advances past rejects)
                     sentence, token_buffer = _pop_sentence(token_buffer)
-                    if not sentence and len(token_buffer.split()) >= 12:
-                        # Provisional flush — emit buffered words without waiting
-                        # for a period so the FIRST audio starts sooner.
-                        sentence = token_buffer.strip()
-                        token_buffer = ""
                     if sentence:
                         sentence_queue.put(sentence)
 

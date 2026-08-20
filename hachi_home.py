@@ -52,11 +52,20 @@ class SmartHomeAction(BaseModel):
             raise ValueError("Entertainment only supports media actions.")
         if self.action in thermostat_actions:
             if self.value is None:
-                raise ValueError("Temperature actions require a numeric value.")
-            if self.action == "set_temperature" and not 16 <= self.value <= 30:
-                raise ValueError("Thermostat values must be between 16 and 30 C.")
-            if self.action != "set_temperature" and not 0 < self.value <= 10:
-                raise ValueError("Temperature adjustments must be between 0 and 10 C.")
+                if self.action in {"increase_temperature", "decrease_temperature"}:
+                    self.value = 2.0
+                else:
+                    self.value = 22.0
+            if self.action == "set_temperature":
+                if self.value > 30:
+                    self.value = 30.0
+                elif self.value < 16:
+                    self.value = 16.0
+            else:
+                if self.value <= 0:
+                    self.value = 1.0
+                elif self.value > 10:
+                    self.value = 5.0
         elif self.value is not None:
             raise ValueError("Only temperature actions accept a numeric value.")
         return self
@@ -110,12 +119,97 @@ def is_smart_home_request(text: str) -> bool:
     """Recognize likely home requests outside the explicit Home dashboard."""
     value = (text or "").lower()
     return bool(re.search(
-        r"\b(?:smart\s*home|thermostat|temperature|degrees?|light|lights|bulb|"
-        r"front door|door lock|lock the door|unlock the door|living room|kitchen|"
-        r"freez(?:e|ing)|warmer|cooler|too (?:hot|cold|dark|bright)|getting dark|"
-        r"secure (?:the )?(?:house|home|door)|movie night|study music|entertainment)\b",
+        r"\b(?:smart\s*home|thermostat|temperature|degrees?|light|lights|bulb|bulbs|lamp|lamps|"
+        r"front door|door lock|door|lock|unlock|locked|unlocked|living room|kitchen|"
+        r"freez(?:e|ing)|chilly|boiling|hot|cold|warm|cooler|colder|warmer|hotter|"
+        r"cool(?:ing)?\s+(?:the\s+room|down|it|the\s+house)|"
+        r"warm(?:ing)?\s+(?:the\s+room|up|it|the\s+house)|"
+        r"heat(?:\s+up)?|"
+        r"too (?:hot|cold|dark|bright)|so (?:hot|cold|warm|dark|bright)|getting (?:dark|cold|hot|warm)|"
+        r"turn (?:everything|all|both|all the lights) (?:off|on)|"
+        r"(?:turn|switch)\s+(?:off|on)\s+(?:everything|all|both)|"
+        r"unlock (?:everything|all|the door)|lock (?:everything|all|the door)|"
+        r"make it (?:colder|cooler|warmer|hotter|darker|brighter|cold|cool|warm|hot)|"
+        r"secure (?:the )?(?:house|home|door)|movie night|study music|entertainment|tv|television)\b",
         value,
     ))
+
+
+def infer_smart_home_actions(text: str) -> list[dict]:
+    """Fallback rule-based extractor to infer smart-home actions if model fails or truncates."""
+    lower = (text or "").lower()
+    actions = []
+
+    # Global "everything / all" switches
+    if re.search(r"\b(?:turn\s+everything\s+off|turn\s+all\s+off|turn\s+off\s+everything|turn\s+off\s+all|switch\s+off\s+all|kill\s+all\s+lights|turn\s+off\s+all\s+lights)\b", lower):
+        actions.append({"action": "turn_off", "target": "living_room_light"})
+        actions.append({"action": "turn_off", "target": "kitchen_light"})
+        actions.append({"action": "stop_media", "target": "entertainment"})
+    elif re.search(r"\b(?:turn\s+everything\s+on|turn\s+all\s+on|turn\s+on\s+everything|turn\s+on\s+all|switch\s+on\s+all|turn\s+on\s+all\s+lights)\b", lower):
+        actions.append({"action": "turn_on", "target": "living_room_light"})
+        actions.append({"action": "turn_on", "target": "kitchen_light"})
+
+    if re.search(r"\b(?:unlock\s+everything|unlock\s+all|unlock\s+(?:the\s+)?door)\b", lower):
+        actions.append({"action": "unlock", "target": "front_door_lock"})
+    elif re.search(r"\b(?:lock\s+everything|lock\s+all|lock\s+(?:the\s+)?door|secure\s+the\s+house)\b", lower):
+        actions.append({"action": "lock", "target": "front_door_lock"})
+
+    # Specific Living room light
+    if "living room" in lower and any(w in lower for w in ("light", "lights", "lamp")):
+        if re.search(r"\b(?:turn\s+on|switch\s+on|open|enable)\b.*?\bliving\s+room\b|\bliving\s+room\b.*?\b(?:turn\s+on|switch\s+on|on)\b", lower):
+            actions.append({"action": "turn_on", "target": "living_room_light"})
+        elif re.search(r"\b(?:turn\s+off|switch\s+off|close|disable|kill)\b.*?\bliving\s+room\b|\bliving\s+room\b.*?\b(?:turn\s+off|switch\s+off|off)\b", lower):
+            actions.append({"action": "turn_off", "target": "living_room_light"})
+
+    # Specific Kitchen light
+    if "kitchen" in lower and any(w in lower for w in ("light", "lights", "lamp")):
+        if re.search(r"\b(?:turn\s+on|switch\s+on|open|enable)\b.*?\bkitchen\b|\bkitchen\b.*?\b(?:turn\s+on|switch\s+on|on)\b", lower):
+            actions.append({"action": "turn_on", "target": "kitchen_light"})
+        elif re.search(r"\b(?:turn\s+off|switch\s+off|close|disable|kill)\b.*?\bkitchen\b|\bkitchen\b.*?\b(?:turn\s+off|switch\s+off|off)\b", lower):
+            actions.append({"action": "turn_off", "target": "kitchen_light"})
+
+    # General lights (e.g. "open the lights", "turn on the lights", "turn off the lights")
+    if any(w in lower for w in ("light", "lights", "lamp", "lamps")) and "living room" not in lower and "kitchen" not in lower:
+        if re.search(r"\b(?:turn\s+on|switch\s+on|open|enable)\b", lower):
+            actions.append({"action": "turn_on", "target": "living_room_light"})
+            actions.append({"action": "turn_on", "target": "kitchen_light"})
+        elif re.search(r"\b(?:turn\s+off|switch\s+off|close|disable|kill)\b", lower):
+            actions.append({"action": "turn_off", "target": "living_room_light"})
+            actions.append({"action": "turn_off", "target": "kitchen_light"})
+
+    # Specific Front door lock
+    if any(w in lower for w in ("door", "lock", "front door")):
+        if re.search(r"\b(?:unlock|open)\b.*?\b(?:door|lock)\b|\b(?:door|lock)\b.*?\b(?:unlock|unlocked)\b", lower):
+            actions.append({"action": "unlock", "target": "front_door_lock"})
+        elif re.search(r"\b(?:lock|secure|close)\b.*?\b(?:door|front door|house)\b", lower):
+            actions.append({"action": "lock", "target": "front_door_lock"})
+
+    # Thermostat
+    if any(w in lower for w in ("thermostat", "temperature", "temp", "warm", "warmer", "hot", "hotter", "cold", "colder", "cool", "cooler", "heat", "freezing", "chilly", "boiling")):
+        val_match = re.search(r"\b(\d{1,2}(?:\.\d+)?)\s*(?:°|c|degrees|deg|celsius)?\b", lower)
+        # Increase temperature (heating up / user is cold)
+        if re.search(r"\b(?:increase|raise|turn up|warmer|hotter|warm\s+up|heat\s+up|warm\s+the\s+room|make it warm|make it hot|make it warmer|im cold|i'm cold|so cold|too cold|very cold|freezing|chilly)\b", lower):
+            actions.append({"action": "increase_temperature", "target": "living_room_thermostat", "value": 2.0})
+        # Decrease temperature (cooling down / user is hot)
+        elif re.search(r"\b(?:decrease|lower|turn down|cooler|colder|cool\s+down|cool\s+the\s+room|cool\s+it|make it cool|make it cold|make it colder|make it cooler|im hot|i'm hot|so hot|too hot|very hot|boiling|burning)\b", lower):
+            actions.append({"action": "decrease_temperature", "target": "living_room_thermostat", "value": 2.0})
+        elif val_match:
+            actions.append({"action": "set_temperature", "target": "living_room_thermostat", "value": float(val_match.group(1))})
+
+    # Entertainment / TV
+    if any(w in lower for w in ("tv", "television", "entertainment", "movie", "music", "song")):
+        if re.search(r"\b(?:turn\s+on|start|play|watch|open)\b.*?\b(?:tv|television|movie|music)\b|\b(?:tv|television)\b.*?\b(?:on|play)\b", lower):
+            actions.append({"action": "play_media", "target": "entertainment", "title": "TV"})
+        elif re.search(r"\b(?:pause)\b", lower):
+            actions.append({"action": "pause_media", "target": "entertainment"})
+        elif re.search(r"\b(?:turn\s+off|stop|close)\b.*?\b(?:tv|television|entertainment|music)\b", lower):
+            actions.append({"action": "stop_media", "target": "entertainment"})
+
+    # Deduplicate by target
+    seen = {}
+    for a in actions:
+        seen[a["target"]] = a
+    return list(seen.values())
 
 
 def smart_home_prompt_context() -> str:

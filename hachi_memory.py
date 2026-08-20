@@ -46,13 +46,19 @@ def _cosine(left: Iterable[float], right: Iterable[float]) -> float:
 
 
 def _infer_category_subject(content: str) -> tuple[str, str]:
-    clean = re.sub(r"^(?:please\s+)?remember(?:\s+that)?\s+", "", content.strip(), flags=re.IGNORECASE)
-    if re.match(r"^i(?:'m| am)\s+allergic\s+to\s+.+$", clean, flags=re.IGNORECASE):
+    clean = re.sub(r"^(?:please\s+)?remember(?:\s+that|\s+this)?\s+", "", content.strip(), flags=re.IGNORECASE)
+    clean = re.sub(r"[.,!?]+$", "", clean).strip()
+    lower = clean.lower()
+    if "secret" in lower:
+        return "identity", "secret"
+    if any(w in lower for w in ("code", "password", "pin", "safe", "credentials", "key")):
+        return "security", "credentials"
+    if "allergic" in lower or "allergy" in lower:
         return "health", "allergies"
     patterns = [
-        ("preference", r"^i\s+(?:prefer|like|love)\s+(.+)$"),
+        ("preference", r"^i\s+(?:prefer|like|love|dislike|hate)\s+(.+)$"),
         ("identity", r"^my\s+([^.!?]{1,40}?)\s+is\s+(.+)$"),
-        ("profile", r"^i\s+(?:am|live|work|study)\s+(.+)$"),
+        ("profile", r"^i\s+(?:am|live|work|study|m)\s+(.+)$"),
     ]
     for category, pattern in patterns:
         match = re.match(pattern, clean, flags=re.IGNORECASE)
@@ -157,9 +163,45 @@ def format_memory_search(query: str, limit: int = 5) -> str:
 
 
 def capture_explicit_memory(user_text: str) -> dict | None:
-    """Store only explicit memory requests; ordinary chat remains an audit log."""
+    """Store explicit user memory requests with flexible natural phrasing."""
     text = (user_text or "").strip()
-    match = re.match(r"^(?:hachi[, ]+)?(?:please\s+)?remember(?:\s+that)?\s+(.{3,})$", text, flags=re.IGNORECASE)
-    if not match:
+    if not text:
         return None
-    return save_memory(match.group(1), source="explicit_user_request")
+
+    # 1. "no just remember this the code is 4555" / "please remember that X" / "remember this: X"
+    m = re.search(r"\b(?:remember|keep in mind|memorize)\b(?:\s+(?:that|this))?[:\s]+(.{3,})$", text, flags=re.IGNORECASE)
+    if m:
+        fact = m.group(1).strip(" .?!'\"")
+        if len(fact) >= 3:
+            return save_memory(fact, source="explicit_user_request")
+
+    # 2. "make sure you remember this / that" / "don't forget that X"
+    m = re.search(r"\b(?:make\s+sure\s+you\s+remember|don't\s+forget|note\s+that)(?:\s+that|\s+this)?[:\s]+(.{3,})$", text, flags=re.IGNORECASE)
+    if m:
+        fact = m.group(1).strip(" .?!'\"")
+        if len(fact) >= 3:
+            return save_memory(fact, source="explicit_user_request")
+
+    # 3. "ima tell you the code of the safe its 4555" / "im gonna tell you something its that X"
+    m = re.search(r"\b(?:ima|im gonna|let me|i will|i want to)\s+tell\s+you\s+(?:something|a secret|the\s+[^.,!?]+)?\s*[:,-]?\s*(?:it's\s+that|its\s+that|that|is)?\s*(.+?)(?:[,\s]+(?:make\s+sure\s+you\s+remember(?:\s+this)?|remember\s+this|don't\s+forget|keep\s+this\s+in\s+mind))?[.!?]*$", text, flags=re.IGNORECASE)
+    if m:
+        fact = m.group(1).strip(" .?!'\"")
+        if len(fact) >= 3:
+            return save_memory(fact, source="explicit_user_request")
+
+    # 4. "the code of/to the safe is 4555" / "the password for X is Y" when mentioning code/password/secret
+    if re.search(r"\b(?:code|password|pin|secret|safe)\b", text, flags=re.IGNORECASE):
+        m = re.search(r"\b(the\s+(?:code|password|pin)\s+(?:of|for|to)\s+(?:the\s+)?[^.,!?]+\s+(?:is|its|it's)\s+[^.,!?]+)", text, flags=re.IGNORECASE)
+        if m:
+            return save_memory(m.group(1).strip(), category="security", subject="credentials", source="explicit_user_request")
+        m = re.search(r"\b(the\s+code\s+is\s+[^.,!?]+)", text, flags=re.IGNORECASE)
+        if m:
+            return save_memory(m.group(1).strip(), category="security", subject="credentials", source="explicit_user_request")
+
+    # 5. "my secret is X" / "im secretly X" when remember context is present
+    if re.search(r"\b(?:remember|save|note|keep|secret)\b", text, flags=re.IGNORECASE):
+        m = re.search(r"\b(i(?:'m| am) secretly [^.,!?]+|my secret is [^.,!?]+)", text, flags=re.IGNORECASE)
+        if m:
+            return save_memory(m.group(1).strip(), category="identity", subject="secret", source="explicit_user_request")
+
+    return None

@@ -73,8 +73,33 @@ echo [OK] Ollama engine is ready.
 :ensure_model
 echo [*] Checking config.json for configured model...
 for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-Content config.json -ErrorAction SilentlyContinue | ConvertFrom-Json).model_name"') do set "MODEL_NAME=%%i"
-if "%MODEL_NAME%"=="" set "MODEL_NAME=qwen3.5:2b"
-echo [*] Ensuring model: %MODEL_NAME% (pulling if missing)...
+if "%MODEL_NAME%"=="" set "MODEL_NAME=hachi-master"
+echo [*] Ensuring AI model '%MODEL_NAME%' is ready...
+
+"%OLLAMA_EXE%" list | findstr /i "%MODEL_NAME%" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [OK] Model '%MODEL_NAME%' is installed and ready.
+    goto :launch_hachi
+)
+
+:: If model not registered, check for local Modelfile to auto-create
+if exist "gguf\v5\Modelfile" (
+    echo [*] Registering local model '%MODEL_NAME%' from gguf\v5\Modelfile...
+    pushd "%~dp0gguf\v5"
+    "%OLLAMA_EXE%" create %MODEL_NAME% -f Modelfile
+    popd
+    goto :launch_hachi
+)
+if exist "MODEL\Modelfile" (
+    echo [*] Registering local model '%MODEL_NAME%' from MODEL\Modelfile...
+    pushd "%~dp0MODEL"
+    "%OLLAMA_EXE%" create %MODEL_NAME% -f Modelfile
+    popd
+    goto :launch_hachi
+)
+
+:: Otherwise attempt pulling from Ollama library
+echo [*] Pulling model from Ollama library: %MODEL_NAME%...
 "%OLLAMA_EXE%" pull %MODEL_NAME%
 
 :: ── Step 5: Launch Hachi ─────────────────────────────────────

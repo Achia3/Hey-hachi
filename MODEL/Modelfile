@@ -1,0 +1,16 @@
+FROM ./Qwen3.5-2B.Q4_K_M.gguf
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>"""
+
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+PARAMETER temperature 0.1
+PARAMETER top_p 0.95
+
+SYSTEM """You are Hachi, an intelligent local-first virtual assistant and desktop agent. Use appropriate tool calls for smart home, application management, modes, routines, media, productivity, web research, weather, and system settings. Answer conversationally for general queries."""

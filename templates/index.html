@@ -716,9 +716,7 @@
   .pomo-notify-btn { padding: 10px 24px; border-radius: 12px; border: none; background: var(--accent); color: #fff; font-family: var(--font-display); font-size: 14px; font-weight: 600; cursor: pointer; transition: transform .15s; }
   .pomo-notify-btn:hover { transform: scale(1.03); }
   .pomo-notify-btn.secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text-dim); margin-left: 8px; }
-  .voice-transcript { width: 100%; min-height: 52px; max-height: 100px; overflow-y: auto; background: rgba(28,26,21,0.03); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; font-family: var(--font-body); font-size: 13px; color: var(--text-dim); text-align: center; transition: all .3s; margin-bottom: 12px; }
-  .voice-transcript.heard { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
-  .voice-transcript.interim { color: var(--accent); border-color: rgba(200,146,46,0.3); }
+  .voice-transcript { display: none !important; }
   .stt-badge { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); background: rgba(28,26,21,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; margin-top: 6px; display: inline-block; }
 </style>
 </head>
@@ -824,6 +822,11 @@
       New Chat
     </button>
 
+    <button class="side-action" type="button" onclick="openSmartHomeSimulator()" style="margin-top:6px;" title="Open Smart Home">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Smart Home
+    </button>
+
     <div class="sidebar-spacer"></div>
     
     <!-- Pomodoro Banner (in sidebar bottom) -->
@@ -863,7 +866,12 @@
         Hachi 1.0
         </div>
       </div>
-      <div></div>
+      <div class="topbar-right">
+        <button class="smart-home-nav-btn" id="smartHomeBtn" type="button" title="Open Smart Home" onclick="openSmartHomeSimulator()" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated,#fff);color:var(--text);font-family:var(--font-display);font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:all .2s ease;">
+          <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Smart Home</span>
+        </button>
+      </div>
     </div>
 
     <!-- Scrollable Chat Viewport -->
@@ -1113,7 +1121,7 @@ function removeChat(chatId) {
 }
 
 let smartHomeBrowserPopup = null;
-const SMART_HOME_POPUP_PATTERN = /\b(?:smart\s*home|thermostat|temperature|degrees?|lights?|bulb|front door|door lock|lock the door|unlock the door|living room|kitchen|freez(?:e|ing)|warmer|cooler|too (?:hot|cold|dark|bright)|getting dark|secure (?:the )?(?:house|home|door)|movie night|study music|entertainment)\b/i;
+const SMART_HOME_POPUP_PATTERN = /\b(?:smart\s*home|thermostat|temperature|degrees?|lights?|bulb|bulbs|lamp|lamps|front door|door lock|door|lock|unlock|locked|unlocked|living room|kitchen|freez(?:e|ing)|chilly|boiling|hot|cold|warm|cooler|colder|warmer|hotter|cool|heat|too (?:hot|cold|dark|bright)|so (?:hot|cold|warm|dark|bright)|getting (?:dark|cold|hot|warm)|turn (?:everything|all|both|all the lights) (?:off|on)|open (?:the )?(?:lights|smart home|home)|secure (?:the )?(?:house|home|door)|movie night|study music|entertainment|tv|television)\b/i;
 
 function prepareSmartHomePopup(message) {
     // Browser popups must originate directly from the user's Send click. This
@@ -2608,35 +2616,28 @@ async function streamAndSpeakResponse(userText) {
                     const id = pendingAudioIds.shift();
                     const audio = new Audio(`/api/tts_audio/${id}`);
                     audio.preload = 'auto';
+                    audio.load();
                     audioQueue.push({ audio, sentence: '' });
                     continue;
                 }
-                await sleep(20);
+                await sleep(15);
                 continue;
             }
 
             const item = audioQueue.shift();
-            setVoiceState('speaking', 'Speaking…', item.sentence.substring(0, 60));
+            setVoiceState('speaking', 'Speaking…', 'Hachi is speaking');
             sub.textContent = 'Say "stop" or tap the orb to interrupt';
-            transcriptEl.textContent = item.sentence.length > 100
-                ? item.sentence.substring(0, 100) + '…'
-                : item.sentence;
-            transcriptEl.className = 'voice-transcript';
+
+            // Preload next queued audio immediately for zero-latency gapless playback
+            if (audioQueue.length > 0 && audioQueue[0].audio) {
+                try { audioQueue[0].audio.load(); } catch(_) {}
+            }
 
             await playAudio(item.audio, item.sentence);
 
-            if (!isInterrupted && voiceActive && !voiceAborted) {
-                if (audioQueue.length === 0 && !playerDone) {
-                    setVoiceState('thinking', 'Thinking…', 'Synthesizing next sentence…');
-                } else if (audioQueue.length === 0 && playerDone) {
-                    setVoiceState('listening', 'Listening…', 'Your turn — speak now');
-                }
-            }
             if (isInterrupted) break;
           }
         } finally {
-            // Speaking is an owned state: every completion, playback error, and
-            // cancellation path releases it.
             if (voiceActive && !voiceAborted) {
                 setVoiceState('listening', 'Listening…', isInterrupted ? 'Go ahead — speak now' : 'Your turn — speak now');
             } else {
@@ -2694,9 +2695,6 @@ async function streamAndSpeakResponse(userText) {
         }
         localInterruptMonitor = monitor;
     });
-
-    // Play instant local female neural ack (0ms latency, 100% female voice)
-    playLocalFemaleAck(userText);
 
     const playerTask = drainAudioQueue();
 
@@ -2802,21 +2800,8 @@ async function streamAndSpeakResponse(userText) {
 }
 
 function playLocalFemaleAck(userText) {
-    const isTagalog = (detectLangHint(userText || '') === 'fil-PH');
-    const acks = isTagalog ? ['ack_tl_1.mp3', 'ack_tl_2.mp3', 'ack_tl_3.mp3'] : ['ack_en_1.mp3', 'ack_en_2.mp3', 'ack_en_3.mp3'];
-    const chosen = acks[Math.floor(Math.random() * acks.length)];
-    if (ackAudio) {
-        try { ackAudio.pause(); ackAudio.currentTime = 0; } catch (_) {}
-    }
-    const audio = new Audio('/static/audio/acks/' + chosen);
-    ackAudio = audio;
-    audio.volume = 0.95;
-    audio.onended = () => {
-        if (ackAudio === audio) ackAudio = null;
-    };
-    audio.play().catch(() => {
-        if (ackAudio === audio) ackAudio = null;
-    });
+    // Disabled: AI speaks response directly without filler audio
+    return;
 }
 
 // ── Browser SpeechSynthesis fallback (explicit female voice) ─────────────────
@@ -2844,27 +2829,28 @@ function playAudio(audio, fallbackText) {
         currentAudio = audio;
         audio.volume = 0.95;
 
-        activeAudioResolve = () => {
+        let finished = false;
+        const done = () => {
+            if (finished) return;
+            finished = true;
             clearTimeout(guard);
             clearTimeout(loadTimeout);
+            if (currentAudio === audio) currentAudio = null;
             resolve();
         };
 
-        const done = () => {
-            if (currentAudio === audio) currentAudio = null;
-            if (activeAudioResolve) activeAudioResolve();
-        };
-
-        const guard = setTimeout(done, 20000);
+        const guard = setTimeout(done, 25000);
 
         const tryPlay = () => {
-            if (!voiceActive || voiceAborted || isInterrupting) { done(); return; }
+            if (!voiceActive || voiceAborted || isInterrupting || finished) { done(); return; }
             if (window.speechSynthesis) speechSynthesis.cancel();
-            audio.play().catch(() => {
-                // Autoplay blocked or decode error — fall back to browser TTS
-                if (fallbackText) speakBrowserFallback(fallbackText);
-                done();
-            });
+            const p = audio.play();
+            if (p !== undefined) {
+                p.catch(() => {
+                    if (fallbackText) speakBrowserFallback(fallbackText);
+                    done();
+                });
+            }
         };
 
         const loadTimeout = setTimeout(() => {
@@ -2874,22 +2860,23 @@ function playAudio(audio, fallbackText) {
             } else {
                 tryPlay();
             }
-        }, 4000);
+        }, 3000);
 
-        audio.oncanplaythrough = () => {
-            clearTimeout(loadTimeout);
-            tryPlay();
-        };
         audio.onended = done;
         audio.onerror = () => {
             if (fallbackText) speakBrowserFallback(fallbackText);
             done();
         };
 
-        audio.load();
-        if (audio.readyState >= 3) {
+        if (audio.readyState >= 2) {
             clearTimeout(loadTimeout);
             tryPlay();
+        } else {
+            audio.oncanplay = () => {
+                clearTimeout(loadTimeout);
+                tryPlay();
+            };
+            audio.load();
         }
     });
 }

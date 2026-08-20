@@ -9,9 +9,9 @@
   "global_dictation_hotkey": "ctrl+alt+space",
   "use_deepseek": false,
   "deepseek_model": "deepseek-v4-flash",
-  "tagalog_voice": "fil-PH-AngeloNeural",
+  "tagalog_voice": "fil-PH-BlessicaNeural",
   "english_voice": "en-US-AvaNeural",
-  "offline_tts_only": true,
+  "offline_tts_only": false,
   "web_search_provider": "duckduckgo",
   "web_search_max_results": 8,
   "web_search_timeout_seconds": 8

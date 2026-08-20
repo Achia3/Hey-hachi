@@ -48,12 +48,29 @@ echo [*] Checking Ollama installation...
 where ollama >nul 2>&1
 if %errorlevel% neq 0 (
     echo [!] WARNING: Ollama executable not found in system PATH.
-    echo     Please install it from https://ollama.com and pull the model:
-    echo       ollama pull qwen3.5:2b
+    echo     Please install it from https://ollama.com
 ) else (
     echo [OK] Ollama detected.
-    echo [*] Pulling model qwen3.5:2b (skips if already present)...
-    ollama pull qwen3.5:2b
+    echo [*] Verifying model 'hachi-master'...
+    ollama list | findstr /i "hachi-master" >nul 2>&1
+    if %errorlevel% equ 0 (
+        echo [OK] Model 'hachi-master' is installed and ready.
+    ) else (
+        if exist "gguf\v5\Modelfile" (
+            echo [*] Registering 'hachi-master' from gguf\v5\Modelfile...
+            pushd "%~dp0gguf\v5"
+            ollama create hachi-master -f Modelfile
+            popd
+        ) else if exist "MODEL\Modelfile" (
+            echo [*] Registering 'hachi-master' from MODEL\Modelfile...
+            pushd "%~dp0MODEL"
+            ollama create hachi-master -f Modelfile
+            popd
+        ) else (
+            echo [*] Pulling fallback model qwen3.5:2b...
+            ollama pull qwen3.5:2b
+        )
+    )
 )
 echo.
 

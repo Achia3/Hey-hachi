@@ -51,6 +51,7 @@ from hachi_web import app, FLASK_PORT, start_wakeword_listener
 from hachi_web import start_tts_janitor
 from hachi_db import init_db
 from hachi_productivity import start_reminder_scheduler
+from hachi_agent import MODEL_NAME
 
 
 def _wait_for_flask(host="127.0.0.1", port=FLASK_PORT, timeout=15):
@@ -151,6 +152,7 @@ def main():
     # Initialize DB once at startup (not on every DB call)
     init_db()
     start_reminder_scheduler()
+    print(f"🤖 Active AI Model Engine: {MODEL_NAME}")
 
     # Browser voice mode has its own microphone path. Keep the old always-on
     # wake-word listener opt-in so it cannot contend for the microphone.

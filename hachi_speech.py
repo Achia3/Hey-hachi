@@ -20,9 +20,9 @@ except ImportError:
 # Config
 # ---------------------------------------------------------------------------
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-DEFAULT_TAGALOG_VOICE = "fil-PH-AngeloNeural"
+DEFAULT_TAGALOG_VOICE = "fil-PH-BlessicaNeural"
 DEFAULT_ENGLISH_VOICE = "en-US-AvaNeural"
-OFFLINE_TTS_ONLY = True
+OFFLINE_TTS_ONLY = False
 
 if os.path.exists(_CONFIG_PATH):
     try:

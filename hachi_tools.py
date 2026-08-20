@@ -413,12 +413,15 @@ def _lnk_target(path: str):
 
 
 def find_app_in_start_menu(app_name: str):
-    """Search Windows Start Menu shortcuts for any installed application.
-    Covers all Start Menu roots (APPDATA, PROGRAMDATA, LOCALAPPDATA) and matches
-    both the .lnk filename AND the shortcut's target exe."""
+    """Search Windows Start Menu and Desktop shortcuts for any installed application.
+    Covers all Start Menu roots, Desktop, and Local AppData Programs."""
+    user_home = os.path.expanduser("~")
     search_dirs = [
+        os.path.join(user_home, 'Desktop'),
+        os.path.join(os.environ.get('PUBLIC', r'C:\Users\Public'), 'Desktop'),
         os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
         os.path.join(os.environ.get('PROGRAMDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs'),
         os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
     ]
     app_lower = app_name.lower().strip()
@@ -430,30 +433,46 @@ def find_app_in_start_menu(app_name: str):
             continue
         for root, dirs, files in os.walk(base_dir):
             for f in files:
-                if not f.lower().endswith('.lnk'):
-                    continue
-                name = f[:-4].lower()
-                # Exact substring match on filename
-                if app_lower in name or name in app_lower:
-                    return os.path.join(root, f)
-                # All words present (fuzzy)
-                if app_words and all(w in name for w in app_words):
-                    best_match = os.path.join(root, f)
-                    continue
-                # Match against the shortcut's TARGET exe (catches display-name mismatch)
-                target = _lnk_target(os.path.join(root, f))
-                if target:
-                    t = os.path.splitext(target)[0]
-                    if app_lower in t or t in app_lower or (app_words and all(w in t for w in app_words)):
+                f_lower = f.lower()
+                if f_lower.endswith(('.lnk', '.exe', '.url')):
+                    name = os.path.splitext(f_lower)[0]
+                    # Exact match
+                    if app_lower == name:
                         return os.path.join(root, f)
+                    # Substring match
+                    if app_lower in name or name in app_lower:
+                        if not best_match:
+                            best_match = os.path.join(root, f)
+                    # All words present
+                    if app_words and all(w in name for w in app_words):
+                        best_match = os.path.join(root, f)
+
+                if f_lower.endswith('.lnk'):
+                    target = _lnk_target(os.path.join(root, f))
+                    if target:
+                        t = os.path.splitext(target)[0]
+                        if app_lower in t or t in app_lower or (app_words and all(w in t for w in app_words)):
+                            return os.path.join(root, f)
 
     return best_match
 
+
 def _launch_app_unverified(app_name, args=None):
-    """Launch app process with protocol fallbacks for 100% reliability on any PC.
-    Returns a user-facing spoken confirmation (not a bare bool)."""
+    """Launch app process with protocol fallbacks and deep search for 100% reliability.
+    Returns a user-facing spoken confirmation."""
     if not app_name or not app_name.strip():
         return "No application specified to open."
+    success_msg = f"Opening {app_name}."
+
+    # Direct path or file opening support
+    expanded = os.path.expandvars(os.path.expanduser(app_name.strip('"\' ')))
+    if os.path.exists(expanded):
+        try:
+            os.startfile(expanded)
+            logging.info(f"Opened path directly via os.startfile: {expanded}")
+            return f"Opened {os.path.basename(expanded)}."
+        except Exception as e:
+            logging.warning(f"Direct startfile failed for {expanded}: {e}")
     success_msg = f"Opening {app_name}."
     try:
         app_clean = app_name.lower().strip()
@@ -1057,23 +1076,70 @@ def _normalize_search_queries(query: object = "", queries: object = None) -> lis
 
 
 def _search_ddgs(query: str, limit: int = 6, timeout: int = 8) -> list[dict]:
-    from ddgs import DDGS
-
     records = []
-    with DDGS(timeout=timeout) as ddgs:
-        for row in ddgs.text(query, max_results=limit):
-            records.append({
-                "title": str(row.get("title") or "").strip(),
-                "url": str(row.get("href") or "").strip(),
-                "snippet": str(row.get("body") or "").strip(),
-                "provider": "duckduckgo",
-                "query": query,
-            })
+    # Tier 1: ddgs library
+    try:
+        from ddgs import DDGS
+        with DDGS(timeout=timeout) as ddgs:
+            for row in ddgs.text(query, max_results=limit):
+                records.append({
+                    "title": str(row.get("title") or "").strip(),
+                    "url": str(row.get("href") or "").strip(),
+                    "snippet": str(row.get("body") or "").strip(),
+                    "provider": "duckduckgo",
+                    "query": query,
+                })
+        if records:
+            return records
+    except Exception as e:
+        logging.debug("DDGS library lookup failed: %s; trying HTML endpoint", e)
+
+    # Tier 2: HTML endpoint fallback
+    try:
+        import urllib.parse
+        from bs4 import BeautifulSoup
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        res = requests.get(url, headers=headers, timeout=timeout)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, "html.parser")
+            for r in soup.select(".result")[:limit]:
+                title_el = r.select_one(".result__title")
+                snippet_el = r.select_one(".result__snippet")
+                url_el = r.select_one(".result__url")
+                if title_el:
+                    title = title_el.get_text(strip=True)
+                    snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+                    href = title_el.find("a")["href"] if title_el.find("a") else ""
+                    if "uddg=" in href:
+                        href = urllib.parse.unquote(href.split("uddg=")[1].split("&")[0])
+                    records.append({
+                        "title": title,
+                        "url": href or (url_el.get_text(strip=True) if url_el else ""),
+                        "snippet": snippet,
+                        "provider": "duckduckgo_html",
+                        "query": query
+                    })
+    except Exception as e2:
+        logging.debug("DDG HTML search fallback failed: %s", e2)
+
     return records
 
 
 def _search_brave(query: str, limit: int, timeout: int) -> list[dict]:
     api_key = os.getenv("BRAVE_SEARCH_API_KEY", "").strip()
+    if not api_key:
+        try:
+            cfg_path = os.path.join(os.path.dirname(__file__), "config.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    c = json.load(f)
+                    api_key = str(c.get("brave_search_api_key") or c.get("brave_api_key") or "").strip()
+        except Exception:
+            pass
     if not api_key:
         raise RuntimeError("BRAVE_SEARCH_API_KEY is not configured")
     response = requests.get(
@@ -1733,6 +1799,136 @@ def run_routine(name: str, routine_input: str = "") -> str:
 
 # Tool definitions for Ollama - MUST use {"type": "function", "function": {...}} wrapper format
 AVAILABLE_TOOLS = [
+    # ── HACHI MASTER MODEL V2 CORE TOOLS ────────────────────────────────
+    {
+        "type": "function",
+        "function": {
+            "name": "control_smart_home",
+            "description": "Apply validated actions to smart home devices (lights, thermostat, front door lock, entertainment). Supports relative temperature adjustments like 'I am cold' or 'I am hot'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "Short summary of the user's intended goal."},
+                    "actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {"type": "string", "enum": ["turn_on", "turn_off", "set_temperature", "increase_temperature", "decrease_temperature", "lock", "unlock", "play_media", "pause_media", "stop_media"]},
+                                "target": {"type": "string", "enum": ["living_room_light", "kitchen_light", "living_room_thermostat", "front_door_lock", "entertainment"]},
+                                "value": {"type": "number", "description": "Temperature in Celsius (16-30 C) or relative adjustment."},
+                                "title": {"type": "string", "description": "Media title if playing media."}
+                            },
+                            "required": ["action", "target"]
+                        }
+                    }
+                },
+                "required": ["actions"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_smart_home_state",
+            "description": "Inspect and retrieve the current live state of all smart home devices in the house.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_app",
+            "description": "Launch, close, or check status of desktop applications by name (e.g. Discord, VS Code, Chrome, Steam, Spotify, Terminal, Settings, Calculator, Obsidian).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["launch", "close", "status"], "description": "Action to perform: launch, close, or status."},
+                    "app_name": {"type": "string", "description": "Name of the application or process."}
+                },
+                "required": ["action", "app_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_mode",
+            "description": "Manage assistant desktop modes: gaming, study, movie, or focus (pomodoro timer).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["start", "stop", "status"], "description": "Action: start, stop, or status."},
+                    "mode_name": {"type": "string", "enum": ["gaming", "study", "movie", "focus"], "description": "Mode name."}
+                },
+                "required": ["action", "mode_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "media",
+            "description": "Control playback for music, videos, and system media across Spotify, YouTube, or system media.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["play", "pause", "stop", "next", "previous", "volume_up", "volume_down"], "description": "Media action."},
+                    "target": {"type": "string", "enum": ["spotify", "youtube", "system"], "description": "Target platform or system player."},
+                    "query": {"type": "string", "description": "Search query or song/artist name to play."}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_productivity",
+            "description": "Manage notes, todo tasks, school deadlines, reminders, and long-term user memories in SQLite database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["create", "set", "list", "search", "complete", "delete"], "description": "Action to perform."},
+                    "type": {"type": "string", "enum": ["note", "todo", "deadline", "reminder", "memory"], "description": "Item type."},
+                    "title": {"type": "string", "description": "Title of note, task, deadline, or reminder subject."},
+                    "content": {"type": "string", "description": "Body, note content, or memory fact to save."},
+                    "due_time": {"type": "string", "description": "Due date, deadline, or time expression."},
+                    "course": {"type": "string", "description": "Course code e.g. CS402."}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_research",
+            "description": "Search the live web or scrape webpage content for current information, news, or articles.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["search", "scrape"], "description": "search query or scrape URL."},
+                    "query": {"type": "string", "description": "Search query or URL to scrape."}
+                },
+                "required": ["action", "query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "system_control",
+            "description": "System settings and desktop utilities: volume, brightness, screenshot, clipboard, and dictation toggle.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["screenshot", "clipboard_get", "clipboard_set", "toggle_dictation", "volume_up", "volume_down", "mute", "brightness_up", "brightness_down"], "description": "System action."}
+                },
+                "required": ["action"]
+            }
+        }
+    },
     {
         "type": "function", "function": {
             "name": "add_voice_dictionary_term",
@@ -2193,11 +2389,20 @@ AVAILABLE_TOOLS = [
 # One source of truth for the capability layer. The model receives AVAILABLE_TOOLS
 # while the UI/debug API can expose these human-readable safety properties.
 _TOOL_SAFETY = {
+    "control_smart_home": ("smart_home", "user_intent"),
+    "get_smart_home_state": ("smart_home", "read_only"),
+    "manage_app": ("desktop", "user_intent"),
+    "manage_mode": ("desktop", "user_intent"),
+    "run_routine": ("automation", "user_intent"),
+    "media": ("media", "user_intent"),
+    "manage_productivity": ("productivity", "user_intent"),
+    "get_weather": ("information", "read_only"),
+    "web_research": ("research", "read_only"),
+    "system_control": ("desktop", "user_intent"),
     "add_voice_dictionary_term": ("voice", "user_intent"),
     "list_voice_dictionary": ("voice", "read_only"),
     "set_global_dictation": ("voice", "user_intent"),
     "list_routines": ("automation", "read_only"),
-    "run_routine": ("automation", "user_intent"),
     "search_web": ("research", "read_only"),
     "research_web": ("research", "read_only"),
     "fetch_url": ("research", "read_only"),
@@ -2207,10 +2412,7 @@ _TOOL_SAFETY = {
     "browser_read": ("browser", "read_only"),
     "browser_action": ("browser", "user_intent"),
     "delegate_reasoning": ("reasoning", "cloud_read_only"),
-    "get_weather": ("information", "read_only"),
     "get_system_stats": ("information", "read_only"),
-    "get_smart_home_state": ("smart_home", "read_only"),
-    "control_smart_home": ("smart_home", "user_intent"),
     "system_health_report": ("information", "read_only"),
     "search_memory": ("memory", "read_only"),
     "clipboard_get": ("desktop", "read_only"),
@@ -2262,11 +2464,8 @@ def execute_tool_call(tool_name: str, arguments: dict):
     """Execute target tool by name and return string result."""
     logging.info(f"Executing Tool Call: {tool_name} with args {arguments}")
     arguments = arguments or {}
-    # Tools that REQUIRE args must not fire with defaults when the model gave an
-    # empty/malformed dict — otherwise "close_app" with {} would kill everything,
-    # and "launch_mode" with {} would launch gaming unprompted.
     REQUIRED_ARGS = {
-        "run_routine": "name",
+        "run_routine": "routine_name",
         "add_voice_dictionary_term": "term",
         "launch_mode": "mode_name",
         "close_mode": "mode_name",
@@ -2289,10 +2488,110 @@ def execute_tool_call(tool_name: str, arguments: dict):
         "add_todo": "title",
     }
     if tool_name in REQUIRED_ARGS and not arguments.get(REQUIRED_ARGS[tool_name]):
-        msg = f"Tool {tool_name} needs a value for '{REQUIRED_ARGS[tool_name]}' but none was provided."
-        logging.warning(msg)
-        return msg
-    if tool_name == "add_voice_dictionary_term":
+        # allow fallback param names (e.g. name vs routine_name)
+        if tool_name == "run_routine" and arguments.get("name"):
+            pass
+        else:
+            msg = f"Tool {tool_name} needs a value for '{REQUIRED_ARGS[tool_name]}' but none was provided."
+            logging.warning(msg)
+            return msg
+
+    # ── Master V2 Core Tool Handlers ──
+    if tool_name == "manage_app":
+        action = str(arguments.get("action", "launch")).lower()
+        app_name = str(arguments.get("app_name", "")).strip()
+        if action == "close":
+            return close_app(app_name)
+        elif action == "status":
+            return "Recently opened apps: " + ", ".join(get_recently_opened_apps())
+        else:
+            return launch_app(app_name)
+    elif tool_name == "manage_mode":
+        action = str(arguments.get("action", "start")).lower()
+        mode_name = str(arguments.get("mode_name", "gaming")).lower()
+        if action in ("stop", "close", "end", "exit"):
+            return close_mode(mode_name)
+        elif action == "status":
+            return f"Mode {mode_name} requested."
+        else:
+            return launch_mode(mode_name)
+    elif tool_name == "media":
+        action = str(arguments.get("action", "play")).lower()
+        target = str(arguments.get("target", "spotify")).lower()
+        query = str(arguments.get("query", "")).strip()
+        if action == "play":
+            if target == "youtube" and query:
+                return play_youtube(query)
+            elif query:
+                return play_spotify(query)
+            else:
+                return media_control("play")
+        elif action in ("pause", "stop", "next", "previous", "volume_up", "volume_down"):
+            return media_control(action)
+        return media_control("play")
+    elif tool_name == "manage_productivity":
+        action = str(arguments.get("action", "create")).lower()
+        item_type = str(arguments.get("type", "note")).lower()
+        title = str(arguments.get("title", "")).strip()
+        content = str(arguments.get("content", "")).strip()
+        due_time = str(arguments.get("due_time", "")).strip()
+        course = str(arguments.get("course", "")).strip()
+
+        if item_type == "memory":
+            if action in ("create", "set", "save", "add"):
+                saved = save_memory(content or title, category="memory", subject=title or "user")
+                return f"Saved to memory: {content or title}"
+            else:
+                durable = format_memory_search(content or title, limit=5)
+                return f"Memory recall:\n{durable}"
+        elif item_type in ("todo", "task"):
+            if action in ("create", "set", "add"):
+                return add_todo(title or content, due_time)
+            elif action == "complete":
+                return f"Completed todo: {title or content}"
+            else:
+                return list_todos()
+        elif item_type == "deadline":
+            if action in ("create", "set", "add"):
+                return add_assignment_deadline(title or content, due_time or "next week", course)
+            else:
+                return list_assignment_deadlines()
+        elif item_type == "reminder":
+            if action in ("create", "set", "add"):
+                return set_reminder(title or content, due_time)
+            else:
+                return list_reminders()
+        else: # note
+            if action in ("create", "set", "save", "add"):
+                return save_note(content or title, title or "Note")
+            else:
+                return list_notes(query=title or content)
+    elif tool_name == "web_research":
+        action = str(arguments.get("action", "search")).lower()
+        query = str(arguments.get("query", "")).strip()
+        if action == "scrape" or query.startswith("http"):
+            return fetch_url(query)
+        else:
+            return search_web(query)
+    elif tool_name == "system_control":
+        action = str(arguments.get("action", "")).lower()
+        if action == "screenshot":
+            return capture_screenshot()
+        elif action == "clipboard_get":
+            return clipboard_get()
+        elif action == "clipboard_set":
+            return clipboard_set(arguments.get("text", "") or arguments.get("content", ""))
+        elif action == "toggle_dictation":
+            from hachi_dictation import set_global_dictation, is_dictation_enabled
+            new_state = not is_dictation_enabled()
+            set_global_dictation(new_state)
+            return f"Global dictation is now {'enabled' if new_state else 'disabled'}."
+        elif action in ("volume_up", "volume_down", "mute", "brightness_up", "brightness_down"):
+            return media_control(action)
+        return f"System action {action} completed."
+
+    # ── Legacy & Component Tools ──
+    elif tool_name == "add_voice_dictionary_term":
         return add_voice_term(arguments.get("term", ""))
     elif tool_name == "list_voice_dictionary":
         terms = get_voice_terms()
@@ -2305,7 +2604,8 @@ def execute_tool_call(tool_name: str, arguments: dict):
     elif tool_name == "list_routines":
         return list_routines()
     elif tool_name == "run_routine":
-        return run_routine(arguments.get("name", ""), arguments.get("routine_input", ""))
+        r_name = arguments.get("routine_name") or arguments.get("name", "")
+        return run_routine(r_name, arguments.get("routine_input", ""))
     elif tool_name == "launch_mode":
         return launch_mode(arguments.get("mode_name", "gaming"))
     elif tool_name == "close_mode":
