@@ -22,6 +22,7 @@ hachi_memory.db-shm
 *.sqlite-wal
 *.sqlite-shm
 *.log
+uploads/
 
 # Embedded browser profile, cache, cookies, and session data
 .webview_profile/

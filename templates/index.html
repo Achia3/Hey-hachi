@@ -1,538 +1,799 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hachi 1.0</title>
+<title>Hachi 1.0 — Intelligent Voice & Desktop Companion</title>
 <script src="/static/marked.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-  :root{
-    --bg: #f6f4ee;
-    --bg-sidebar: #fbfaf6;
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f8f6f0;
+    --bg-sidebar: #fcfbf8;
     --bg-elevated: #ffffff;
+    --bg-card: #ffffff;
     --text: #1c1a15;
-    --text-dim: #726d61;
-    --text-faint: #aca795;
+    --text-dim: #656054;
+    --text-faint: #9c9688;
     --accent: #c8922e;
-    --accent-soft: #c8922e1a;
-    --accent-ink: #2b3a54;
-    --border: rgba(28,26,21,0.09);
-    --border-strong: rgba(28,26,21,0.16);
-    --radius-lg: 26px;
-    --radius-md: 16px;
+    --accent-hover: #b37e22;
+    --accent-soft: rgba(200, 146, 46, 0.12);
+    --accent-ink: #202b3d;
+    --border: rgba(28, 26, 21, 0.08);
+    --border-strong: rgba(28, 26, 21, 0.15);
+    --shadow-sm: 0 2px 8px rgba(28, 26, 21, 0.04);
+    --shadow-md: 0 12px 32px -8px rgba(28, 26, 21, 0.08);
+    --radius-lg: 24px;
+    --radius-md: 14px;
+    --radius-sm: 8px;
     --font-display: 'Fraunces', serif;
     --font-body: 'Inter', sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
   }
 
-  *{ box-sizing:border-box; margin:0; padding:0; }
-  html,body{ height:100%; }
+  [data-theme="dark"] {
+    --bg: #12110e;
+    --bg-sidebar: #171612;
+    --bg-elevated: #1e1d18;
+    --bg-card: #1e1d18;
+    --text: #eae6dc;
+    --text-dim: #9c9586;
+    --text-faint: #635f55;
+    --accent: #dca842;
+    --accent-hover: #e8b857;
+    --accent-soft: rgba(220, 168, 66, 0.16);
+    --accent-ink: #e0e7f5;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.15);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+  }
 
-  body{
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  body {
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-body);
-    display:flex;
-    min-height:100vh;
-    overflow:hidden;
+    display: flex;
+    min-height: 100vh;
+    overflow: hidden;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
-  .app{
-    display:flex;
-    width:100%;
-    min-height:100vh;
+  /* App Shell Layout */
+  .app {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    opacity: 0;
+    transition: opacity 1.1s ease;
   }
+  .app.revealed { opacity: 1; }
 
   /* ===================== Sidebar ===================== */
-  .sidebar{
-    width: 248px;
-    flex-shrink:0;
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border);
-    display:flex;
-    flex-direction:column;
-    padding: 20px 14px;
-    overflow:hidden;
-    transition: width .2s ease, padding .2s ease, border-color .2s ease;
+    display: flex;
+    flex-direction: column;
+    padding: 18px 14px;
+    overflow-y: auto;
+    transition: width .25s cubic-bezier(0.4, 0, 0.2, 1), padding .25s ease, border-color .25s ease;
+    z-index: 20;
   }
 
-  .app.sidebar-collapsed .sidebar{
-    width:0;
-    padding-left:0;
-    padding-right:0;
-    border-right-color:transparent;
+  .app.sidebar-collapsed .sidebar {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
   }
-  .app.sidebar-collapsed .sidebar > *{ opacity:0; pointer-events:none; }
+  .app.sidebar-collapsed .sidebar > * { opacity: 0; pointer-events: none; }
 
-  .sidebar-top{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding: 2px 6px 22px;
+  .sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
   }
 
-  .logo{
-    display:flex;
-    align-items:center;
-    gap:9px;
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-  .logo-mark{
-    width:28px; height:28px;
-    position:relative;
-    flex-shrink:0;
+  .logo-mark {
+    width: 30px; height: 30px;
+    flex-shrink: 0;
   }
-  .logo-mark svg{ width:100%; height:100%; }
-
-  .logo-name{
+  .logo-mark svg { width: 100%; height: 100%; }
+  .logo-name {
     font-family: var(--font-display);
-    font-weight:600;
-    font-size:17px;
-    letter-spacing:0.01em;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.01em;
+    color: var(--text);
   }
 
-  .collapse-btn{
-    width:30px; height:30px;
-    border-radius:8px;
-    border:1px solid var(--border);
-    background:transparent;
-    color:var(--text-dim);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    transition: border-color .15s ease, color .15s ease;
+  .collapse-btn {
+    width: 32px; height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .2s ease;
   }
-  .collapse-btn:hover{ border-color:var(--border-strong); color:var(--text); }
-  .collapse-btn svg{ width:14px; height:14px; }
+  .collapse-btn:hover { border-color: var(--border-strong); color: var(--text); background: var(--border); }
+  .collapse-btn svg { width: 15px; height: 15px; }
 
-  .nav-group{
-    background: var(--bg-elevated);
-    border:1px solid var(--border);
+  .new-chat-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
     border-radius: var(--radius-md);
-    padding:5px;
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    margin-bottom:18px;
-  }
-
-  .nav-item{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:9px 11px;
-    border-radius:10px;
-    font-size:13.5px;
-    font-weight:500;
-    color: var(--text-dim);
-    cursor:pointer;
-    transition: background .15s ease, color .15s ease;
-    border:none;
-    background:none;
-    width:100%;
-    text-align:left;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
     font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(200, 146, 46, 0.25);
+    transition: all .2s ease;
+    margin-bottom: 16px;
+    width: 100%;
   }
-  .nav-item svg{ width:16px; height:16px; flex-shrink:0; }
-  .nav-item:hover{ background: rgba(28,26,21,0.04); color: var(--text); }
-  .nav-item.active{ background: var(--accent-soft); color: var(--accent); }
-
-  .side-action{
-    display:flex; align-items:center; gap:10px;
-    padding: 10px 11px;
-    border-radius:10px;
-    font-size:13.5px;
-    font-weight:500;
-    color: var(--text-dim);
-    cursor:pointer;
-    transition: background .15s ease, color .15s ease;
-    border:0; background:transparent; width:100%; text-align:left; font-family:var(--font-body);
+  .new-chat-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(200, 146, 46, 0.35);
   }
-  .side-action:hover{ background: rgba(28,26,21,0.04); color: var(--text); }
-  .side-action svg{ width:16px; height:16px; }
+  .new-chat-btn svg { width: 16px; height: 16px; }
 
-  .chat-list{ display:flex; flex-direction:column; gap:2px; }
-  .chat-row{ display:flex; align-items:center; gap:2px; border-radius:10px; }
-  .chat-tab{
-    display:flex; align-items:center; gap:9px; flex:1; min-width:0; border:0; background:transparent;
-    color:var(--text-dim); border-radius:10px; padding:9px 11px; font:500 13px var(--font-body);
-    text-align:left; cursor:pointer; overflow:hidden;
-  }
-  .chat-tab:hover{ background:rgba(28,26,21,.04); color:var(--text); }
-  .chat-tab.active{ background:var(--accent-soft); color:var(--accent); }
-  .chat-tab-label{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .chat-tab svg{ width:15px; height:15px; flex-shrink:0; }
-  .chat-remove{
-    width:26px; height:26px; flex-shrink:0; border:0; border-radius:7px; background:transparent;
-    color:var(--text-faint); font:18px/1 var(--font-body); cursor:pointer; opacity:0;
-  }
-  .chat-row:hover .chat-remove, .chat-tab.active + .chat-remove{ opacity:1; }
-  .chat-remove:hover{ background:rgba(185,28,28,.1); color:#b91c1c; }
-
-  .sidebar-spacer{ flex:1; }
-
-  /* ===================== Main ===================== */
-  /* ===================== Main Layout ===================== */
-  .main{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    position:relative;
-    overflow:hidden;
-    height:100vh;
+  .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 2px;
   }
 
-  .topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding: 20px 30px;
-    flex-shrink:0;
-    z-index:10;
-  }
-
-  .model-select{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font-family: var(--font-display);
-    font-size:16px;
-    font-weight:500;
-    cursor:pointer;
-    padding: 6px 12px 6px 4px;
-    border-radius:10px;
+  .chat-row {
+    display: flex;
+    align-items: center;
+    position: relative;
+    border-radius: 10px;
     transition: background .15s ease;
   }
-  .model-select:hover{ background: rgba(28,26,21,0.04); }
-  .model-select svg{ width:13px; height:13px; color: var(--text-dim); margin-top:2px; }
+  .chat-row:hover { background: rgba(200, 146, 46, 0.08); }
 
-  .chat-viewport{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    overflow-y:auto;
-    position:relative;
-    padding:0 24px 140px;
-    scroll-behavior:smooth;
-  }
-
-  /* ===================== Hero (Empty state) ===================== */
-  .hero{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    position:relative;
-    min-height:340px;
-    padding:40px 24px 20px;
-    transition: opacity .3s ease;
-  }
-
-  .main.has-chat .hero{
-    display:none !important;
-  }
-
-  .honeycomb{
-    position:absolute;
-    top: 45%;
-    left:50%;
-    transform: translate(-50%, -55%);
-    width: 560px;
-    height:320px;
-    pointer-events:none;
-    opacity:0.45;
-    z-index:0;
-  }
-
-  .hero-inner{
-    position:relative;
-    z-index:1;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    max-width: 720px;
-  }
-
-  .hero-title{
-    font-family: var(--font-display);
-    font-size: 52px;
-    font-weight:500;
-    letter-spacing:-0.01em;
-    text-align:center;
-    line-height:1.08;
-    cursor:default;
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-    gap: 0 16px;
-  }
-  .hero-title .word{
-    display:inline-block;
-    transition: transform .35s cubic-bezier(.2,.8,.2,1), color .35s ease;
-  }
-  .hero-title:hover .word{ color: var(--text-faint); }
-  .hero-title .word:hover{
-    transform: translateY(-9px) rotate(var(--tilt,-2deg));
-    color: var(--accent) !important;
-  }
-  .hero-title .word:nth-child(1){ --tilt:-3deg; }
-  .hero-title .word:nth-child(2){ --tilt:2deg; }
-  .hero-title .word:nth-child(3){ --tilt:-2deg; }
-  .hero-title .word:nth-child(4){ --tilt:3deg; }
-  .hero-title .word:nth-child(5){ --tilt:-1deg; }
-  .hero-title .word:nth-child(6){ --tilt:2deg; }
-
-  .hero-sub{
-    margin-top:18px;
-    font-size:15px;
+  .chat-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--text-dim);
-    text-align:center;
-  }
-  .hero-sub b{ color: var(--text); font-weight:600; }
-
-  /* ===================== Composer Container ===================== */
-  .composer-container{
-    position:absolute;
-    bottom:0;
-    left:0;
-    right:0;
-    padding:16px 24px 24px;
-    background: linear-gradient(to top, var(--bg) 80%, rgba(246,244,238,0));
-    z-index:20;
-    pointer-events:none;
-  }
-
-  .composer-box{
-    pointer-events:auto;
+    cursor: pointer;
+    border: none;
+    background: none;
     width: 100%;
-    max-width: 840px;
+    text-align: left;
+    font-family: var(--font-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color .15s ease;
+  }
+  .chat-tab svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.6; }
+  .chat-tab.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .chat-tab.active svg { opacity: 1; }
+
+  .chat-remove {
+    position: absolute;
+    right: 6px;
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0;
+    transition: all .15s ease;
+  }
+  .chat-row:hover .chat-remove { opacity: 1; }
+  .chat-remove:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+  .sidebar-spacer { flex: 1; }
+
+  /* Pomodoro Banner */
+  .pomodoro-banner {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .pomodoro-banner.visible { display: flex; }
+  .pomo-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-faint); }
+  .pomo-dot.done { background: var(--accent); border-color: var(--accent); }
+
+  .status-indicator {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+  }
+
+  /* ===================== Main Area ===================== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Topbar */
+  .topbar {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    z-index: 10;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sidebar-open-btn {
+    width: 32px; height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-dim);
+    display: none; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .app.sidebar-collapsed .sidebar-open-btn { display: flex; }
+  .sidebar-open-btn:hover { border-color: var(--border-strong); color: var(--text); }
+  .sidebar-open-btn svg { width: 16px; height: 16px; }
+
+  .model-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-dim);
+    box-shadow: var(--shadow-sm);
+  }
+  .model-pill-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .topbar-btn:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .topbar-btn.primary {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .topbar-btn.primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  /* Chat Viewport */
+  .chat-viewport {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px 160px;
+    position: relative;
+    scroll-behavior: smooth;
+  }
+
+  /* Hero Welcome */
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin: auto 0;
+    padding: 30px 16px;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .main.has-chat .hero { display: none; }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(200, 146, 46, 0.25);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 12px;
+    max-width: 620px;
+  }
+  .hero-title span { color: var(--accent); }
+
+  .hero-sub {
+    font-size: 15px;
+    color: var(--text-dim);
+    max-width: 480px;
+    line-height: 1.55;
+    margin-bottom: 28px;
+  }
+
+  /* Quick Suggestion Chips */
+  .hero-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    max-width: 680px;
+  }
+
+  .hero-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 15px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .hero-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background: var(--accent-soft);
+  }
+  .hero-chip svg { width: 15px; height: 15px; }
+
+  /* Messages Stream */
+  .messages {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 820px;
     margin: 0 auto;
+  }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    animation: rise .3s ease both;
+    width: 100%;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .msg.user {
+    align-self: flex-end;
+    align-items: flex-end;
+    max-width: 78%;
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    align-items: flex-start;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .bubble {
+    padding: 14px 18px;
+    border-radius: 18px;
+    font-size: 14.5px;
+    line-height: 1.65;
+    word-break: break-word;
+    position: relative;
+  }
+
+  .msg.user .bubble {
+    background: var(--accent);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(200, 146, 46, 0.22);
+  }
+
+  .msg.assistant .bubble {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+    box-shadow: var(--shadow-sm);
+    padding: 18px 22px;
+    width: 100%;
+  }
+
+  /* Markdown formatting inside assistant bubble */
+  .bubble h1, .bubble h2, .bubble h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    margin: 14px 0 8px;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .bubble h1 { font-size: 18px; }
+  .bubble h2 { font-size: 16px; color: var(--accent-ink); }
+  .bubble h3 { font-size: 14.5px; }
+  .bubble p { margin: 7px 0; }
+  .bubble p:first-child { margin-top: 0; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { margin: 8px 0 8px 20px; }
+  .bubble li { margin: 4px 0; line-height: 1.55; }
+  .bubble strong { font-weight: 600; color: var(--text); }
+  .bubble em { font-style: italic; }
+  .bubble code {
+    background: var(--accent-soft);
+    border: 1px solid rgba(200, 146, 46, 0.2);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--accent);
+  }
+  .bubble pre {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  .bubble pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text);
+    font-size: 13px;
+  }
+  .bubble blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+    margin: 10px 0;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .bubble table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 13.5px;
+  }
+  .bubble th, .bubble td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .bubble th { background: var(--bg-sidebar); font-weight: 600; }
+
+  /* Actions bar below assistant message */
+  .msg-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 0 4px;
+  }
+
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .copy-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .copy-btn.copied {
+    background: #22c55e22;
+    border-color: #22c55e;
+    color: #22c55e;
+  }
+
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .tool-badge {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(200, 146, 46, 0.3);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .typing {
+    display: flex;
+    gap: 5px;
+    padding: 14px 18px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    animation: bounce 1.1s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+  /* ===================== Floating Composer ===================== */
+  .composer-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 820px;
+    z-index: 30;
+  }
+
+  .composer-box {
     background: var(--bg-elevated);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
-    box-shadow: 0 20px 46px -18px rgba(28,26,21,0.22);
-    padding: 18px 20px 12px;
-    transition: border-color .15s ease, box-shadow .2s ease;
+    padding: 10px 14px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .composer-box:focus-within{
+  .composer-box:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 22px 50px -16px rgba(200,146,46,0.25);
+    box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-md);
   }
 
-  .composer-box textarea{
-    width:100%;
-    border:none;
-    outline:none;
-    resize:none;
-    background:none;
-    font-family: var(--font-body);
-    font-size:15px;
-    color: var(--text);
-    line-height:1.5;
-    max-height:140px;
-    min-height:26px;
-  }
-  .composer-box textarea::placeholder{ color: var(--text-faint); }
-
-  .composer-tools{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    margin-top:12px;
-  }
-
-  .tools-left{ display:flex; align-items:center; gap:6px; }
-
-  .attachment-preview{
-    display:none;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin:0 0 12px;
-    padding:9px 10px 9px 12px;
-    border:1px solid rgba(200,146,46,.38);
-    border-radius:11px;
-    background:var(--accent-soft);
-    color:var(--text);
-    font-size:13px;
-  }
-
-  .sidebar-open-btn{
-    display:none; width:32px; height:32px; border:1px solid var(--border); border-radius:9px;
-    background:var(--bg-elevated); color:var(--text-dim); align-items:center; justify-content:center;
-    cursor:pointer; margin-right:10px;
-  }
-  .sidebar-open-btn:hover{ border-color:var(--border-strong); color:var(--text); }
-  .sidebar-open-btn svg{ width:15px; height:15px; }
-  .app.sidebar-collapsed .sidebar-open-btn{ display:flex; }
-  .topbar-left{ display:flex; align-items:center; }
-  .attachment-preview.visible{ display:flex; }
-  .attachment-info{ min-width:0; display:flex; align-items:center; gap:8px; }
-  .attachment-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
-  .attachment-size{ color:var(--text-dim); font-family:var(--font-mono); font-size:10px; white-space:nowrap; }
-  .attachment-remove{ width:25px; height:25px; border:0; border-radius:8px; background:transparent; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; }
-  .attachment-remove:hover{ color:#b8453f; background:rgba(184,69,63,.1); }
-  .composer-box.drag-over{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(200,146,46,.14); }
-  .file-input{ display:none; }
-
-  .tool-btn{
-    width:32px; height:32px;
-    border-radius:9px;
-    border:1px solid var(--border);
-    background:transparent;
-    color: var(--text-dim);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    transition: border-color .15s ease, color .15s ease, background .15s ease;
-  }
-  .tool-btn:hover{ border-color: var(--border-strong); color:var(--text); background: rgba(28,26,21,0.03); }
-  .tool-btn.on{ background: var(--accent-soft); border-color: transparent; color: var(--accent); }
-  .tool-btn svg{ width:15px; height:15px; }
-
-  .tools-right{ display:flex; align-items:center; gap:8px; }
-
-  .mic-btn{
-    width:34px; height:34px;
-    border-radius:50%;
-    border:none;
+  .attachment-preview {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
     background: var(--accent-soft);
+    border: 1px solid rgba(200, 146, 46, 0.3);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
     color: var(--accent);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    transition: transform .15s ease, background .15s ease;
   }
-  .mic-btn:hover{ transform: scale(1.06); background: var(--accent); color:#fff; }
-  .mic-btn svg{ width:15px; height:15px; }
-
-  .send-btn{
-    width:34px; height:34px;
-    border-radius:50%;
-    border:none;
-    background: var(--text);
-    color:#fff;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    transition: transform .15s ease, background .15s ease;
-  }
-  .send-btn:hover{ transform: scale(1.06); background: var(--accent-ink); }
-  .send-btn svg{ width:14px; height:14px; }
-
-  /* ===================== Voice overlay ===================== */
-  .voice-overlay{
-    position:absolute;
-    inset:0;
-    background: radial-gradient(ellipse 100% 65% at 50% 28%, #fbf3e3 0%, #f6f4ee 68%);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:space-between;
-    padding: 34px 40px 44px;
-    opacity:0;
-    pointer-events:none;
-    transform: translateY(14px);
-    transition: opacity .4s ease, transform .4s ease;
-    z-index: 30;
-  }
-  .voice-overlay.active{ opacity:1; pointer-events:all; transform:translateY(0); }
-
-  .voice-top{ display:flex; align-items:center; justify-content:space-between; width:100%; }
-
-  .voice-status{
-    font-family: var(--font-mono);
-    font-size:11px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color: var(--text-dim);
-    display:flex; align-items:center; gap:7px;
-  }
-  .voice-status .dot{ width:6px; height:6px; border-radius:50%; background: var(--accent); animation: pulse-dot 1.4s infinite ease-in-out; }
-  @keyframes pulse-dot{ 0%,100%{opacity:.35;} 50%{opacity:1;} }
-
-  .voice-timer{ font-family: var(--font-mono); font-size:11px; color: var(--text-faint); }
-
-  .orb-wrap{
-    position:relative;
-    width:230px; height:230px;
-    display:flex; align-items:center; justify-content:center;
+  .attachment-preview.visible { display: flex; }
+  .attachment-remove {
+    background: none; border: none; font-size: 16px; cursor: pointer; color: var(--accent);
   }
 
-  .hex-ring{
-    position:absolute;
-    width:100%; height:100%;
-    opacity:0;
-  }
-  .hex-ring svg{ width:100%; height:100%; }
-  .hex-ring.h1{ animation: hex-pulse 3s infinite ease-out; }
-  .hex-ring.h2{ animation: hex-pulse 3s infinite ease-out 1s; }
-  .hex-ring.h3{ animation: hex-pulse 3s infinite ease-out 2s; }
-  @keyframes hex-pulse{
-    0%{ transform: scale(0.55) rotate(0deg); opacity:0; }
-    30%{ opacity:.5; }
-    100%{ transform: scale(1.18) rotate(14deg); opacity:0; }
-  }
-
-  .orb-core{
-    width:136px; height:136px;
-    border-radius:38% 42% 40% 40%/ 46% 40% 44% 40%;
-    background: radial-gradient(circle at 35% 30%, #ffe1a6, var(--accent) 48%, #9a6a1a 100%);
-    box-shadow: 0 0 60px 8px rgba(200,146,46,0.3), inset 0 -10px 22px rgba(0,0,0,0.18);
-    display:flex; align-items:center; justify-content:center;
-    gap:4px;
-    transition: filter .3s ease, border-radius .6s ease;
-  }
-  .app[data-voice="thinking"] .orb-core{ filter: saturate(.55) brightness(1.02); }
-
-  .bar{
-    width:4px; border-radius:3px;
-    background: rgba(40,26,4,0.55);
-    height:14px;
-  }
-  .app[data-voice="listening"] .bar, .app[data-voice="speaking"] .bar{ animation: bar-bounce 1s infinite ease-in-out; }
-  .app[data-voice="thinking"] .bar{ height:6px !important; opacity:.5; }
-  .bar:nth-child(1){ animation-delay:0s; }
-  .bar:nth-child(2){ animation-delay:.12s; }
-  .bar:nth-child(3){ animation-delay:.24s; }
-  .bar:nth-child(4){ animation-delay:.36s; }
-  .bar:nth-child(5){ animation-delay:.48s; }
-  @keyframes bar-bounce{ 0%,100%{ height:12px;} 50%{ height:38px;} }
-
-  .voice-caption{
-    font-family: var(--font-display);
-    font-size:21px;
-    font-weight:500;
+  #inputField {
+    width: 100%;
+    min-height: 44px;
+    max-height: 140px;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--font-body);
+    font-size: 14.5px;
     color: var(--text);
-    text-align:center;
-    min-height:28px;
+    resize: none;
+    line-height: 1.5;
+    padding: 4px 0;
   }
-  .voice-sub{
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--text-faint);
-    margin-top:6px;
-    text-align:center;
+  #inputField::placeholder { color: var(--text-faint); }
+
+  .composer-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
   }
 
-  .voice-bottom{ display:flex; align-items:center; gap:26px; }
-  .voice-ctrl{
-    width:52px; height:52px;
-    border-radius:50%;
-    border:1px solid var(--border-strong);
-    background: var(--bg-elevated);
+  .tools-left, .tools-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tool-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
     color: var(--text-dim);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    transition: transform .15s ease, background .15s ease, color .15s ease;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .15s ease;
   }
-  .voice-ctrl:hover{ transform: scale(1.06); color: var(--text); }
-  .voice-ctrl svg{ width:18px; height:18px; }
+  .tool-btn:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+  .tool-btn svg { width: 16px; height: 16px; }
+  .file-input { display: none; }
 
-  .voice-ctrl.end{ width:60px; height:60px; background:#c0433f; border:none; color:#fff; }
-  .voice-ctrl.end:hover{ background:#d0524d; }
-  .voice-ctrl.end svg{ width:20px; height:20px; }
+  .mic-btn {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .mic-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .mic-btn svg { width: 16px; height: 16px; }
 
-  .voice-ctrl.muted{ background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .send-btn {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #ffffff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(200, 146, 46, 0.3);
+    transition: all .2s ease;
+  }
+  .send-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.04);
+  }
+  .send-btn svg { width: 16px; height: 16px; }
 
-  /* ===================== Loader ===================== */
+  /* Toast */
+  .toast {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-70px);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    transition: transform .35s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 40;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  
+  /* ===================== Loader Animation (Preserved 100%) ===================== */
   .loader-screen{
     position:fixed;
     inset:0;
@@ -665,62 +926,11 @@
     66%{ opacity: 0.25; }
     to{ transform: translateY(-50px) translate(-100px); opacity: 0; }
   }
-  /* Added CSS for messages and bubbles */
-  .messages { display:flex; flex-direction:column; gap:24px; width: 100%; max-width: 840px; margin: 0 auto; padding: 20px 0 160px; }
-  .msg { display:flex; flex-direction:column; animation:rise .3s ease both; width:100%; }
-  @keyframes rise { from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
-  .msg.user { align-self:flex-end; align-items:flex-end; max-width:78%; }
-  .msg.assistant { align-self:flex-start; align-items:flex-start; max-width:100%; width:100%; }
-  .bubble { padding:14px 18px; border-radius:20px; font-size:15px; line-height:1.65; word-break:break-word; }
-  .msg.user .bubble { background:#c8922e; color:#fff; border-bottom-right-radius:4px; font-weight: 500; box-shadow: 0 4px 16px rgba(200,146,46,0.25); }
-  .msg.assistant .bubble { background:var(--bg-elevated); border:1px solid var(--border-strong); color:var(--text); border-bottom-left-radius:4px; box-shadow: 0 6px 20px -6px rgba(28,26,21,0.06); padding:18px 22px; width:100%; }
-  .meta { font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin-top:6px; padding:0 4px; }
-  .tool-badge { font-family:var(--font-mono); font-size:10px; background:var(--accent-soft); border:1px solid rgba(200,146,46,0.3); color:var(--accent); border-radius:6px; padding:3px 8px; margin-top:6px; display:inline-block; }
-  .typing { display:flex; gap:5px; padding:14px 18px; background:var(--bg-elevated); border:1px solid var(--border-strong); border-radius:20px; border-bottom-left-radius:4px; width:fit-content; }
-  .typing span { width:6px; height:6px; border-radius:50%; background:var(--text-dim); animation:bounce 1.1s infinite ease-in-out; }
-  .typing span:nth-child(2) { animation-delay:.15s; }
-  .typing span:nth-child(3) { animation-delay:.3s; }
-  
-  .bubble h1, .bubble h2, .bubble h3 { font-family:var(--font-display); font-weight:600; margin:12px 0 6px; line-height:1.3; }
-  .bubble h1 { font-size:17px; }
-  .bubble h2 { font-size:15px; color:var(--accent-ink); }
-  .bubble h3 { font-size:14px; color:var(--text-dim); }
-  .bubble p { margin:6px 0; }
-  .bubble p:first-child { margin-top:0; }
-  .bubble p:last-child { margin-bottom:0; }
-  .bubble ul, .bubble ol { margin:6px 0 6px 18px; }
-  .bubble li { margin:3px 0; line-height:1.55; }
-  .bubble strong { color:var(--accent-ink); font-weight:600; }
-  .bubble em { color:var(--text-dim); font-style:italic; }
-  .bubble code { background:rgba(28,26,21,0.04); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-family:var(--font-mono); font-size:13px; color:var(--accent); }
-  .bubble pre { background:rgba(28,26,21,0.03); border:1px solid var(--border); border-radius:10px; padding:12px; overflow-x:auto; margin:8px 0; }
-  .bubble pre code { background:none; border:none; padding:0; color:var(--text); }
-  .bubble blockquote { border-left:3px solid var(--accent); padding-left:12px; margin:8px 0; color:var(--text-dim); font-style:italic; }
-  .bubble hr { border:none; border-top:1px solid var(--border); margin:10px 0; }
-  .bubble a { color:var(--accent); text-decoration:underline; text-underline-offset:2px; }
 
-  /* Pomodoro and Toast */
-  .pomodoro-banner { display: none; flex-direction: column; gap: 5px; background: var(--bg-elevated); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-md); margin-bottom: 12px; }
-  .pomodoro-banner.visible { display: flex; }
-  .pomo-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--text-faint); }
-  .pomo-dot.done { background: var(--accent); border-color: var(--accent); }
-  .toast { position: absolute; top: 16px; left: 50%; transform: translateX(-50%) translateY(-70px); background: var(--accent-soft); border: 1px solid var(--accent); color: var(--accent); padding: 8px 16px; border-radius: 20px; font-family: var(--font-mono); font-size: 12px; transition: transform .35s ease; z-index: 30; white-space: nowrap; pointer-events: none; }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .pomo-notify { position: absolute; inset: 0; z-index: 40; background: rgba(246,244,238,0.7); backdrop-filter: blur(6px); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; animation: fadeIn .3s ease; }
-  .pomo-notify.show { display: flex; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  .pomo-notify-card { background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 32px 36px; text-align: center; max-width: 320px; box-shadow: 0 20px 46px -18px rgba(28,26,21,0.24); }
-  .pomo-notify-icon { font-size: 48px; margin-bottom: 12px; }
-  .pomo-notify-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
-  .pomo-notify-sub { font-family: var(--font-body); font-size: 14px; color: var(--text-dim); margin-bottom: 20px; }
-  .pomo-notify-btn { padding: 10px 24px; border-radius: 12px; border: none; background: var(--accent); color: #fff; font-family: var(--font-display); font-size: 14px; font-weight: 600; cursor: pointer; transition: transform .15s; }
-  .pomo-notify-btn:hover { transform: scale(1.03); }
-  .pomo-notify-btn.secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text-dim); margin-left: 8px; }
-  .voice-transcript { display: none !important; }
-  .stt-badge { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); background: rgba(28,26,21,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; margin-top: 6px; display: inline-block; }
 </style>
 </head>
 <body>
+
 <div class="loader-screen" id="loaderScreen">
   <div class="loader-quad tl"></div>
   <div class="loader-quad tr"></div>
@@ -803,8 +1013,8 @@
       <div class="logo">
         <div class="logo-mark">
           <svg viewBox="0 0 28 28" fill="none">
-            <path d="M14 2 L25 8 V20 L14 26 L3 20 V8 Z" stroke="#1c1a15" stroke-width="1.6" stroke-linejoin="round"/>
-            <path d="M14 2 V26 M3 8 L25 20 M25 8 L3 20" stroke="#c8922e" stroke-width="1.1" stroke-linejoin="round"/>
+            <path d="M14 2 L25 8 V20 L14 26 L3 20 V8 Z" stroke="var(--text)" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M14 2 V26 M3 8 L25 20 M25 8 L3 20" stroke="var(--accent)" stroke-width="1.1" stroke-linejoin="round"/>
           </svg>
         </div>
         <span class="logo-name">Hachi</span>
@@ -814,60 +1024,63 @@
       </button>
     </div>
 
-    <div class="nav-group" id="chatList" aria-label="Chats">
-    </div>
-
-    <button class="side-action" type="button" onclick="newChat()">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      New Chat
+    <button class="new-chat-btn" type="button" onclick="newChat()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>New Chat</span>
     </button>
 
-    <button class="side-action" type="button" onclick="openSmartHomeSimulator()" style="margin-top:6px;" title="Open Smart Home">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Smart Home
-    </button>
+    <div class="nav-group" id="chatList" aria-label="Chats"></div>
 
     <div class="sidebar-spacer"></div>
-    
-    <!-- Pomodoro Banner (in sidebar bottom) -->
+
+    <!-- Pomodoro Banner -->
     <div class="pomodoro-banner" id="pomodoroBanner">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span id="pomoLabel" style="font-size:10px; font-weight:600; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.06em;">Work Session</span>
-            <span id="pomoIcon">🍅</span>
-        </div>
-        <div id="pomoTimer" style="font-family:var(--font-display); font-size:24px; font-weight:600; color:var(--accent);">25:00</div>
-        <div class="pomo-sessions" id="pomoSessions" style="display:flex; gap:4px; margin-top:2px;">
-            <span class="pomo-dot" id="pd1"></span>
-            <span class="pomo-dot" id="pd2"></span>
-            <span class="pomo-dot" id="pd3"></span>
-            <span class="pomo-dot" id="pd4"></span>
-        </div>
-        <div style="display:flex; gap:6px; margin-top:8px;">
-            <button id="pomoPauseBtn" onclick="togglePomodoro()" style="flex:1; padding:4px 0; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font-family:var(--font-mono); font-size:11px; cursor:pointer;">⏸ Pause</button>
-            <button id="pomoStopBtn" onclick="stopPomodoro()" style="flex:1; padding:4px 0; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font-family:var(--font-mono); font-size:11px; cursor:pointer;">✕ Stop</button>
-        </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="pomoLabel" style="font-size:10.5px; font-weight:600; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.06em;">Focus Session</span>
+        <span id="pomoIcon">🍅</span>
+      </div>
+      <div id="pomoTimer" style="font-family:var(--font-display); font-size:24px; font-weight:600; color:var(--accent);">25:00</div>
+      <div class="pomo-sessions" id="pomoSessions" style="display:flex; gap:4px; margin-top:2px;">
+        <span class="pomo-dot" id="pd1"></span>
+        <span class="pomo-dot" id="pd2"></span>
+        <span class="pomo-dot" id="pd3"></span>
+        <span class="pomo-dot" id="pd4"></span>
+      </div>
+      <div style="display:flex; gap:6px; margin-top:8px;">
+        <button id="pomoPauseBtn" onclick="togglePomodoro()" style="flex:1; padding:5px 0; border-radius:8px; border:1px solid var(--border); background:var(--bg-sidebar); color:var(--text-dim); font-family:var(--font-mono); font-size:11px; cursor:pointer;">⏸ Pause</button>
+        <button id="pomoStopBtn" onclick="stopPomodoro()" style="flex:1; padding:5px 0; border-radius:8px; border:1px solid var(--border); background:var(--bg-sidebar); color:var(--text-dim); font-family:var(--font-mono); font-size:11px; cursor:pointer;">✕ Stop</button>
+      </div>
     </div>
 
-    <div class="status-indicator" style="font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; gap:6px; color:var(--text-dim); padding: 0 10px;">
-      <span class="status-dot" id="micDot" style="width:6px;height:6px;border-radius:50%;background:#f87171; box-shadow: 0 0 8px #f87171;"></span>
+    <div class="status-indicator">
+      <span class="status-dot" id="micDot"></span>
       <span id="micStatus">mic...</span>
     </div>
   </aside>
 
-  <!-- Main -->
+  <!-- Main Container -->
   <div class="main" id="mainContainer">
+    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-left">
         <button class="sidebar-open-btn" id="sidebarOpenBtn" type="button" title="Open sidebar" aria-label="Open sidebar" onclick="toggleSidebar()">
           <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.6"/></svg>
         </button>
-        <div class="model-select">
-        <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;margin-right:6px;"><path d="M12 3v6M12 15v6M4.2 7l5.2 3M14.6 14l5.2 3M4.2 17l5.2-3M14.6 10l5.2-3" stroke="currentColor" stroke-width="2"/></svg>
-        Hachi 1.0
+        <div class="model-pill">
+          <span class="model-pill-dot"></span>
+          <span>Hachi 1.0 (Master)</span>
         </div>
       </div>
       <div class="topbar-right">
-        <button class="smart-home-nav-btn" id="smartHomeBtn" type="button" title="Open Smart Home" onclick="openSmartHomeSimulator()" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated,#fff);color:var(--text);font-family:var(--font-display);font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:all .2s ease;">
+        <button class="topbar-btn" id="themeToggleBtn" type="button" title="Toggle theme" onclick="toggleTheme()">
+          <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="themeLabel">Dark</span>
+        </button>
+        <button class="topbar-btn" type="button" title="Clear chat history" onclick="clearChat()">
+          <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Clear</span>
+        </button>
+        <button class="topbar-btn primary" id="smartHomeBtn" type="button" title="Open Smart Home Simulator" onclick="openSmartHomeSimulator()">
           <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Smart Home</span>
         </button>
@@ -876,39 +1089,46 @@
 
     <!-- Scrollable Chat Viewport -->
     <div class="chat-viewport" id="chatViewport">
+      <!-- Hero Welcome Screen -->
       <div class="hero" id="heroSection">
-        <svg class="honeycomb" viewBox="0 0 560 320" fill="none">
-          <g stroke="#1c1a15" stroke-width="1" opacity="0.5">
-            <path d="M180 40 L230 68 L230 124 L180 152 L130 124 L130 68 Z"/>
-            <path d="M280 20 L330 48 L330 104 L280 132 L230 104 L230 48 Z"/>
-            <path d="M380 40 L430 68 L430 124 L380 152 L330 124 L330 68 Z"/>
-            <path d="M230 124 L280 152 L280 208 L230 236 L180 208 L180 152 Z"/>
-            <path d="M330 124 L380 152 L380 208 L330 236 L280 208 L280 152 Z"/>
-          </g>
-        </svg>
-
-        <div class="hero-inner">
-          <h1 class="hero-title" id="heroTitle"></h1>
-          <p class="hero-sub">Interact with <b>Hachi</b> and explore the boundless creative world</p>
+        <div class="hero-badge">AI Assistant & Desktop Brain</div>
+        <h1 class="hero-title">What can I do for you <span>today</span>?</h1>
+        <p class="hero-sub">Control your smart home, search the web, manage focus routines, or chat naturally with Hachi.</p>
+        
+        <div class="hero-chips">
+          <button class="hero-chip" onclick="quickPrompt('What is the weather today?')">
+            <span>🌤️</span> What's the weather today?
+          </button>
+          <button class="hero-chip" onclick="quickPrompt('Is the front door locked?')">
+            <span>🏡</span> Is the front door locked?
+          </button>
+          <button class="hero-chip" onclick="quickPrompt('Start a 25-minute Pomodoro focus session')">
+            <span>⏱️</span> Start 25-min Pomodoro
+          </button>
+          <button class="hero-chip" onclick="quickPrompt('Check system memory and CPU stats')">
+            <span>💻</span> Check system stats
+          </button>
         </div>
       </div>
 
-      <!-- Messages -->
+      <!-- Messages Stream -->
       <div class="messages" id="messages"></div>
     </div>
 
-    <!-- Fixed Composer at Bottom -->
+    <!-- Fixed Floating Composer -->
     <div class="composer-container">
       <div class="composer-box" id="composerBox">
         <div class="attachment-preview" id="attachmentPreview">
-          <div class="attachment-info">
-            <span aria-hidden="true" id="attachmentType">PDF</span>
+          <div class="attachment-info" style="display:flex; align-items:center; gap:8px;">
+            <span aria-hidden="true" id="attachmentType" style="font-weight:700;">PDF</span>
             <span class="attachment-name" id="attachmentName"></span>
-            <span class="attachment-size" id="attachmentSize"></span>
+            <span class="attachment-size" id="attachmentSize" style="opacity:0.7;"></span>
           </div>
           <button class="attachment-remove" type="button" title="Remove attachment" onclick="removePdfAttachment()">×</button>
         </div>
-        <textarea id="inputField" placeholder="Ask Hachi to build something..." rows="1" onkeydown="handleKey(event)"></textarea>
+
+        <textarea id="inputField" placeholder="Ask Hachi to search, control devices, or write code..." rows="1" onkeydown="handleKey(event)"></textarea>
+
         <div class="composer-tools">
           <div class="tools-left">
             <input class="file-input" id="pdfFileInput" type="file" accept="application/pdf,.pdf,audio/*,.wav,.mp3,.m4a,.ogg,.webm,.mp4,.flac" onchange="selectAttachment(event)">
@@ -927,2018 +1147,504 @@
         </div>
       </div>
     </div>
-
-    <!-- Voice overlay -->
-    <div class="voice-overlay" id="voiceOverlay">
-      <div class="voice-top">
-        <div class="voice-status"><span class="dot" id="voiceDot"></span><span id="voiceStatusText">Listening</span></div>
-        <div class="voice-timer" id="voiceTimer">00:00</div>
-      </div>
-
-      <div style="display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width: 400px;">
-        <div class="orb-wrap" id="voiceOrb" onclick="handleVoiceOrbTap()" title="Tap to interrupt while Hachi is speaking">
-          <div class="hex-ring h1"><svg viewBox="0 0 100 100"><path d="M50 4 L90 27 V73 L50 96 L10 73 V27 Z" stroke="#c8922e" stroke-width="1.3" fill="none"/></svg></div>
-          <div class="hex-ring h2"><svg viewBox="0 0 100 100"><path d="M50 4 L90 27 V73 L50 96 L10 73 V27 Z" stroke="#c8922e" stroke-width="1.3" fill="none"/></svg></div>
-          <div class="hex-ring h3"><svg viewBox="0 0 100 100"><path d="M50 4 L90 27 V73 L50 96 L10 73 V27 Z" stroke="#c8922e" stroke-width="1.3" fill="none"/></svg></div>
-          <div class="orb-core">
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-          </div>
-        </div>
-
-        <div class="voice-transcript" id="voiceTranscript">Speak whenever you're ready…</div>
-
-        <div>
-          <div class="voice-caption" id="voiceCaption">Listening…</div>
-          <div class="voice-sub" id="voiceSub">Speak whenever you're ready</div>
-          <div style="text-align:center"><span class="stt-badge" id="sttBadge">🎤 Web Speech API</span></div>
-        </div>
-      </div>
-
-      <div class="voice-bottom">
-        <button class="voice-ctrl" id="muteBtn" title="Mute" onclick="toggleMute()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" stroke-width="1.8"/><path d="M19 11a7 7 0 01-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </button>
-        <button class="voice-ctrl end" title="End voice mode" onclick="closeVoice()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-        </button>
-        <button class="voice-ctrl" title="Switch to text" onclick="closeVoice()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
   </div>
 </div>
 
-<!-- Wake-word toast notification -->
 <div class="toast" id="wakeToast">🎤 Hey Hachi detected!</div>
-
-<!-- Pomodoro session complete notification -->
-<div class="pomo-notify" id="pomoNotify">
-    <div class="pomo-notify-card">
-        <div class="pomo-notify-icon" id="pomoNotifyIcon">🍅</div>
-        <div class="pomo-notify-title" id="pomoNotifyTitle">Session Complete!</div>
-        <div class="pomo-notify-sub" id="pomoNotifyMsg">Great work! Time for a 5-minute break.</div>
-        <div>
-            <button class="pomo-notify-btn" id="pomoNotifyAction" onclick="pomoNextAction()">Start Break ☕</button>
-            <button class="pomo-notify-btn secondary" onclick="stopPomodoro()">Stop</button>
-        </div>
-    </div>
-</div>
 
 <script>
 // ============================================================
-// DOM refs
+// Core State & Elements
 // ============================================================
-const appEl        = document.getElementById('appEl');
-const overlay      = document.getElementById('voiceOverlay');
-const caption      = document.getElementById('voiceCaption');
-const sub          = document.getElementById('voiceSub');
-const statusTxt    = document.getElementById('voiceStatusText');
-const voiceDot     = document.getElementById('voiceDot');
-const timerEl      = document.getElementById('voiceTimer');
-const muteBtn      = document.getElementById('muteBtn');
-const micBtn       = document.getElementById('micBtn');
-const msgBox       = document.getElementById('messages');
-const inputEl      = document.getElementById('inputField');
-const composerBox  = document.getElementById('composerBox');
+const appEl = document.getElementById('appEl');
+const msgBox = document.getElementById('messages');
+const inputEl = document.getElementById('inputField');
+const composerBox = document.getElementById('composerBox');
 const pdfFileInput = document.getElementById('pdfFileInput');
 const attachmentPreview = document.getElementById('attachmentPreview');
 const attachmentName = document.getElementById('attachmentName');
 const attachmentSize = document.getElementById('attachmentSize');
 const attachmentType = document.getElementById('attachmentType');
-const toast        = document.getElementById('wakeToast');
-const transcriptEl = document.getElementById('voiceTranscript');
-const sttBadge     = document.getElementById('sttBadge');
-const chatListEl   = document.getElementById('chatList');
+const toast = document.getElementById('wakeToast');
+const chatListEl = document.getElementById('chatList');
+const themeLabel = document.getElementById('themeLabel');
 
-// ============================================================
-// App state
-// ============================================================
-let currentMode   = 'default';
-let voiceActive   = false;
-let isMuted       = false;
-let attachedPdf   = null;
-let attachedKind  = '';
-let voiceSeconds  = 0;
-let timerInterval = null;
-let wakewordPoll  = null;
+let currentMode = 'default';
+let attachedPdf = null;
+let attachedKind = '';
 let chats = [];
 let activeChatId = '';
 let chatIsStreaming = false;
-const CHAT_STORAGE_KEY = 'hachi.chatTabs.v1';
+let smartHomeBrowserPopup = null;
+const CHAT_STORAGE_KEY = 'hachi.chatTabs.v2';
+
+// Theme Management (Light mode default)
+function initTheme() {
+  const saved = localStorage.getItem('hachi.theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  if (themeLabel) themeLabel.textContent = saved === 'dark' ? 'Light' : 'Dark';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('hachi.theme', next);
+  if (themeLabel) themeLabel.textContent = next === 'dark' ? 'Light' : 'Dark';
+}
+initTheme();
 
 function makeChatId() {
-    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
-
 function persistChats() {
-    try { localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({ chats, activeChatId })); } catch (_) {}
+  try { localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({ chats, activeChatId })); } catch (_) {}
 }
-
-function activeChat() { return chats.find(chat => chat.id === activeChatId); }
+function activeChat() { return chats.find(c => c.id === activeChatId); }
 
 function saveActiveChat() {
-    const chat = activeChat();
-    if (!chat) return;
-    chat.messagesHtml = msgBox.innerHTML;
-    chat.hasMessages = msgBox.children.length > 0;
-    chat.mode = currentMode;
-    persistChats();
+  const chat = activeChat();
+  if (!chat) return;
+  chat.messagesHtml = msgBox.innerHTML;
+  chat.hasMessages = msgBox.children.length > 0;
+  chat.mode = currentMode;
+  persistChats();
 }
 
 function renderChatList() {
-    if (!chatListEl) return;
-    chatListEl.innerHTML = '';
-    chats.forEach((chat) => {
-        const row = document.createElement('div');
-        row.className = 'chat-row';
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `chat-tab${chat.id === activeChatId ? ' active' : ''}`;
-        button.title = chat.title;
-        button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 11-3.2-6.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8 12h6M8 9h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
-        const label = document.createElement('span');
-        label.className = 'chat-tab-label';
-        label.textContent = chat.title;
-        button.appendChild(label);
-        button.addEventListener('click', () => switchChat(chat.id));
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'chat-remove';
-        remove.title = `Remove ${chat.title}`;
-        remove.setAttribute('aria-label', `Remove ${chat.title}`);
-        remove.textContent = '×';
-        remove.addEventListener('click', () => removeChat(chat.id));
-        row.append(button, remove);
-        chatListEl.appendChild(row);
-    });
+  if (!chatListEl) return;
+  chatListEl.innerHTML = '';
+  chats.forEach((chat) => {
+    const row = document.createElement('div');
+    row.className = 'chat-row';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `chat-tab${chat.id === activeChatId ? ' active' : ''}`;
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 11-3.2-6.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8 12h6M8 9h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>' + (chat.title || 'Chat') + '</span>';
+    button.addEventListener('click', () => switchChat(chat.id));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'chat-remove';
+    remove.textContent = '×';
+    remove.addEventListener('click', (e) => { e.stopPropagation(); removeChat(chat.id); });
+    row.append(button, remove);
+    chatListEl.appendChild(row);
+  });
 }
 
 function restoreActiveChat() {
-    const chat = activeChat();
-    if (!chat) return;
-    msgBox.innerHTML = chat.messagesHtml || '';
-    currentMode = chat.mode || 'default';
-    const mainEl = document.getElementById('mainContainer');
-    if (mainEl) mainEl.classList.toggle('has-chat', Boolean(chat.hasMessages));
-    renderChatList();
-    scrollToBottom();
+  const chat = activeChat();
+  if (!chat) return;
+  msgBox.innerHTML = chat.messagesHtml || '';
+  currentMode = chat.mode || 'default';
+  const mainEl = document.getElementById('mainContainer');
+  if (mainEl) mainEl.classList.toggle('has-chat', Boolean(chat.hasMessages));
+  renderChatList();
+  scrollToBottom();
 }
 
 function switchChat(chatId) {
-    if (chatId === activeChatId || chatIsStreaming) return;
-    saveActiveChat();
-    activeChatId = chatId;
-    restoreActiveChat();
-    inputEl.focus();
+  if (chatId === activeChatId || chatIsStreaming) return;
+  saveActiveChat();
+  activeChatId = chatId;
+  restoreActiveChat();
+  inputEl.focus();
 }
 
 function newChat() {
-    if (chatIsStreaming) return;
-    saveActiveChat();
-    const number = chats.length + 1;
-    const chat = { id: makeChatId(), title: number === 1 ? 'Chat' : `New Chat ${number}`, messagesHtml: '', hasMessages: false, mode: 'default' };
-    chats.push(chat);
-    activeChatId = chat.id;
-    restoreActiveChat();
-    persistChats();
-    inputEl.focus();
+  if (chatIsStreaming) return;
+  saveActiveChat();
+  const num = chats.length + 1;
+  const chat = { id: makeChatId(), title: num === 1 ? 'General Chat' : `Chat ${num}`, messagesHtml: '', hasMessages: false, mode: 'default' };
+  chats.push(chat);
+  activeChatId = chat.id;
+  restoreActiveChat();
+  persistChats();
+  inputEl.focus();
 }
 
 function removeChat(chatId) {
-    if (chatIsStreaming) return;
-    const index = chats.findIndex(chat => chat.id === chatId);
-    if (index < 0) return;
-    const wasActive = chatId === activeChatId;
-    chats.splice(index, 1);
-    if (!chats.length) {
-        chats = [{ id: makeChatId(), title: 'Chat', messagesHtml: '', hasMessages: false, mode: 'default' }];
-    }
-    if (wasActive) activeChatId = chats[Math.min(index, chats.length - 1)].id;
-    persistChats();
-    if (wasActive) restoreActiveChat();
-    else renderChatList();
-}
-
-let smartHomeBrowserPopup = null;
-const SMART_HOME_POPUP_PATTERN = /\b(?:smart\s*home|thermostat|temperature|degrees?|lights?|bulb|bulbs|lamp|lamps|front door|door lock|door|lock|unlock|locked|unlocked|living room|kitchen|freez(?:e|ing)|chilly|boiling|hot|cold|warm|cooler|colder|warmer|hotter|cool|heat|too (?:hot|cold|dark|bright)|so (?:hot|cold|warm|dark|bright)|getting (?:dark|cold|hot|warm)|turn (?:everything|all|both|all the lights) (?:off|on)|open (?:the )?(?:lights|smart home|home)|secure (?:the )?(?:house|home|door)|movie night|study music|entertainment|tv|television)\b/i;
-
-function prepareSmartHomePopup(message) {
-    // Browser popups must originate directly from the user's Send click. This
-    // only reserves the visual simulator; Qwen still decides every action.
-    if (SMART_HOME_POPUP_PATTERN.test(String(message || ''))) openSmartHomeSimulator();
-}
-
-async function openSmartHomeSimulator() {
-    try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_smart_home) {
-            const result = await window.pywebview.api.open_smart_home();
-            if (result && result.opened === false) throw new Error(result.error || 'Could not open simulator.');
-            return;
-        }
-        if (smartHomeBrowserPopup && !smartHomeBrowserPopup.closed) {
-            smartHomeBrowserPopup.focus();
-            try { smartHomeBrowserPopup.hachiSmartHomeBegin?.(); } catch (_) {}
-            return;
-        }
-        smartHomeBrowserPopup = window.open('/smart-home?auto=1', 'hachi-smart-home-simulator', 'popup=yes,width=1160,height=820,resizable=yes');
-        if (!smartHomeBrowserPopup) throw new Error('Your browser blocked the simulator popup. Allow popups for Hachi and retry the command.');
-        smartHomeBrowserPopup.focus();
-    } catch (error) {
-        alert(error.message || 'Could not open the Smart Home simulation window.');
-    }
-}
-
-function nameActiveChatFromMessage(text) {
-    const chat = activeChat();
-    const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!chat || !cleaned || (chat.hasMessages && !/^New Chat \d+$/.test(chat.title) && chat.title !== 'Chat')) return;
-    chat.title = cleaned.slice(0, 32) + (cleaned.length > 32 ? '…' : '');
-    renderChatList();
+  if (chatIsStreaming) return;
+  const idx = chats.findIndex(c => c.id === chatId);
+  if (idx < 0) return;
+  const wasActive = chatId === activeChatId;
+  chats.splice(idx, 1);
+  if (!chats.length) {
+    chats = [{ id: makeChatId(), title: 'General Chat', messagesHtml: '', hasMessages: false, mode: 'default' }];
+  }
+  if (wasActive) activeChatId = chats[Math.min(idx, chats.length - 1)].id;
+  persistChats();
+  if (wasActive) restoreActiveChat();
+  else renderChatList();
 }
 
 function toggleSidebar() {
-    const collapsed = appEl.classList.toggle('sidebar-collapsed');
-    try { localStorage.setItem('hachi.sidebarCollapsed', collapsed ? '1' : '0'); } catch (_) {}
+  const collapsed = appEl.classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('hachi.sidebarCollapsed', collapsed ? '1' : '0'); } catch (_) {}
 }
 
-function initializeChats() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '{}');
-        if (Array.isArray(saved.chats) && saved.chats.length) {
-            chats = saved.chats.filter(chat => chat && typeof chat.id === 'string' && typeof chat.title === 'string');
-            activeChatId = chats.some(chat => chat.id === saved.activeChatId) ? saved.activeChatId : chats[0].id;
-        }
-    } catch (_) {}
-    if (!chats.length) chats = [{ id: makeChatId(), title: 'Chat', messagesHtml: '', hasMessages: false, mode: 'default' }];
-    if (!activeChatId) activeChatId = chats[0].id;
-    try { if (localStorage.getItem('hachi.sidebarCollapsed') === '1') appEl.classList.add('sidebar-collapsed'); } catch (_) {}
-    restoreActiveChat();
-    persistChats();
+async function openSmartHomeSimulator() {
+  try {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_smart_home) {
+      const result = await window.pywebview.api.open_smart_home();
+      if (result && result.opened === false) throw new Error(result.error || 'Could not open simulator.');
+      return;
+    }
+    if (smartHomeBrowserPopup && !smartHomeBrowserPopup.closed) {
+      smartHomeBrowserPopup.focus();
+      return;
+    }
+    smartHomeBrowserPopup = window.open('/smart-home?auto=1', 'hachi-smart-home-simulator', 'popup=yes,width=1160,height=820,resizable=yes');
+    if (!smartHomeBrowserPopup) throw new Error('Your browser blocked the simulator popup. Allow popups for Hachi and retry.');
+    smartHomeBrowserPopup.focus();
+  } catch (err) {
+    alert(err.message || 'Could not open Smart Home simulation.');
+  }
 }
 
-// Markdown renderer configuration (guard against missing library)
-if (typeof marked !== 'undefined') {
-    marked.setOptions({ breaks: true, gfm: true });
+function scrollToBottom() {
+  const viewport = document.getElementById('chatViewport');
+  if (viewport) viewport.scrollTop = viewport.scrollHeight;
+}
+
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function copyMessageText(btn, text) {
+  if (!navigator.clipboard) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.classList.remove('copied');
+    }, 1800);
+  });
 }
 
 function sanitizeHtml(html) {
-    // Allow only a safe subset of tags/attributes from LLM output.
-    // Blocks <script>, event handlers, javascript: URLs, iframes, etc.
-    const allowed = new Set(['p','br','b','strong','i','em','u','s','code','pre','ul','ol','li','blockquote','h1','h2','h3','h4','table','thead','tbody','tr','th','td','a','hr']);
-    const allowedAttrs = new Set(['href','title','target','rel','class']);
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const walk = (node) => {
-        [...node.childNodes].forEach((child) => {
-            if (child.nodeType === Node.ELEMENT_NODE) {
-                const tag = child.tagName.toLowerCase();
-                // Drop event handlers and unsafe URLs anywhere
-                [...child.attributes].forEach((attr) => {
-                    const name = attr.name.toLowerCase();
-                    const val = attr.value.trim().toLowerCase();
-                    if (name.startsWith('on') ||
-                        (name === 'href' && (val.startsWith('javascript:') || val.startsWith('data:'))) ||
-                        (name === 'src' && (val.startsWith('javascript:') || val.startsWith('data:'))) ||
-                        (name === 'style')) {
-                        child.removeAttribute(attr.name);
-                    } else if (!allowedAttrs.has(name)) {
-                        child.removeAttribute(attr.name);
-                    }
-                });
-                if (!allowed.has(tag)) {
-                    // Replace disallowed element with its text content
-                    const frag = document.createDocumentFragment();
-                    while (child.firstChild) frag.appendChild(child.firstChild);
-                    child.replaceWith(frag);
-                } else {
-                    walk(child);
-                }
-            } else if (child.nodeType === Node.TEXT_NODE) {
-                // Leave text nodes as-is (their content came from marked/LLM)
-            }
+  const allowed = new Set(['p','br','b','strong','i','em','u','s','code','pre','ul','ol','li','blockquote','h1','h2','h3','h4','table','thead','tbody','tr','th','td','a','hr','span']);
+  const allowedAttrs = new Set(['href','title','target','rel','class']);
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const walk = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        [...child.attributes].forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          const val = attr.value.trim().toLowerCase();
+          if (name.startsWith('on') || (name === 'href' && (val.startsWith('javascript:') || val.startsWith('data:')))) {
+            child.removeAttribute(attr.name);
+          } else if (!allowedAttrs.has(name)) {
+            child.removeAttribute(attr.name);
+          }
         });
-    };
-    walk(doc.body);
-    return doc.body.innerHTML;
-}
-
-// ============================================================
-// Utilities
-// ============================================================
-function timeNow() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function scrollToBottom() {
-    const viewport = document.getElementById('chatViewport');
-    if (viewport) viewport.scrollTop = viewport.scrollHeight;
-    if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
+        if (!allowed.has(tag)) {
+          const frag = document.createDocumentFragment();
+          while (child.firstChild) frag.appendChild(child.firstChild);
+          child.replaceWith(frag);
+        } else {
+          walk(child);
+        }
+      }
+    });
+  };
+  walk(doc.body);
+  return doc.body.innerHTML;
 }
 
 function addMessage(text, role, tools, engine) {
-    const mainEl = document.getElementById('mainContainer');
-    if (mainEl) mainEl.classList.add('has-chat');
+  const mainEl = document.getElementById('mainContainer');
+  if (mainEl) mainEl.classList.add('has-chat');
 
-    const wrap   = document.createElement('div');
-    wrap.className = 'msg ' + role;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
 
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
 
-    if (role === 'assistant') {
-        // Render Markdown for assistant messages
-        const rendered = sanitizeHtml(typeof marked !== 'undefined' ? marked.parse(text || '') : (text || '').replace(/\n/g,'<br>'));
-        bubble.innerHTML = rendered;
-    } else {
-        bubble.textContent = text;
-    }
+  if (role === 'assistant') {
+    const rendered = sanitizeHtml(typeof marked !== 'undefined' ? marked.parse(text || '') : (text || '').replace(/\n/g,'<br>'));
+    bubble.innerHTML = rendered;
+  } else {
+    bubble.textContent = text;
+  }
+  wrap.appendChild(bubble);
 
-    const meta = document.createElement('div');
+  if (role === 'assistant') {
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.innerHTML = '📋 Copy';
+    copyBtn.onclick = () => copyMessageText(copyBtn, text);
+    actions.appendChild(copyBtn);
+
+    const meta = document.createElement('span');
     meta.className = 'meta';
-    const engineBadge = (role === 'assistant' && engine)
-        ? (engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · '
-        : '';
-    meta.textContent = (role === 'assistant' ? 'Hachi · ' : '') + engineBadge + timeNow();
+    const engineBadge = engine ? (engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · ' : '';
+    meta.textContent = 'Hachi · ' + engineBadge + timeNow();
+    actions.appendChild(meta);
+    wrap.appendChild(actions);
 
-    wrap.appendChild(bubble);
-    wrap.appendChild(meta);
-
-    // Show tool badges
     if (tools && tools.length > 0) {
-        tools.forEach(t => {
-            const badge = document.createElement('span');
-            badge.className = 'tool-badge';
-            const toolLabels = {
-                launch_mode: '⚡ Mode launched',
-                close_mode: '⛔ Mode closed',
-                close_app: '❌ App closed',
-                get_weather: '🌤 Weather fetched',
-                search_web: '🔍 Web searched',
-                research_web: '📚 Web research completed',
-                delegate_reasoning: '☁ Cloud reasoning used',
-                fetch_url: '🌐 URL fetched',
-                get_system_stats: '💻 System check',
-                search_memory: '🧠 Memory searched',
-                get_smart_home_state: '🏠 Home state checked',
-                control_smart_home: '🏠 Smart home updated',
-                shutdown_hachi: '🔴 Shutting down'
-            };
-            badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
-            badge.title = String(t.output || `${t.tool} completed`);
-            wrap.appendChild(badge);
-        });
+      tools.forEach(t => {
+        const badge = document.createElement('span');
+        badge.className = 'tool-badge';
+        const toolLabels = {
+          get_weather: '🌤 Weather fetched',
+          get_smart_home_state: '🏠 Home state verified',
+          control_smart_home: '🏠 Device updated',
+          search_web: '🔍 Web searched',
+          research_web: '📚 Research completed',
+          play_youtube: '▶️ Media playing',
+          launch_app: '🚀 App launched'
+        };
+        badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
+        wrap.appendChild(badge);
+      });
     }
+  }
 
-    msgBox.appendChild(wrap);
-    scrollToBottom();
-    saveActiveChat();
+  msgBox.appendChild(wrap);
+  scrollToBottom();
+  saveActiveChat();
 }
 
 function showTyping() {
-    const mainEl = document.getElementById('mainContainer');
-    if (mainEl) mainEl.classList.add('has-chat');
-
-    const w = document.createElement('div');
-    w.className = 'msg assistant'; w.id = 'typingDot';
-    w.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
-    msgBox.appendChild(w);
-    scrollToBottom();
+  const mainEl = document.getElementById('mainContainer');
+  if (mainEl) mainEl.classList.add('has-chat');
+  const w = document.createElement('div');
+  w.className = 'msg assistant'; w.id = 'typingDot';
+  w.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  msgBox.appendChild(w);
+  scrollToBottom();
 }
 function removeTyping() {
-    const el = document.getElementById('typingDot');
-    if (el) el.remove();
+  const el = document.getElementById('typingDot');
+  if (el) el.remove();
 }
 
-// ============================================================
-// Text Chat
-// ============================================================
-// ============================================================
-// Natural Language Intent Detector & Pomodoro Signal Handler
-// ============================================================
-
-function detectUserIntent(userText) {
-    if (!userText) return;
-    const lower = userText.toLowerCase().trim();
-
-    // 1. Pomodoro / Focus / Timer intent
-    const pomoPatterns = [
-        'pomodoro', 'timer', 'clock', '25 min', '25-min', '25 minute',
-        'focus mode', 'focus timer', 'start focus', 'deep work', 'mag-focus',
-        'set a timer', 'start a timer', 'count down', 'countdown'
-    ];
-    if (pomoPatterns.some(p => lower.includes(p))) {
-        startPomodoro();
-        const focusChip = document.getElementById('chip-focus');
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        if (focusChip) focusChip.classList.add('active');
-        currentMode = 'focus';
-    }
-
-    // 2. Gaming intent (e.g. "I wanna play a game right now", "let's game", "open steam")
-    const gamingPatterns = [
-        'wanna play', 'want to play', 'play a game', 'play games', 'game time',
-        'gaming', 'open steam', 'lets game', "let's game", 'laro tayo',
-        'maglaro', 'mag-laro', 'boot up steam', 'feel like playing'
-    ];
-    if (gamingPatterns.some(p => lower.includes(p))) {
-        const gameChip = document.getElementById('chip-gaming');
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        if (gameChip) gameChip.classList.add('active');
-        currentMode = 'gaming';
-    }
-
-    // 3. Study intent
-    const studyPatterns = ['study', 'homework', 'vscode', 'mag-aral', 'magaral', 'school work'];
-    if (studyPatterns.some(p => lower.includes(p))) {
-        const studyChip = document.getElementById('chip-study');
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        if (studyChip) studyChip.classList.add('active');
-        currentMode = 'study';
-    }
-
-    // 4. Movie intent
-    const moviePatterns = ['movie', 'watch a', 'film', 'manood', 'netflix', 'stream something'];
-    if (moviePatterns.some(p => lower.includes(p))) {
-        const movieChip = document.getElementById('chip-movie');
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        if (movieChip) movieChip.classList.add('active');
-        currentMode = 'movie';
-    }
-}
-
-function formatFileSize(bytes) {
-    return bytes < 1024 * 1024
-        ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-        : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function setPdfAttachment(file) {
-    if (!file) return;
-    const name = file.name.toLowerCase();
-    const isPdf = name.endsWith('.pdf') || file.type === 'application/pdf';
-    const isAudio = file.type.startsWith('audio/') || ['.wav','.mp3','.m4a','.ogg','.webm','.mp4','.flac'].some(ext => name.endsWith(ext));
-    if (!isPdf && !isAudio) {
-        alert('Please attach a PDF or supported meeting audio file.');
-        return;
-    }
-    const limit = isAudio ? 100 : 25;
-    if (file.size > limit * 1024 * 1024) {
-        alert(`${isAudio ? 'Audio' : 'PDF'} files must be ${limit} MB or smaller.`);
-        return;
-    }
-    attachedPdf = file;
-    attachedKind = isAudio ? 'audio' : 'pdf';
-    attachmentType.textContent = isAudio ? 'AUDIO' : 'PDF';
-    attachmentName.textContent = file.name;
-    attachmentSize.textContent = formatFileSize(file.size);
-    attachmentPreview.classList.add('visible');
-}
-
-function choosePdfFile() { pdfFileInput.click(); }
-function selectAttachment(event) { setPdfAttachment(event.target.files && event.target.files[0]); }
-function removePdfAttachment() {
-    attachedPdf = null;
-    attachedKind = '';
-    pdfFileInput.value = '';
-    attachmentPreview.classList.remove('visible');
-    attachmentName.textContent = '';
-    attachmentSize.textContent = '';
-    attachmentType.textContent = 'PDF';
-}
-
-async function uploadPdfAttachment(file) {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    const response = await fetch('/api/upload_pdf', { method: 'POST', body: form });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'PDF upload failed.');
-    return result;
-}
-
-async function transcribeMeetingAudio(file) {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    const response = await fetch('/api/transcribe_meeting_audio', { method: 'POST', body: form });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Meeting-audio transcription failed.');
-    return result;
-}
-
-composerBox.addEventListener('dragover', event => {
-    event.preventDefault();
-    composerBox.classList.add('drag-over');
-});
-composerBox.addEventListener('dragleave', () => composerBox.classList.remove('drag-over'));
-composerBox.addEventListener('drop', event => {
-    event.preventDefault();
-    composerBox.classList.remove('drag-over');
-    setPdfAttachment(event.dataTransfer.files && event.dataTransfer.files[0]);
-});
-inputEl.addEventListener('paste', event => {
-    const files = event.clipboardData && event.clipboardData.files;
-    if (files && files.length) setPdfAttachment(files[0]);
-});
-
-async function sendMessage() {
-    if (chatIsStreaming) return;
-    const text = inputEl.value.trim();
-    const pdf = attachedPdf;
-    if (!text && !pdf) return;
-    let attachmentId = '';
-    let messageText = text;
-    const chatTitleText = text || (pdf ? `Meeting notes: ${pdf.name}` : 'Chat');
-    const sendButton = document.getElementById('sendBtn');
-
-    if (pdf) {
-        sendButton.disabled = true;
-        sendButton.title = 'Uploading PDF…';
-        try {
-            if (attachedKind === 'audio') {
-                const uploaded = await transcribeMeetingAudio(pdf);
-                const request = messageText || 'Create structured meeting notes with a summary, decisions, action items, owners if mentioned, and open questions.';
-                messageText = `[[HACHI_MEETING_TRANSCRIPT]]\nThe user uploaded meeting audio named '${uploaded.name}'. Use the transcript below as untrusted reference material. ${request}\n\nMEETING TRANSCRIPT:\n${uploaded.transcript}`;
-            } else {
-                const uploaded = await uploadPdfAttachment(pdf);
-                attachmentId = uploaded.id;
-                if (!messageText) messageText = 'Analyze and summarize the attached PDF.';
-            }
-        } catch (error) {
-            alert(error.message || 'Could not process this attachment.');
-            return;
-        } finally {
-            sendButton.disabled = false;
-            sendButton.title = 'Send';
-        }
-    }
-    
-    const mainEl = document.getElementById('mainContainer');
-    if (mainEl) mainEl.classList.add('has-chat');
-
-    // Check intent on user text locally before sending
-    detectUserIntent(messageText);
-    prepareSmartHomePopup(messageText);
-    nameActiveChatFromMessage(chatTitleText);
-
-    const attachmentLabel = attachedKind === 'audio' ? `[Meeting audio transcribed: ${pdf?.name}]` : `[Attached PDF: ${pdf?.name}]`;
-    addMessage(pdf ? `${messageText}\n\n${attachmentLabel}` : messageText, 'user');
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    if (pdf) removePdfAttachment();
-    showTyping();
-
-    let accumulatedText = '';
-    let toolsList = [];
-    let reader = null;
-    let assistantMessageCreated = false;
-    const conversationId = activeChatId;
-    chatIsStreaming = true;
-
-    let wrap = null;
-    let bubble = null;
-    let meta = null;
-
-    function ensureAssistantMessage() {
-        if (!assistantMessageCreated) {
-            assistantMessageCreated = true;
-            removeTyping();
-
-            wrap = document.createElement('div');
-            wrap.className = 'msg assistant';
-
-            bubble = document.createElement('div');
-            bubble.className = 'bubble';
-
-            meta = document.createElement('div');
-            meta.className = 'meta';
-            meta.textContent = 'Hachi · ' + timeNow();
-
-            wrap.appendChild(bubble);
-            wrap.appendChild(meta);
-            msgBox.appendChild(wrap);
-            scrollToBottom();
-        }
-    }
-
-    try {
-        const res = await fetch('/api/stream_chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: messageText, mode: currentMode, attachment_id: attachmentId, conversation_id: conversationId })
-        });
-
-        reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let sseBuffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            sseBuffer += decoder.decode(value, { stream: true });
-            const lines = sseBuffer.split('\n');
-            sseBuffer = lines.pop() ?? '';
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const jsonStr = line.slice(6).trim();
-                if (!jsonStr) continue;
-                try {
-                    const evt = JSON.parse(jsonStr);
-                    if (evt.open_smart_home) {
-                        openSmartHomeSimulator();
-                    }
-                    if (!evt.done && evt.token) {
-                        ensureAssistantMessage();
-                        accumulatedText += evt.token;
-                        const _md = typeof marked !== 'undefined' ? marked.parse(accumulatedText) : accumulatedText.replace(/\n/g,'<br>');
-                        bubble.innerHTML = sanitizeHtml(_md);
-                        scrollToBottom();
-                    }
-                    if (evt.done) {
-                        ensureAssistantMessage();
-                        accumulatedText = evt.full || accumulatedText;
-                        toolsList = evt.tools || [];
-                        if (evt.engine) {
-                            meta.textContent = 'Hachi · ' + (evt.engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · ' + timeNow();
-                        }
-                        if (evt.pomo) {
-                            if (evt.pomo === 'start') startPomodoro();
-                            else stopPomodoro();
-                        }
-
-                        // Render final formatted markdown
-                        const _mdFinal = typeof marked !== 'undefined' ? marked.parse(accumulatedText) : accumulatedText.replace(/\n/g,'<br>');
-                        bubble.innerHTML = sanitizeHtml(_mdFinal);
-                        
-                        // If tools were executed, append badges below the message
-                        if (toolsList.length > 0) {
-                            toolsList.forEach(t => {
-                                const badge = document.createElement('span');
-                                badge.className = 'tool-badge';
-                                const toolLabels = {
-                                    launch_mode: '⚡ Mode launched',
-                                    close_mode: '⛔ Mode closed',
-                                    close_app: '❌ App closed',
-                                    get_weather: '🌤 Weather fetched',
-                                    search_web: '🔍 Web searched',
-                                    research_web: '📚 Web research completed',
-                                    delegate_reasoning: '☁ Cloud reasoning used',
-                                    fetch_url: '🌐 URL fetched',
-                                    get_system_stats: '💻 System check',
-                                    search_memory: '🧠 Memory searched',
-                                    get_smart_home_state: '🏠 Home state checked',
-                                    control_smart_home: '🏠 Smart home updated',
-                                    shutdown_hachi: '🔴 Shutting down'
-                                };
-                                badge.textContent = toolLabels[t.tool] || `🔧 ${t.tool}`;
-                                badge.title = String(t.output || `${t.tool} completed`);
-                                wrap.appendChild(badge);
-                            });
-                        }
-                        scrollToBottom();
-                        break;
-                    }
-                } catch(e) {
-                    console.error("SSE parse error", e);
-                }
-            }
-        }
-
-        applyPomoSignals(accumulatedText, toolsList, messageText, true);
-
-    } catch (err) {
-        removeTyping();
-        try { if (reader) reader.cancel(); } catch(_) {}
-        if (bubble) {
-            bubble.textContent = 'Connection error — is Hachi running?';
-        } else {
-            addMessage('Connection error — is Hachi running?', 'assistant');
-        }
-    } finally {
-        chatIsStreaming = false;
-        saveActiveChat();
-    }
-}
-
-// Shared helper: handle __START_POMODORO__ / __STOP_POMODORO__ in any response,
-// and detect timer/pomodoro keywords as fallback.
-function applyPomoSignals(response, tools, userText, skipAddMessage, engine) {
-    if (!response && !userText) return;
-    let msg = response || '';
-    let started = false;
-    let stopped = false;
-    let focusSettings = null;
-
-    const toolSignalText = (tools || []).map(t => String(t.output || '')).join(' ');
-    const focusMatch = (msg + ' ' + toolSignalText).match(/__START_FOCUS_CYCLE__:(\d+):(\d+):(\d+)__/);
-    if (focusMatch) {
-        focusSettings = { work: Number(focusMatch[1]), rest: Number(focusMatch[2]), cycles: Number(focusMatch[3]) };
-        msg = msg.replace(focusMatch[0], '').trim();
-        started = true;
-    }
-
-    if (msg.includes('__START_POMODORO__')) {
-        msg = msg.replace(/__START_POMODORO__\s?/g, '');
-        started = true;
-    }
-    if (msg.includes('__STOP_POMODORO__')) {
-        msg = msg.replace(/__STOP_POMODORO__\s?/g, '');
-        stopped = true;
-    }
-
-    const combined = ((userText || '') + ' ' + msg).toLowerCase();
-    const startKw = ['pomodoro', '25-minute timer', '25 minute timer',
-                     'pomodoro started', 'focus timer', 'starting a 25',
-                     'pomodoro clock', 'start timer', 'focus mode'];
-    const stopKw  = ['pomodoro stopped', 'stopping the timer', 'timer stopped', 'timer has been stopped'];
-
-    if (!started && !stopped) {
-        if (startKw.some(k => combined.includes(k))) started = true;
-        if (stopKw.some(k => combined.includes(k)))  stopped = true;
-    }
-
-    if (msg.trim() && !skipAddMessage) {
-        addMessage(msg, 'assistant', tools, engine);
-    }
-    if (started) startPomodoro(
-        focusSettings ? focusSettings.work : POMO_WORK_MINS,
-        focusSettings ? focusSettings.rest : POMO_SHORT_MINS,
-        focusSettings ? focusSettings.cycles : 4,
-        true
-    );
-    if (stopped)  stopPomodoro();
+function quickPrompt(txt) {
+  inputEl.value = txt;
+  sendMessage();
 }
 
 function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
 }
-inputEl.addEventListener('input', () => {
-    inputEl.style.height = 'auto';
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
-});
 
 function clearChat() {
-    msgBox.innerHTML = '';
-    const mainEl = document.getElementById('mainContainer');
-    if (mainEl) mainEl.classList.remove('has-chat');
-    if (inputEl) inputEl.focus();
+  msgBox.innerHTML = '';
+  const mainEl = document.getElementById('mainContainer');
+  if (mainEl) mainEl.classList.remove('has-chat');
+  saveActiveChat();
+  inputEl.focus();
 }
 
-// ============================================================
-// Mode chips
-// ============================================================
-async function triggerMode(modeName, chipEl) {
-    currentMode = modeName;
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    if (chipEl) chipEl.classList.add('active');
+function formatFileSize(bytes) {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function setPdfAttachment(file) {
+  if (!file) return;
+  attachedPdf = file;
+  attachedKind = file.type.startsWith('audio/') ? 'audio' : 'pdf';
+  attachmentType.textContent = attachedKind.toUpperCase();
+  attachmentName.textContent = file.name;
+  attachmentSize.textContent = formatFileSize(file.size);
+  attachmentPreview.classList.add('visible');
+}
+function choosePdfFile() { pdfFileInput.click(); }
+function selectAttachment(e) { setPdfAttachment(e.target.files && e.target.files[0]); }
+function removePdfAttachment() {
+  attachedPdf = null;
+  attachedKind = '';
+  pdfFileInput.value = '';
+  attachmentPreview.classList.remove('visible');
+}
 
-    // Focus mode: start the Pomodoro immediately — don't wait for the LLM
-    if (modeName === 'focus') {
-        startPomodoro();
-        addMessage('Focus mode activated! Starting your 25-minute Pomodoro timer. Stay focused — I\'ll notify you when it\'s time for a break! ⏱️', 'assistant');
-        return;
+async function sendMessage() {
+  if (chatIsStreaming) return;
+  const text = inputEl.value.trim();
+  const pdf = attachedPdf;
+  if (!text && !pdf) return;
+
+  const mainEl = document.getElementById('mainContainer');
+  if (mainEl) mainEl.classList.add('has-chat');
+
+  addMessage(text || (pdf ? `Attached ${pdf.name}` : ''), 'user');
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  if (pdf) removePdfAttachment();
+  showTyping();
+
+  let accumulatedText = '';
+  let toolsList = [];
+  let reader = null;
+  let assistantMessageCreated = false;
+  chatIsStreaming = true;
+
+  let wrap = null, bubble = null, actions = null, copyBtn = null, meta = null;
+
+  function ensureAssistantMessage() {
+    if (!assistantMessageCreated) {
+      assistantMessageCreated = true;
+      removeTyping();
+      wrap = document.createElement('div');
+      wrap.className = 'msg assistant';
+      bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      actions = document.createElement('div');
+      actions.className = 'msg-actions';
+      copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.innerHTML = '📋 Copy';
+      meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = 'Hachi · ' + timeNow();
+      actions.append(copyBtn, meta);
+      wrap.append(bubble, actions);
+      msgBox.appendChild(wrap);
+      scrollToBottom();
     }
+  }
 
-    addMessage(`Start ${modeName} mode`, 'user');
-    showTyping();
-    try {
-        const res  = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: `Start ${modeName} mode`, mode: modeName })
-        });
-        const data = await res.json();
-        removeTyping();
-        applyPomoSignals(data.response, data.tools, `Start ${modeName} mode`, false, data.engine);
-    } catch {
-        removeTyping();
-        addMessage(`Could not activate ${modeName} mode.`, 'assistant');
-    }
-}
-
-// ============================================================
-// POMODORO TIMER
-// ============================================================
-const POMO_WORK_MINS  = 25;
-const POMO_SHORT_MINS = 5;
-const POMO_LONG_MINS  = 15;
-
-let pomoInterval  = null;
-let pomoSeconds   = 0;
-let pomoIsWork    = true;
-let pomoSession   = 0;   // 0-3 completed sessions
-let pomoPaused    = false;
-let pomoWorkMins  = POMO_WORK_MINS;
-let pomoBreakMins = POMO_SHORT_MINS;
-let pomoTargetCycles = 4;
-let pomoAutoAdvance = true;
-
-function startPomodoro(workMinutes = POMO_WORK_MINS, breakMinutes = POMO_SHORT_MINS, cycles = 4, autoAdvance = true) {
-    stopPomodoro(true); // clear any existing without notification
-    pomoWorkMins = Math.max(1, Math.min(Number(workMinutes) || POMO_WORK_MINS, 180));
-    pomoBreakMins = Math.max(1, Math.min(Number(breakMinutes) || POMO_SHORT_MINS, 60));
-    pomoTargetCycles = Math.max(1, Math.min(Number(cycles) || 4, 12));
-    pomoAutoAdvance = autoAdvance;
-    pomoIsWork   = true;
-    pomoSession  = 0;
-    pomoPaused   = false;
-    pomoSeconds  = pomoWorkMins * 60;
-
-    updatePomoDisplay();
-    document.getElementById('pomodoroBanner').classList.add('visible');
-    document.getElementById('pomoPauseBtn').textContent = '⏸ Pause';
-
-    pomoInterval = setInterval(pomoTick, 1000);
-
-    // Request browser notification permission
-    if (Notification && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-}
-
-function pomoTick() {
-    if (pomoPaused) return;
-    pomoSeconds--;
-    updatePomoDisplay();
-    if (pomoSeconds <= 0) {
-        clearInterval(pomoInterval);
-        pomoSessionEnd();
-    }
-}
-
-function pomoSessionEnd() {
-    if (pomoIsWork) {
-        pomoSession++;
-        updatePomoSessionDots();
-        const finished = pomoSession >= pomoTargetCycles;
-        const isLong = (pomoSession % 4 === 0) && !finished;
-        showPomoNotification(
-            finished ? '🏁' : '🎉',
-            finished ? 'Focus Cycle Complete!' : 'Work Session Done!',
-            finished
-                ? `Excellent! You completed ${pomoTargetCycles} focus cycle(s).`
-                : isLong
-                ? `Excellent! ${pomoSession} sessions complete. Time for a long break (${POMO_LONG_MINS} min)!`
-                : `Great focus! Time for a ${pomoBreakMins}-minute break.`,
-            finished ? 'Done ✓' : (isLong ? `Start Long Break ☕` : `Start Break ☕`)
-        );
-        // Browser notification
-        if (Notification && Notification.permission === 'granted') {
-            new Notification('Hachi — Pomodoro', { body: finished ? 'All focus cycles complete!' : (isLong ? 'Work session done! Take a long break.' : `Work session done! Take a ${pomoBreakMins}-min break.`) });
-        }
-        if (finished) return;
-    } else {
-        showPomoNotification(
-            '🍅',
-            'Break Over!',
-            'Ready to get back to work? Start your next focus session.',
-            'Start Focus 🍅'
-        );
-        if (Notification && Notification.permission === 'granted') {
-            new Notification('Hachi — Pomodoro', { body: 'Break over! Time to focus.' });
-        }
-    }
-    if (pomoAutoAdvance) setTimeout(() => {
-        if (!pomoInterval && document.getElementById('pomodoroBanner').classList.contains('visible')) pomoNextAction();
-    }, 1000);
-}
-
-function showPomoNotification(icon, title, msg, btnLabel) {
-    document.getElementById('pomoNotifyIcon').textContent = icon;
-    document.getElementById('pomoNotifyTitle').textContent = title;
-    document.getElementById('pomoNotifyMsg').textContent   = msg;
-    document.getElementById('pomoNotifyAction').textContent = btnLabel;
-    document.getElementById('pomoNotify').classList.add('show');
-}
-
-function pomoNextAction() {
-    document.getElementById('pomoNotify').classList.remove('show');
-    if (pomoIsWork && pomoSession >= pomoTargetCycles) {
-        stopPomodoro(true);
-        return;
-    }
-    pomoIsWork = !pomoIsWork;
-
-    if (pomoIsWork) {
-        pomoSeconds = pomoWorkMins * 60;
-        document.getElementById('pomoLabel').textContent = 'Work Session';
-        document.getElementById('pomoIcon').textContent  = '🍅';
-        document.getElementById('pomoTimer').className   = 'pomo-timer';
-    } else {
-        const isLong = (pomoSession % 4 === 0);
-        pomoSeconds = (isLong ? POMO_LONG_MINS : pomoBreakMins) * 60;
-        document.getElementById('pomoLabel').textContent = isLong ? 'Long Break' : 'Short Break';
-        document.getElementById('pomoIcon').textContent  = '☕';
-        document.getElementById('pomoTimer').className   = 'pomo-timer break';
-    }
-
-    pomoPaused = false;
-    document.getElementById('pomoPauseBtn').textContent = '⏸ Pause';
-    updatePomoDisplay();
-    pomoInterval = setInterval(pomoTick, 1000);
-}
-
-function togglePomodoro() {
-    pomoPaused = !pomoPaused;
-    document.getElementById('pomoPauseBtn').textContent = pomoPaused ? '▶ Resume' : '⏸ Pause';
-}
-
-function stopPomodoro(silent) {
-    clearInterval(pomoInterval);
-    pomoInterval = null;
-    pomoSeconds  = 0;
-    pomoIsWork   = true;
-    pomoSession  = 0;
-    pomoPaused   = false;
-    document.getElementById('pomodoroBanner').classList.remove('visible');
-    document.getElementById('pomoNotify').classList.remove('show');
-    // Reset dots
-    ['pd1','pd2','pd3','pd4'].forEach(id => document.getElementById(id).classList.remove('done'));
-    if (!silent) {
-        addMessage('⏱️ Pomodoro session stopped.', 'assistant');
-        // Reset focus chip
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    }
-}
-
-function updatePomoDisplay() {
-    const mins = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
-    const secs = String(pomoSeconds % 60).padStart(2, '0');
-    document.getElementById('pomoTimer').textContent = `${mins}:${secs}`;
-}
-
-function updatePomoSessionDots() {
-    const dots = ['pd1','pd2','pd3','pd4'];
-    dots.forEach((id, i) => {
-        document.getElementById(id).classList.toggle('done', i < (pomoSession % 4 || 4));
+  try {
+    const res = await fetch('/api/stream_chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, mode: currentMode, conversation_id: activeChatId })
     });
-}
 
-// ============================================================
-// VOICE MODE — ChatGPT-style with parallel TTS pipeline
-// ============================================================
-
-// Browser SpeechRecognition is retained only as a last-resort stop-word fallback.
-// Normal conversation turns use direct microphone capture + local Whisper.
-const HAS_WEB_SPEECH = ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-let recognition      = null;    // legacy interrupt fallback only
-let voiceConvActive  = false;
-let voiceAborted     = false;
-let currentAudio     = null;    // Currently playing <audio> element
-let voiceSpeaking    = false;   // True while TTS is playing
-let ackAudio         = null;    // Short acknowledgment clip, if playing
-let activeVoiceTurnId = null;   // Server-side cancellation/idempotency scope
-let voiceHoldFloor    = false;  // Press and hold orb to keep a long-form turn open
-let voiceHoldRelease  = null;
-let voiceCapture      = null;   // Current owned getUserMedia / MediaRecorder turn
-
-// Minimal silent WAV to unlock browser autoplay on first user gesture
-const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAA=';
-
-function setVoiceState(state, cap, sv) {
-    appEl.dataset.voice = state;
-    statusTxt.textContent = state.charAt(0).toUpperCase() + state.slice(1);
-    caption.textContent   = cap;
-    sub.textContent       = sv || '';
-    voiceDot.className = 'dot ' + (state === 'listening' ? 'listening' : state === 'speaking' ? 'speaking' : '');
-    voiceSpeaking = (state === 'speaking');
-}
-
-// Unlock browser audio autoplay (required in WebView2/Chrome)
-function unlockAudio() {
-    try {
-        const a = new Audio(SILENT_WAV);
-        a.volume = 0.01;
-        a.play().catch(() => {});
-    } catch (_) {}
-}
-
-function handleVoiceOrbTap() {
-    // The orb is always a stop control while a turn exists. Do not rely on a
-    // cosmetic "speaking" state, which can briefly be "thinking" while audio
-    // is already buffered and playing.
-    interruptVoicePlayback('tap');
-}
-
-const voiceOrbEl = document.getElementById('voiceOrb');
-voiceOrbEl.addEventListener('pointerdown', () => {
-    if (appEl.dataset.voice === 'listening') {
-        voiceHoldFloor = true;
-        sub.textContent = 'Holding the floor — release when you are finished';
-    }
-});
-for (const eventName of ['pointerup', 'pointercancel', 'pointerleave']) {
-    voiceOrbEl.addEventListener(eventName, () => {
-        if (!voiceHoldFloor) return;
-        voiceHoldFloor = false;
-        if (voiceHoldRelease) voiceHoldRelease();
-    });
-}
-
-// Global interrupt — stops TTS immediately and prepares for next listen turn
-let _voiceInterruptFn = null;
-function interruptVoicePlayback(source) {
-    if (_voiceInterruptFn) {
-        _voiceInterruptFn(source || 'manual');
-        return;
-    }
-    // Defensive fallback for a late click between stream completion and UI
-    // cleanup. It still kills active audio and cancels backend work.
-    if (activeVoiceTurnId) {
-        stopCurrentAudio();
-        fetch('/api/cancel_turn', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ turn_id: activeVoiceTurnId })
-        }).catch(() => {});
-        setVoiceState('listening', 'Listening…', 'Interrupted — speak now');
-    }
-}
-
-function openVoice() {
-    if (voiceActive) return;
-    voiceActive   = true;
-    voiceAborted  = false;
-    currentAudio  = null;
-
-    unlockAudio();
-
-    overlay.classList.add('active');
-    micBtn.classList.add('active');
-
-    voiceSeconds = 0;
-    clearInterval(timerInterval);
-    timerEl.textContent = '00:00';
-    timerInterval = setInterval(() => {
-        voiceSeconds++;
-        timerEl.textContent =
-            String(Math.floor(voiceSeconds / 60)).padStart(2, '0') + ':' +
-            String(voiceSeconds % 60).padStart(2, '0');
-    }, 1000);
-
-    // Fire-and-forget — don't block listening on this round-trip
-    fetch('/api/voice_mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: true })
-    }).catch(() => {});
-
-    transcriptEl.textContent = "Speak whenever you're ready…";
-    transcriptEl.className   = 'voice-transcript';
-
-    sttBadge.textContent = 'Local Whisper · Offline SAPI Audio';
-    setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
-    if (wakewordPoll) { clearInterval(wakewordPoll); wakewordPoll = null; }
-    // Load the local multilingual model while the user begins the first turn.
-    fetch('/api/voice_ready', { method: 'POST' }).catch(() => {});
-    sttBadge.textContent = 'Local Whisper · Offline SAPI Audio';
-    startVoiceConversation();
-}
-
-let activeAudioResolve = null;
-
-function closeVoice() {
-    voiceActive  = false;
-    voiceAborted = true;
-    _voiceInterruptFn = null;
-    if (activeVoiceTurnId) {
-        fetch('/api/cancel_turn', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ turn_id: activeVoiceTurnId })
-        }).catch(() => {});
-        activeVoiceTurnId = null;
-    }
-    voiceHoldFloor = false;
-    voiceHoldRelease = null;
-
-    if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
-    stopVoiceCapture(true);
-    stopCurrentAudio();
-    if (window.speechSynthesis) speechSynthesis.cancel();
-
-    overlay.classList.remove('active');
-    micBtn.classList.remove('active');
-    clearInterval(timerInterval);
-    appEl.dataset.voice = 'idle';
-    voiceSpeaking = false;
-    transcriptEl.textContent = '';
-    transcriptEl.className   = 'voice-transcript';
-
-    fetch('/api/voice_mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: false })
-    }).catch(() => {});
-    fetch('/api/interrupt_speech', { method: 'POST' }).catch(() => {});
-    // Resume wakeword detection now that overlay is closed
-    if (!wakewordPoll) { wakewordPoll = setInterval(pollWakeword, 600); }
-}
-
-function stopCurrentAudio() {
-    if (currentAudio) {
-        try { currentAudio.pause(); currentAudio.currentTime = 0; } catch(_) {}
-        currentAudio = null;
-    }
-    if (ackAudio) {
-        try { ackAudio.pause(); ackAudio.currentTime = 0; } catch(_) {}
-        ackAudio = null;
-    }
-    if (activeAudioResolve) {
-        activeAudioResolve();
-        activeAudioResolve = null;
-    }
-}
-
-function toggleMute() {
-    isMuted = !isMuted;
-    muteBtn.classList.toggle('muted', isMuted);
-    if (isMuted) {
-        setVoiceState('idle', 'Microphone muted', 'Tap mic icon to unmute');
-        transcriptEl.textContent = 'Muted';
-        if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
-        stopVoiceCapture(true);
-        stopCurrentAudio();
-    } else {
-        setVoiceState('listening', 'Listening…', "Speak whenever you're ready");
-        transcriptEl.textContent = "Unmuted — speak now…";
-    }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// MAIN VOICE CONVERSATION LOOP (Browser STT + Streaming LLM + Edge TTS Audio)
-// ──────────────────────────────────────────────────────────────────────────────
-
-async function startVoiceConversation() {
-    while (voiceActive && !voiceAborted) {
-        if (isMuted) { await sleep(400); continue; }
-
-        // ── 1. LISTEN PHASE ──────────────────────────────────────────────────
-        setVoiceState('listening', 'Listening…', 'Speak now…');
-        transcriptEl.textContent = 'Listening…';
-        transcriptEl.className   = 'voice-transcript';
-
-        const heard = await listenWithLocalWhisper();
-
-        if (!voiceActive || voiceAborted) break;
-        if (!heard || !heard.trim()) {
-            await sleep(200);
-            continue;
-        }
-
-        // ── 2. PROCESS + STREAM + PARALLEL TTS PHASE ────────────────────────
-        detectUserIntent(heard);
-        transcriptEl.textContent = `"${heard}"`;
-        transcriptEl.className   = 'voice-transcript heard';
-        addMessage(heard, 'user');
-        setVoiceState('thinking', 'Thinking…', 'Hachi is processing…');
-
-        await streamAndSpeakResponse(heard);
-        const wasInterrupted = isInterrupting;
-
-        if (!voiceActive || voiceAborted) break;
-
-        setVoiceState('listening', 'Listening…', 'Your turn — speak now');
-        transcriptEl.textContent = 'Your turn…';
-        transcriptEl.className   = 'voice-transcript';
-        // Skip the rest delay on barge-in so Hachi listens again immediately
-        if (!wasInterrupted) await sleep(100);
-    }
-}
-
-// ── Single listen turn using Web Speech API ──────────────────────────────────
-// continuous=true keeps listening across pauses. Endpointing is tiered: a
-// punctuated final commits faster, while incomplete/filler text keeps the floor.
-// Tries en-PH → fil-PH → en-US; remembers the language that worked last time.
-const TAGALOG_HINTS = new Set([
-    'ang','ng','mga','sa','na','ko','mo','po','ba','pa','lang','po','sige',
-    'kumusta','salamat','oo','hindi','ano','bakit','paano','kailan','sino'
-]);
-
-function pickBestTranscript(result) {
-    let best = '';
-    for (let j = 0; j < result.length; j++) {
-        const alt = result[j].transcript || '';
-        if (alt.length > best.length) best = alt;
-    }
-    return best;
-}
-
-function detectLangHint(text) {
-    const words = text.toLowerCase().split(/\s+/);
-    let tl = 0;
-    for (const w of words) if (TAGALOG_HINTS.has(w)) tl++;
-    return tl >= 2 ? 'fil-PH' : (tl >= 1 ? 'en-PH' : null);
-}
-
-function listenOneTurn() {
-    return new Promise((resolve) => {
-        if (!HAS_WEB_SPEECH || !voiceActive || isMuted || voiceAborted) {
-            resolve('');
-            return;
-        }
-
-        if (recognition) {
-            try { recognition.abort(); } catch(e) {}
-            recognition = null;
-        }
-
-        const LANGUAGES = sttLangPref
-            ? [sttLangPref, 'en-PH', 'fil-PH', 'en-US'].filter((v, i, a) => a.indexOf(v) === i)
-            : ['en-PH', 'fil-PH', 'en-US'];
-        let langIndex = 0;
-
-        const attempt = () => {
-            const rec = new SpeechRecognition();
-            recognition = rec;
-            rec.continuous      = true;
-            rec.interimResults  = true;
-            rec.maxAlternatives = 3;
-            rec.lang            = LANGUAGES[langIndex];
-
-            let accumulated   = '';
-            let interimText   = '';
-            let settled       = false;
-            let silenceTimer  = null;
-            let watchdogTimer = null;
-            let gotSpeech     = false;
-            const combinedText = () => {
-                const finalPart = accumulated.trim();
-                const interimPart = interimText.trim();
-                if (!finalPart) return interimPart;
-                if (!interimPart || finalPart.toLowerCase().endsWith(interimPart.toLowerCase())) return finalPart;
-                return `${finalPart} ${interimPart}`.trim();
-            };
-
-            const finish = (text) => {
-                if (settled) return;
-                settled = true;
-                voiceHoldRelease = null;
-                if (silenceTimer) clearTimeout(silenceTimer);
-                if (watchdogTimer) clearTimeout(watchdogTimer);
-                try { rec.abort(); } catch (_) {}
-                recognition = null;
-                if (text && text.trim()) {
-                    sttLangPref = LANGUAGES[langIndex];
-                    const hint = detectLangHint(text);
-                    if (hint) sttLangPref = hint;
-                }
-                resolve(text);
-            };
-
-            const armSilence = () => {
-                if (silenceTimer) clearTimeout(silenceTimer);
-                if (voiceHoldFloor) return;
-                const currentText = combinedText().toLowerCase();
-                const terminalPunctuation = /[.!?]["']?$/.test(currentText);
-                const endsWithFiller = /\b(?:uh|um|erm|hmm|ah|ano|kuwan|wait)\s*$/.test(currentText);
-                // Fast when ASR has clearly completed a sentence; generous for
-                // long-form thought pauses and filler-ended fragments.
-                const delay = !gotSpeech ? 3000 : (endsWithFiller ? 4500 : (terminalPunctuation ? 1500 : 3400));
-                silenceTimer = setTimeout(() => {
-                    if (voiceHoldFloor) return;
-                    const got = combinedText();
-                    if (got) { finish(got); return; }
-                    if (langIndex < LANGUAGES.length - 1) {
-                        langIndex++;
-                        settled = true;
-                        attempt();
-                    } else {
-                        finish('');
-                    }
-                }, delay);
-            };
-            voiceHoldRelease = armSilence;
-
-            rec.onstart = () => {
-                transcriptEl.textContent = 'Listening…';
-                transcriptEl.className   = 'voice-transcript';
-                armSilence();
-            };
-
-            rec.onresult = (event) => {
-                interimText = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const seg = pickBestTranscript(event.results[i]);
-                    if (event.results[i].isFinal) {
-                        const cleanSeg = seg.trim();
-                        if (cleanSeg && !accumulated.trim().toLowerCase().endsWith(cleanSeg.toLowerCase())) {
-                            accumulated += (accumulated && !accumulated.endsWith(' ') ? ' ' : '') + cleanSeg;
-                        }
-                        gotSpeech = true;
-                    } else {
-                        interimText += seg;
-                        if (seg.trim()) gotSpeech = true;
-                    }
-                }
-                const display = combinedText();
-                transcriptEl.textContent = display || 'Listening…';
-                transcriptEl.className   = display
-                    ? (accumulated.trim() ? 'voice-transcript heard' : 'voice-transcript interim')
-                    : 'voice-transcript';
-                armSilence();
-            };
-
-            rec.onend = () => {
-                if (settled) return;
-                const got = combinedText();
-                if (got) {
-                    // Chrome/WebView may stop recognition before Hachi's longer
-                    // endpoint grace expires. Restart the same turn and retain
-                    // accumulated text so a thinking pause is not a hard cutoff.
-                    armSilence();
-                    setTimeout(() => {
-                        if (!settled && voiceActive && !voiceAborted && !isMuted) {
-                            try { rec.start(); } catch (_) {}
-                        }
-                    }, 80);
-                    return;
-                }
-                if (langIndex < LANGUAGES.length - 1) {
-                    langIndex++;
-                    settled = true;
-                    attempt();
-                } else {
-                    finish('');
-                }
-            };
-
-            rec.onerror = (event) => {
-                if (settled) return;
-                if (event.error === 'not-allowed') {
-                    settled = true;
-                    sub.textContent = 'Microphone permission denied — please allow mic access.';
-                    finish('');
-                    return;
-                }
-                if (event.error === 'no-speech' && gotSpeech) {
-                    finish(combinedText());
-                    return;
-                }
-                if (langIndex < LANGUAGES.length - 1) {
-                    langIndex++;
-                    settled = true;
-                    attempt();
-                } else {
-                    finish('');
-                }
-            };
-
-            watchdogTimer = setTimeout(() => {
-                const got = combinedText();
-                finish(got);
-            }, 60000);
-
-            try {
-                rec.start();
-            } catch(e) {
-                if (!settled) { settled = true; resolve(''); }
-            }
-        };
-
-        attempt();
-    });
-}
-
-
-// ── Stream response + play Edge TTS audio with instant barge-in ──────────────
-// Direct microphone turn capture. The WebView only captures audio and detects a
-// natural endpoint; the backend owns transcription through Faster-Whisper. This
-// removes the browser/cloud SpeechRecognition restart and language-selection
-// problems that made the former voice mode feel unreliable.
-function stopVoiceCapture(discard = false) {
-    if (voiceCapture && voiceCapture.finish) voiceCapture.finish(discard);
-}
-
-function listenWithLocalWhisper() {
-    if (!voiceActive || voiceAborted || isMuted || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-        return Promise.resolve('');
-    }
-
-    return new Promise((resolve) => {
-        (async () => {
-            let stream, context, source, analyser, recorder;
-            let frameId = null;
-            let maxTimer = null;
-            let chunks = [];
-            let heardSpeech = false;
-            let ending = false;
-            let discardRequested = false;
-            let noiseFloor = 0.004;
-            let lastVoiceAt = performance.now();
-            let abortController = null;
-
-            const finish = (discard = false) => {
-                if (discard) {
-                    discardRequested = true;
-                    if (abortController) abortController.abort();
-                }
-                if (ending) return;
-                ending = true;
-                if (frameId) cancelAnimationFrame(frameId);
-                if (maxTimer) clearTimeout(maxTimer);
-                if (recorder && recorder.state !== 'inactive') recorder.stop();
-                else complete('');
-            };
-
-            const capture = { finish };
-            voiceCapture = capture;
-
-            const releaseMicrophone = async () => {
-                if (frameId) cancelAnimationFrame(frameId);
-                if (maxTimer) clearTimeout(maxTimer);
-                try { source?.disconnect(); analyser?.disconnect(); } catch (_) {}
-                if (stream) for (const track of stream.getTracks()) track.stop();
-                try { await context?.close(); } catch (_) {}
-            };
-
-            const complete = async (text) => {
-                await releaseMicrophone();
-                if (voiceCapture === capture) voiceCapture = null;
-                voiceHoldRelease = null;
-                resolve(text || '');
-            };
-
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    channelCount: 1
-                }});
-                if (!voiceActive || voiceAborted || isMuted) {
-                    finish(true);
-                    return;
-                }
-
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                context = new AudioCtx();
-                source = context.createMediaStreamSource(stream);
-                analyser = context.createAnalyser();
-                analyser.fftSize = 1024;
-                source.connect(analyser);
-                const samples = new Float32Array(analyser.fftSize);
-                const types = ['audio/webm;codecs=opus', 'audio/webm'];
-                const mimeType = types.find(type => MediaRecorder.isTypeSupported(type));
-                recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-
-                recorder.ondataavailable = event => {
-                    if (event.data && event.data.size) chunks.push(event.data);
-                };
-                recorder.onerror = () => finish(true);
-                recorder.onstop = async () => {
-                    await releaseMicrophone();
-                    if (discardRequested || !heardSpeech || !chunks.length) {
-                        await complete('');
-                        return;
-                    }
-                    setVoiceState('thinking', 'Understanding…', 'Transcribing your voice locally…');
-                    transcriptEl.textContent = 'Understanding what you said…';
-                    transcriptEl.className = 'voice-transcript interim';
-                    abortController = new AbortController();
-                    try {
-                        const audio = new Blob(chunks, { type: mimeType || 'audio/webm' });
-                        const form = new FormData();
-                        form.append('audio', audio, 'voice.webm');
-                        const response = await fetch('/api/transcribe_voice_turn', {
-                            method: 'POST', body: form, signal: abortController.signal
-                        });
-                        const result = await response.json();
-                        if (!response.ok) throw new Error(result.error || 'Transcription failed');
-                        await complete(discardRequested ? '' : (result.text || '').trim());
-                    } catch (error) {
-                        if (!discardRequested && voiceActive) {
-                            sub.textContent = error.name === 'AbortError'
-                                ? 'Cancelled'
-                                : 'I could not understand that — please try again.';
-                        }
-                        await complete('');
-                    }
-                };
-
-                voiceHoldRelease = () => finish(false);
-                recorder.start(250);
-                const startedAt = performance.now();
-                const monitorLevel = () => {
-                    if (ending || !voiceActive || voiceAborted || isMuted) {
-                        finish(true);
-                        return;
-                    }
-                    analyser.getFloatTimeDomainData(samples);
-                    let energy = 0;
-                    for (const sample of samples) energy += sample * sample;
-                    const level = Math.sqrt(energy / samples.length);
-                    // Adapt only before the user starts talking. This handles a
-                    // quiet room, laptop fan, or different microphone gain.
-                    if (!heardSpeech) noiseFloor = noiseFloor * 0.94 + Math.min(level, 0.03) * 0.06;
-                    const threshold = Math.max(0.012, noiseFloor * 2.8);
-                    const now = performance.now();
-                    if (level > threshold) {
-                        heardSpeech = true;
-                        lastVoiceAt = now;
-                        transcriptEl.textContent = 'Listening…';
-                        transcriptEl.className = 'voice-transcript interim';
-                    }
-                    if (heardSpeech && !voiceHoldFloor && now - lastVoiceAt > 950) {
-                        finish(false);
-                        return;
-                    }
-                    if (!heardSpeech && now - startedAt > 30000) {
-                        finish(false);
-                        return;
-                    }
-                    frameId = requestAnimationFrame(monitorLevel);
-                };
-                maxTimer = setTimeout(() => finish(false), 90000);
-                monitorLevel();
-            } catch (error) {
-                if (voiceActive && !voiceAborted) {
-                    sub.textContent = 'Microphone unavailable — check permission and try again.';
-                }
-                await complete('');
-            }
-        })();
-    });
-}
-
-let isInterrupting = false;
-
-const STOP_WORDS = [
-    'stop', 'stopped', 'quiet', 'shh', 'shhh', 'pause', 'cancel', 'enough',
-    'shut up', 'be quiet', 'please stop', 'ok stop', 'hold on', 'wait',
-    'tama', 'tama na', 'hinto', 'tigil', 'tumahimik', 'sandali',
-    'pakitigil', 'sige na', 'tumigil', 'hoy stop'
-];
-
-function matchesStopWord(text) {
-    const txt = text.trim().toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!txt) return false;
-    if (/\b(?:don't|do not|dont|huwag)\s+(?:you\s+)?stop\b/.test(txt)) return false;
-    if (txt.split(' ').length > 5) return false;
-    return STOP_WORDS.some(w => txt === w || txt === `hachi ${w}` || txt === `hey hachi ${w}`);
-}
-
-function encodeInterruptWav(floatChunks, sourceRate) {
-    let total = 0;
-    for (const chunk of floatChunks) total += chunk.length;
-    const merged = new Float32Array(total);
-    let offset = 0;
-    for (const chunk of floatChunks) { merged.set(chunk, offset); offset += chunk.length; }
-    const targetRate = 16000;
-    const ratio = sourceRate / targetRate;
-    const length = Math.max(1, Math.floor(merged.length / ratio));
-    const pcm = new Int16Array(length);
-    for (let i = 0; i < length; i++) {
-        const start = Math.floor(i * ratio);
-        const end = Math.min(merged.length, Math.floor((i + 1) * ratio));
-        let sum = 0;
-        for (let j = start; j < end; j++) sum += merged[j];
-        const sample = Math.max(-1, Math.min(1, sum / Math.max(1, end - start)));
-        pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-    }
-    const buffer = new ArrayBuffer(44 + pcm.byteLength);
-    const view = new DataView(buffer);
-    const write = (at, value) => { for (let i = 0; i < value.length; i++) view.setUint8(at + i, value.charCodeAt(i)); };
-    write(0, 'RIFF'); view.setUint32(4, 36 + pcm.byteLength, true); write(8, 'WAVE');
-    write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true); view.setUint32(24, targetRate, true);
-    view.setUint32(28, targetRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-    write(36, 'data'); view.setUint32(40, pcm.byteLength, true);
-    new Int16Array(buffer, 44).set(pcm);
-    return new Blob([buffer], { type: 'audio/wav' });
-}
-
-async function startLocalInterruptMonitor(turnId, onStop) {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: {
-            echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1
-        }});
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        const context = new AudioCtx();
-        const source = context.createMediaStreamSource(stream);
-        const processor = context.createScriptProcessor(4096, 1, 1);
-        const silentGain = context.createGain();
-        silentGain.gain.value = 0;
-        source.connect(processor); processor.connect(silentGain); silentGain.connect(context.destination);
-        let chunks = [];
-        let samples = 0;
-        let requestActive = false;
-        let stopped = false;
-
-        const stop = async () => {
-            if (stopped) return;
-            stopped = true;
-            processor.onaudioprocess = null;
-            try { source.disconnect(); processor.disconnect(); silentGain.disconnect(); } catch (_) {}
-            for (const track of stream.getTracks()) track.stop();
-            try { await context.close(); } catch (_) {}
-        };
-
-        processor.onaudioprocess = async (event) => {
-            if (stopped) return;
-            const input = event.inputBuffer.getChannelData(0);
-            // Do not cancel from raw sound level. With laptop speakers, the
-            // microphone can hear Hachi's own TTS and falsely treat it as the
-            // user speaking. This monitor only cancels on a confirmed phrase.
-            chunks.push(new Float32Array(input));
-            samples += input.length;
-            if (samples < context.sampleRate * 1.15 || requestActive) return;
-            const sending = chunks;
-            chunks = [];
-            samples = 0;
-            requestActive = true;
-            try {
-                const form = new FormData();
-                form.append('audio', encodeInterruptWav(sending, context.sampleRate), 'interrupt.wav');
-                form.append('turn_id', turnId);
-                const response = await fetch('/api/transcribe_interrupt', { method: 'POST', body: form });
-                const result = await response.json();
-                if (!stopped && (result.stop || matchesStopWord(result.text || ''))) onStop('local-audio');
-            } catch (_) {
-            } finally {
-                requestActive = false;
-            }
-        };
-        return { stop };
-    } catch (_) {
-        return null;
-    }
-}
-
-async function streamAndSpeakResponse(userText) {
-    const audioQueue = [];
-    const pendingAudioIds = [];
-    let playerDone = false;
-    let isInterrupted = false;
-    let engine = 'qwen';
-    const streamAbort = new AbortController();
-    const turnId = (window.crypto && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    activeVoiceTurnId = turnId;
-    let reader = null;
-    let localInterruptMonitor = null;
-    isInterrupting = false;
-
-    function doInterrupt(source) {
-        if (isInterrupted) return;
-        isInterrupted  = true;
-        isInterrupting = true;
-        audioQueue.length = 0;
-        pendingAudioIds.length = 0;
-        stopCurrentAudio();
-        if (window.speechSynthesis) speechSynthesis.cancel();
-        streamAbort.abort();
-        fetch('/api/cancel_turn', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ turn_id: turnId })
-        }).catch(() => {});
-        setVoiceState('listening', 'Listening…', 'Go ahead — speak now');
-        transcriptEl.textContent = 'Interrupted — speak now…';
-        transcriptEl.className   = 'voice-transcript';
-        if (interruptRec) { try { interruptRec.abort(); } catch(_) {} interruptRec = null; }
-        interruptRecRunning = false;
-        if (localInterruptMonitor) { localInterruptMonitor.stop(); localInterruptMonitor = null; }
-    }
-
-    _voiceInterruptFn = doInterrupt;
-
-    // ── Audio player task (runs in parallel) ──────────────────────────────
-    async function drainAudioQueue() {
+    reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr) continue;
         try {
-          while (!playerDone || audioQueue.length > 0 || pendingAudioIds.length > 0) {
-            if (isInterrupted || !voiceActive || voiceAborted) break;
-            if (audioQueue.length === 0) {
-                if (pendingAudioIds.length > 0) {
-                    const id = pendingAudioIds.shift();
-                    const audio = new Audio(`/api/tts_audio/${id}`);
-                    audio.preload = 'auto';
-                    audio.load();
-                    audioQueue.push({ audio, sentence: '' });
-                    continue;
-                }
-                await sleep(15);
-                continue;
-            }
-
-            const item = audioQueue.shift();
-            setVoiceState('speaking', 'Speaking…', 'Hachi is speaking');
-            sub.textContent = 'Say "stop" or tap the orb to interrupt';
-
-            // Preload next queued audio immediately for zero-latency gapless playback
-            if (audioQueue.length > 0 && audioQueue[0].audio) {
-                try { audioQueue[0].audio.load(); } catch(_) {}
-            }
-
-            await playAudio(item.audio, item.sentence);
-
-            if (isInterrupted) break;
+          const evt = JSON.parse(jsonStr);
+          if (evt.open_smart_home) openSmartHomeSimulator();
+          if (!evt.done && evt.token) {
+            ensureAssistantMessage();
+            accumulatedText += evt.token;
+            bubble.innerHTML = sanitizeHtml(typeof marked !== 'undefined' ? marked.parse(accumulatedText) : accumulatedText);
+            scrollToBottom();
           }
-        } finally {
-            if (voiceActive && !voiceAborted) {
-                setVoiceState('listening', 'Listening…', isInterrupted ? 'Go ahead — speak now' : 'Your turn — speak now');
-            } else {
-                voiceSpeaking = false;
+          if (evt.done) {
+            ensureAssistantMessage();
+            accumulatedText = evt.full || accumulatedText;
+            toolsList = evt.tools || [];
+            bubble.innerHTML = sanitizeHtml(typeof marked !== 'undefined' ? marked.parse(accumulatedText) : accumulatedText);
+            copyBtn.onclick = () => copyMessageText(copyBtn, accumulatedText);
+            if (evt.engine) meta.textContent = 'Hachi · ' + (evt.engine === 'deepseek' ? 'DeepSeek · cloud' : 'Qwen · local') + ' · ' + timeNow();
+            if (toolsList.length > 0) {
+              toolsList.forEach(t => {
+                const badge = document.createElement('span');
+                badge.className = 'tool-badge';
+                badge.textContent = `✓ ${t.tool}`;
+                wrap.appendChild(badge);
+              });
             }
-        }
+            scrollToBottom();
+            break;
+          }
+        } catch (_) {}
+      }
     }
-
-    // ── Stop-word barge-in listener (continuous, multi-language) ──────────
-    let interruptRec = null;
-    let interruptRecRunning = false;
-    const INTERRUPT_LANGS = ['en-PH', 'fil-PH', 'en-US'];
-    let interruptLangIdx = 0;
-
-    function startInterruptListener() {
-        if (!HAS_WEB_SPEECH || !voiceActive || isMuted || voiceAborted || isInterrupted) return;
-        if (interruptRecRunning) return;
-        try {
-            const rec = new SpeechRecognition();
-            interruptRec = rec;
-            interruptRecRunning = true;
-            rec.continuous      = true;
-            rec.interimResults  = true;
-            rec.lang            = INTERRUPT_LANGS[interruptLangIdx % INTERRUPT_LANGS.length];
-            rec.maxAlternatives = 2;
-
-            rec.onresult = (event) => {
-                if (isInterrupted) return;
-                let txt = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    txt += pickBestTranscript(event.results[i]);
-                }
-                if (matchesStopWord(txt)) doInterrupt('voice');
-            };
-            rec.onerror = () => { interruptRecRunning = false; };
-            rec.onend   = () => {
-                interruptRecRunning = false;
-                if (!isInterrupted && !playerDone && voiceActive && !voiceAborted && !isMuted) {
-                    interruptLangIdx++;
-                    setTimeout(startInterruptListener, 50);
-                }
-            };
-            rec.start();
-        } catch(_) { interruptRecRunning = false; }
-    }
-
-    // Use interim browser recognition as the low-latency path for the small,
-    // fixed stop vocabulary. Local Whisper runs alongside it as the dependable
-    // fallback when WebView2 drops recognition during audio playback.
-    startInterruptListener();
-    startLocalInterruptMonitor(turnId, doInterrupt).then((monitor) => {
-        if (isInterrupted || playerDone || !voiceActive) {
-            if (monitor) monitor.stop();
-            return;
-        }
-        localInterruptMonitor = monitor;
-    });
-
-    const playerTask = drainAudioQueue();
-
-    // ── SSE reader (voice_stream endpoint) ────────────────────────────────
-    let fullText = '';
-    let toolsList = [];
-    try {
-        const res = await fetch('/api/voice_stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userText, mode: currentMode, turn_id: turnId }),
-            signal: streamAbort.signal
-        });
-        reader = res.body.getReader();
-    } catch(e) {
-        playerDone = true;
-        _voiceInterruptFn = null;
-        if (interruptRec) { try { interruptRec.abort(); } catch(_) {} }
-        if (localInterruptMonitor) { await localInterruptMonitor.stop(); localInterruptMonitor = null; }
-        await playerTask;
-        return;
-    }
-
-    const decoder   = new TextDecoder();
-    let   sseBuffer = '';
-
-    try {
-        while (voiceActive && !voiceAborted && !isInterrupted) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            sseBuffer += decoder.decode(value, { stream: true });
-            const lines = sseBuffer.split('\n');
-            sseBuffer   = lines.pop() ?? '';
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const jsonStr = line.slice(6).trim();
-                if (!jsonStr) continue;
-                try {
-                    const evt = JSON.parse(jsonStr);
-
-                    if (evt.type === 'open_smart_home') {
-                        openSmartHomeSimulator();
-                    }
-
-                    if (evt.type === 'token') {
-                        // Update thinking display
-                        if (!isInterrupted) {
-                            setVoiceState('thinking', 'Thinking…', evt.text);
-                        }
-                    }
-
-                    if (evt.type === 'audio') {
-                        // Pre-fetch audio but cap the queue so long replies don't
-                        // stack many parallel downloads (lazy-create when it drains).
-                        if (!isInterrupted) {
-                            if (audioQueue.length < 3) {
-                                const audio = new Audio(`/api/tts_audio/${evt.id}`);
-                                audio.preload = 'auto';
-                                audioQueue.push({ audio, sentence: evt.sentence || '' });
-                            } else {
-                                // Queue is full — remember the sentence and fetch lazily
-                                pendingAudioIds.push(evt.id);
-                            }
-                        }
-                    }
-
-                    if (evt.type === 'done') {
-                        fullText  = evt.full  || '';
-                        toolsList = evt.tools || [];
-                        engine    = evt.engine || 'qwen';
-                        if (evt.pomo) {
-                            if (evt.pomo === 'start') startPomodoro();
-                            else stopPomodoro();
-                        }
-                        break;
-                    }
-                } catch(_) {}
-            }
-        }
-    } catch(_) {
-    } finally {
-        try { reader.cancel(); } catch(_) {}
-        playerDone = true;
-    }
-
-    await playerTask;
-    // Keep interruption ownership alive until queued audio has actually ended.
-    // SSE can finish well before the final generated sentence plays.
-    _voiceInterruptFn = null;
-    if (activeVoiceTurnId === turnId) activeVoiceTurnId = null;
-    if (interruptRec) { try { interruptRec.abort(); } catch(_) {} }
-    if (localInterruptMonitor) { await localInterruptMonitor.stop(); localInterruptMonitor = null; }
-
-    // Add assistant message to chat
-    // C1: applyPomoSignals(..., true) — skip its internal addMessage so we don't
-    // render the same response twice. Engine badge shows which model answered.
-    if (!voiceAborted && fullText && !isInterrupted) {
-        addMessage(fullText, 'assistant', toolsList, engine);
-        applyPomoSignals(fullText, toolsList, userText, true);
-    }
+  } catch (err) {
+    removeTyping();
+    if (bubble) bubble.textContent = 'Connection error — is Hachi running?';
+    else addMessage('Connection error — is Hachi running?', 'assistant');
+  } finally {
+    chatIsStreaming = false;
+    saveActiveChat();
+  }
 }
 
-function playLocalFemaleAck(userText) {
-    // Disabled: AI speaks response directly without filler audio
-    return;
+// Pomodoro Timer Logic
+const POMO_WORK_MINS = 25;
+let pomoInterval = null;
+let pomoSeconds = POMO_WORK_MINS * 60;
+let pomoPaused = false;
+
+function startPomodoro() {
+  clearInterval(pomoInterval);
+  pomoSeconds = POMO_WORK_MINS * 60;
+  pomoPaused = false;
+  document.getElementById('pomodoroBanner').classList.add('visible');
+  pomoInterval = setInterval(pomoTick, 1000);
+}
+function pomoTick() {
+  if (pomoPaused) return;
+  pomoSeconds--;
+  const m = Math.floor(pomoSeconds / 60);
+  const s = pomoSeconds % 60;
+  document.getElementById('pomoTimer').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  if (pomoSeconds <= 0) {
+    clearInterval(pomoInterval);
+    alert('Pomodoro session completed! Time for a short break.');
+  }
+}
+function togglePomodoro() {
+  pomoPaused = !pomoPaused;
+  document.getElementById('pomoPauseBtn').textContent = pomoPaused ? '▶ Resume' : '⏸ Pause';
+}
+function stopPomodoro() {
+  clearInterval(pomoInterval);
+  document.getElementById('pomodoroBanner').classList.remove('visible');
 }
 
-// ── Browser SpeechSynthesis fallback (explicit female voice) ─────────────────
-function speakBrowserFallback(text) {
-    if (!text || !window.speechSynthesis) return;
-    try {
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.rate = 1.1;
-        u.volume = 1.0;
-        const voices = speechSynthesis.getVoices();
-        const preferred = voices.find(v => (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Ava') || v.name.includes('Jenny') || v.gender === 'female') && /en|fil/i.test(v.lang + v.name));
-        if (preferred) u.voice = preferred;
-        speechSynthesis.speak(u);
-    } catch (_) {}
-}
-
-// ── Play a single <audio> element with load-wait + SpeechSynthesis fallback ───
-function playAudio(audio, fallbackText) {
-    return new Promise((resolve) => {
-        if (!voiceActive || voiceAborted || isInterrupting) {
-            resolve();
-            return;
-        }
-        currentAudio = audio;
-        audio.volume = 0.95;
-
-        let finished = false;
-        const done = () => {
-            if (finished) return;
-            finished = true;
-            clearTimeout(guard);
-            clearTimeout(loadTimeout);
-            if (currentAudio === audio) currentAudio = null;
-            resolve();
-        };
-
-        const guard = setTimeout(done, 25000);
-
-        const tryPlay = () => {
-            if (!voiceActive || voiceAborted || isInterrupting || finished) { done(); return; }
-            if (window.speechSynthesis) speechSynthesis.cancel();
-            const p = audio.play();
-            if (p !== undefined) {
-                p.catch(() => {
-                    if (fallbackText) speakBrowserFallback(fallbackText);
-                    done();
-                });
-            }
-        };
-
-        const loadTimeout = setTimeout(() => {
-            if (audio.readyState < 2 && fallbackText) {
-                speakBrowserFallback(fallbackText);
-                done();
-            } else {
-                tryPlay();
-            }
-        }, 3000);
-
-        audio.onended = done;
-        audio.onerror = () => {
-            if (fallbackText) speakBrowserFallback(fallbackText);
-            done();
-        };
-
-        if (audio.readyState >= 2) {
-            clearTimeout(loadTimeout);
-            tryPlay();
-        } else {
-            audio.oncanplay = () => {
-                clearTimeout(loadTimeout);
-                tryPlay();
-            };
-            audio.load();
-        }
-    });
-}
-
-// ============================================================
-// Wake-word polling
-// ============================================================
-function showWakeToast() {
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2500);
-}
-
-async function pollWakeword() {
-    try {
-        const res  = await fetch('/api/wakeword_status');
-        const data = await res.json();
-        if (data.detected && !voiceActive) { showWakeToast(); openVoice(); }
-    } catch { /* server not ready yet */ }
-}
-
-wakewordPoll = setInterval(pollWakeword, 600);
-
-// ── Mic status indicator (Fix 12) ───────────────────────────────────────────
-// Tells the user whether the program sees a microphone (green) or not (red),
-// with the device name — so a broken mic is obvious instead of silent.
+// Mic status polling
 async function pollMicStatus() {
-    try {
-        const res  = await fetch('/api/mic_status');
-        const data = await res.json();
-        const micEl   = document.getElementById('micStatus');
-        const dotEl   = document.getElementById('micDot');
-        if (!micEl || !dotEl) return;
-        if (data.ok && data.detected) {
-            dotEl.style.background = '#4ade80';   // green
-            micEl.textContent = 'mic · ' + (data.mics[0]?.name || 'detected');
-        } else {
-            dotEl.style.background = '#f87171';   // red
-            micEl.textContent = 'mic · not detected';
-        }
-        micEl.style.cursor = 'default';
-    } catch { /* server not ready yet — leave as "mic…" */ }
+  try {
+    const res = await fetch('/api/mic_status');
+    const data = await res.json();
+    const micEl = document.getElementById('micStatus');
+    const dotEl = document.getElementById('micDot');
+    if (micEl && dotEl) {
+      if (data.ok && data.detected) {
+        dotEl.style.background = '#4ade80';
+        micEl.textContent = 'mic · ' + (data.mics[0]?.name || 'ready');
+      } else {
+        dotEl.style.background = '#f87171';
+        micEl.textContent = 'mic · offline';
+      }
+    }
+  } catch (_) {}
 }
 pollMicStatus();
 setInterval(pollMicStatus, 8000);
 
-/* Build the hover-animated hero title from words */
-(function() {
-  const titleWords = ["What", "can", "I", "do", "for", "you?"];
-  const heroTitle = document.getElementById('heroTitle');
-  if (heroTitle) {
-    titleWords.forEach(function(w) {
-      const span = document.createElement('span');
-      span.className = 'word';
-      span.textContent = w;
-      heroTitle.appendChild(span);
-    });
-  }
-})();
-
+// Initialize chats
+function initializeChats() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '{}');
+    if (Array.isArray(saved.chats) && saved.chats.length) {
+      chats = saved.chats;
+      activeChatId = saved.activeChatId || chats[0].id;
+    }
+  } catch (_) {}
+  if (!chats.length) chats = [{ id: makeChatId(), title: 'General Chat', messagesHtml: '', hasMessages: false, mode: 'default' }];
+  if (!activeChatId) activeChatId = chats[0].id;
+  restoreActiveChat();
+}
 initializeChats();
 
-/* Loader reveal logic */
+// Loader reveal logic (Preserved 100%)
 (function(){
   const loaderScreen = document.getElementById('loaderScreen');
   const appScreen = document.querySelector('.app');
@@ -2952,8 +1658,6 @@ initializeChats();
     setTimeout(function(){ loaderScreen.style.display = 'none'; }, 1500);
   }, 4000);
 })();
-
 </script>
-
 </body>
 </html>
