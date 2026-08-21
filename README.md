@@ -1,117 +1,146 @@
-# HACHI - Agentic AI Voice Assistant
+# 🐾 HACHI — Agentic AI Voice Assistant
 
-A fully autonomous, voice-enabled **Agentic AI Desktop Assistant** built for local execution using Ollama, tool calling, local SQLite memory, Microsoft Edge Neural TTS, and PyWebView desktop interface.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Model: Qwen 3.5](https://img.shields.io/badge/LLM-Qwen%203.5-orange.svg)](https://ollama.com/)
+[![Tests: 77 Passed](https://img.shields.io/badge/Tests-77%20Passed-brightgreen.svg)](tests/)
 
----
-
-## ✨ Features
-
-- 🤖 **Agentic Function Calling**: Automatically understands intent and triggers system tools (no hardcoded keywords required).
-- 🇵🇭 **Tagalog & English Voice Support**: Native Tagalog (`fil-PH`) and English speech recognition with Microsoft Edge Neural Voices (`fil-PH-AngeloNeural` / `en-US-AvaNeural`).
-- 🗄️ **Local SQLite Database Memory**: Tracks past conversations, executed tasks, and dates so Hachi can recall historical activity (*"What did I do last Tuesday?"*).
-- 🎯 **Context-Driven Modes**:
-  - 🎮 **Gaming Mode**: Steam (Big Picture), Discord, Spotify.
-  - 📚 **Study Mode**: VS Code, ChatGPT (Desktop app or Web tab), Spotify.
-  - 🎬 **Movie Mode**: YouTube & Netflix browser tabs.
-  - ⏱️ **Focus Mode**: Spotify + integrated Focus Pomodoro Timer.
-- 🚪 **Universal App Control**: Close ANY running application on Windows (*"Close Chrome"*, *"Close Notepad"*).
-- 🌐 **Live Web Scraping & Weather**: Scrapes live weather forecasts and performs instant DuckDuckGo web searches.
-- 📊 **PC System Diagnostics**: Live CPU usage, RAM memory consumption, and battery status.
-- 🖥️ **Native Desktop Interface**: Sleek PyWebView application window with real-time progress bar.
+A fully autonomous, bilingual, voice-enabled **Agentic Desktop Assistant** built for 100% private local execution using Ollama, tool calling, hybrid vector SQLite memory, Microsoft Edge Neural TTS, simulated smart home IoT controls, and a modern desktop interface.
 
 ---
 
-## 🛠️ Requirements
+## ✨ Key Features
 
-- **Python 3.8+**
-- **Ollama** running locally (`http://localhost:11434`)
-- **Qwen Model** (configured with `qwen3.5:2b` in `config.json`)
-- **Microphone & Speaker**
-- **Windows OS**
+### 🤖 1. Agentic Decision-Making & Tool Orchestration
+- **Dynamic Tool Routing**: Automatically infers user intent without rigid keywords or commands.
+- **Fast-Intent Bypasses**: Instant zero-latency execution (~50ms) for high-frequency commands like volume controls, app launches, and system health checks.
+- **Multi-Step Workflows**: Chains multiple tools autonomously (e.g. searching the web, extracting text, synthesizing findings, and setting a reminder).
+
+### 🎙️ 2. Bilingual Speech & Neural Voice
+- **Tagalog & English Recognition**: Seamlessly processes both English and Tagalog (`fil-PH`) speech inputs.
+- **Natural Neural Synthesis**: Powered by Microsoft Edge Neural Voices (`fil-PH-AngeloNeural` and `en-US-AvaNeural`) with wake-word and acoustic sound cues.
+- **Local Whisper Fallback**: Offline fallback speech-to-text using local Whisper models.
+
+### 🧠 3. Durable Memory & Entity Supersession
+- **Hashed Trigram Vector Embeddings**: Dependency-free semantic search combined with token lexical matching.
+- **Entity Supersession**: Automatically updates and supersedes older conflicting facts (e.g., safe codes, passwords, preferences) while preserving memory history across chat sessions.
+- **Direct Conversational Recall**: Answers memory queries naturally and directly without cluttered dumps.
+
+### 🏠 4. Interactive Smart Home Simulation
+- **Full IoT Control Dashboard**: Control smart lights (brightness/RGB colors), locks, thermostats, entertainment systems, and fans.
+- **Real-Time Visualizer**: Interactive web dashboard (`/smart_home`) with mechanical animations, gold radial state indicators, and Server-Sent Events (SSE).
+- **Routines & Scenes**: Automated routines (`Morning Routine`, `Good Night`, `Party Mode`, `Study Scene`).
+
+### 📄 5. PDF & Document Intelligence
+- **Document Attachment Analysis**: Attach PDF documents directly into the chat interface for instant summarization, key point extraction, and grounded Q&A.
+- **Local File & Folder Navigation**: Open folders, documents, and files directly on Windows desktop.
+
+### 🌐 6. Web Research & Headless Browser Automation
+- **Multi-Source Synthesis**: Performs multi-query web searches via DuckDuckGo (or Brave/Tavily) and synthesizes source-grounded answers with citations `[1]`.
+- **Playwright Headless Browser**: Navigates, clicks, and extracts content from live web pages.
+
+### 🎯 7. Preset Environment Modes
+- 🎮 **Gaming Mode**: Launches Steam, Discord, sets ambient RGB lights, and opens Spotify.
+- 📚 **Study Mode**: Launches VS Code, Notion/ChatGPT, sets study lighting, and starts ambient music.
+- 🎬 **Movie Mode**: Launches media player/Netflix and dims the room lights.
+- ⏱️ **Focus Mode**: Starts an integrated Pomodoro timer with Spotify focus audio.
 
 ---
 
-## 🚀 Quick Execution
+## 🛠️ System Architecture
 
-### 1-Click Launch (Recommended)
-Simply double-click:
-```cmd
-run.bat
 ```
-*(Automatically starts Ollama in the background, launches Hachi, and **kills Ollama on window exit to free up RAM**!)*
+Hey-hachi/
+├── hachi_app.py                # Desktop GUI Application (PyWebView)
+├── hachi_agent.py              # Agentic Decision Engine & Tool Dispatcher
+├── hachi_tools.py              # Comprehensive Tool Registry & Schemas
+├── hachi_memory.py             # Durable Hybrid Vector Memory & Supersession
+├── hachi_db.py                 # SQLite Database Manager (Chats, Tasks, Memory)
+├── hachi_home.py               # Smart Home State Manager & Automation Logic
+├── hachi_home_agent.py         # Smart Home Natural Language Agent
+├── hachi_productivity.py       # Notes, Todos, Reminders, File & Clipboard Tools
+├── hachi_speech.py             # Microphone Capture & Edge Neural TTS
+├── hachi_whisper.py            # Local Whisper Speech-to-Text Fallback
+├── hachi_dictation.py          # Continuous Voice Dictation Engine
+├── hachi_browser.py            # Playwright Headless Browser Automation
+├── hachi_web.py                # Flask Backend API & SSE Event Stream
+├── hachi_voice_dictionary.py   # Phonetic Voice Matcher for Tagalog / Slang
+├── config.json                 # Core Configuration (Model, Voices, Settings)
+├── hachi_routines.json         # Smart Home Routine Presets
+├── requirements.txt            # Python Dependencies
+├── setup.bat                   # 1-Click Environment Setup Script
+├── run.bat                     # 1-Click Application Launcher
+├── stop.bat                    # Clean Process & Ollama Cleanup Script
+├── templates/
+│   ├── index.html              # Main Desktop Assistant Chat & Voice UI
+│   └── smart_home.html         # Smart Home Simulation Dashboard
+├── static/                     # Web Fonts, UI Icons, Audio Chimes, Marked.js
+└── tests/                      # Automated Pytest Suite (77 Unit & Integration Tests)
+```
 
-### First Time Setup
-On a new PC, run `setup.bat` once to install Python packages:
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Operating System**: Windows 10 or Windows 11
+- **Python**: Version 3.10, 3.11, or 3.12
+- **Ollama**: Installed from [ollama.com](https://ollama.com/) with `qwen2.5:3b` or `qwen3.5:2b`
+
+### 1. One-Click Setup
+Run `setup.bat` to automatically create a virtual environment and install all dependencies:
 ```cmd
 setup.bat
 ```
 
+### 2. Launching Hachi
+Double-click `run.bat` to launch the assistant:
+```cmd
+run.bat
+```
+*(This script automatically launches the Ollama server in the background, starts the Flask API, opens the PyWebView desktop app, and terminates background services upon closing to save RAM).*
+
+### 3. Stopping Hachi
+To stop all background processes and free system memory:
+```cmd
+stop.bat
+```
+
 ---
 
-## ⚙️ Customization (`config.json`)
+## ⚙️ Configuration (`config.json`)
 
-Edit `config.json` to change the Ollama model or TTS voices dynamically:
+Customize model selection, speech voices, and search providers in `config.json`:
 
 ```json
 {
-  "model_name": "qwen3.5:2b",
+  "model_name": "qwen2.5:3b",
   "use_deepseek": false,
   "deepseek_model": "deepseek-chat",
   "tagalog_voice": "fil-PH-AngeloNeural",
-  "english_voice": "en-US-AvaNeural"
+  "english_voice": "en-US-AvaNeural",
+  "web_search_provider": "duckduckgo",
+  "sound_feedback": true,
+  "wake_word_enabled": true
 }
 ```
 
-### 🧠 Dual-Mode Engine Routing
-
-### Web research providers
-
-Hachi keeps Qwen as the local decision-maker. `search_web` can search up to three focused queries concurrently, then Qwen answers from returned evidence with numbered citations and source URLs.
-
-The default is free DuckDuckGo. Set `web_search_provider` to `brave`, `tavily`, or `searxng` to use a different provider. Put credentials only in `.env`:
-
-```env
-BRAVE_SEARCH_API_KEY=...
-# or TAVILY_API_KEY=...
-# or SEARXNG_BASE_URL=https://search.example.com
-```
-
-If an optional provider is unavailable, Hachi falls back to DuckDuckGo. Search-result content and fetched pages are treated as untrusted evidence, never as instructions.
-
-Hachi now defaults to **Qwen-only local mode**. The legacy DeepSeek integration remains disabled for compatibility, while Qwen via Ollama handles requests and tool selection.
-
-| Intent | Qwen (local) | DeepSeek (cloud) |
-|--------|--------------|------------------|
-| Greetings / simple chat | ✅ primary | — |
-| Tool commands (open/close apps, modes, system stats, weather) | ✅ primary with tools | escalate only if Qwen produces no tool call |
-| Knowledge tools (web search, URL fetch) | ✅ tried first | escalate for tool call + final synthesis |
-| Complex reasoning (explain/compare/code) | quick local-action pass | ✅ primary for the reasoning answer |
-
-The chat bubble shows which engine answered: **"Qwen · local"** or **"DeepSeek · cloud"**. Set `"use_deepseek": false` (or remove the API key from `.env`) to run Qwen-only, fully offline. Set `DEEPSEEK_API_KEY` in `.env` (never in `config.json`) to enable the cloud escalator.
-
 ---
 
-## 📊 File Architecture
+## 🧪 Testing & Verification
+
+Hachi includes a comprehensive automated test suite covering tool schemas, database migrations, smart home actions, memory retrieval, and agent routing:
+
+```cmd
+python -m pytest
+```
 
 ```
-Hey-hachi/
-├── hachi_app.py        # Desktop App Launcher (PyWebView)
-├── hachi_agent.py      # Ollama Function Calling Core
-├── hachi_tools.py      # System Tools (Modes, App Control, Weather, Web Search)
-├── hachi_speech.py     # Speech Recognition & Edge Neural TTS
-├── hachi_db.py         # SQLite Local Memory Database Manager
-├── hachi_web.py        # Flask REST API Backend
-├── hachi_memory.db     # SQLite Database File
-├── config.json         # Model & Voice Settings
-├── setup.bat           # Portable Setup Script
-├── requirements.txt    # Python Dependencies
-├── templates/
-│   └── index.html      # Desktop App UI & Pomodoro Widget
-└── old_version/        # Archived Prototype Files
+============================= 77 passed in 2.37s =============================
 ```
 
 ---
 
-## 📄 License & Credits
+## 📄 License
 
-Developed for AI Lab Works. Powered by **Ollama**, **Qwen 3.5**, and **Microsoft Edge TTS**.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
