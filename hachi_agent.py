@@ -21,6 +21,8 @@ def split_into_subrequests(user_input: str) -> list[str]:
     """
     if not user_input or not user_input.strip():
         return []
+    if "[[HACHI_ATTACHED_PDF]]" in user_input or "[[HACHI_MEETING_TRANSCRIPT]]" in user_input:
+        return [user_input.strip()]
     s = user_input.strip()
     # Normalize newlines to spaces for matching
     normalized = re.sub(r"[\r\n]+", " ", s)
@@ -335,17 +337,22 @@ def select_tools_for_request(user_input: str, limit: int = 8, force_home: bool =
         include("research_web", "search_web")
     if _is_memory_request(user_input) or re.search(r"\bremember\b", text):
         include("search_memory", "remember_fact")
-    browser_task_request = bool(re.search(r"\b(?:browser|chrome|website|webpage|web site)\b", text) or (
-        "search" in text and re.search(r"\b(?:open|go to|visit)\b", text)
-    ))
-    if re.search(r"\b(?:open|launch|start)\b.*\b(?:app|discord|spotify|chrome|vscode|steam)\b", text) and not (
-        browser_task_request and "chrome" in text
-    ):
-        include("launch_app", "launch_mode", "close_mode")
-    if browser_task_request:
+    is_mode_request = bool(re.search(r"\b(?:mode|gaming mode|study mode|movie mode|focus mode|game time|mag-aral|mag-laro|manood|pomodoro)\b", text))
+    is_app_open = bool(re.search(r"\b(?:open|launch|start|run)\b", text))
+    is_app_close = bool(re.search(r"\b(?:close|quit|exit|stop|kill)\b", text))
+    is_browser_task = _is_browser_goal_request(user_input) or bool(
+        re.search(r"\b(?:website|webpage|web site|url|https?://)\b", text) or (
+            "search" in text and re.search(r"\b(?:go to|visit|click|read)\b", text)
+        )
+    )
+    if is_mode_request:
+        include("launch_mode", "close_mode")
+    if is_app_open:
+        include("launch_app")
+    if is_browser_task:
         include("browser_search", "browser_navigate", "browser_open_best_result", "browser_read", "browser_action")
-    if re.search(r"\b(?:close|quit|exit|stop)\b.*\b(?:app|discord|spotify|chrome|vscode|steam)\b", text):
-        include("close_app", "close_recent_apps", "close_mode")
+    if is_app_close:
+        include("close_app", "close_recent_apps")
     if re.search(r"\b(?:play|pause|resume|skip|volume|spotify|youtube)\b", text):
         include("play_spotify", "play_youtube", "media_control")
     if re.search(r"\b(?:remind|reminder|alarm)\b", text):
@@ -360,8 +367,8 @@ def select_tools_for_request(user_input: str, limit: int = 8, force_home: bool =
         include("get_weather")
     if re.search(r"\b(?:cpu|ram|battery|disk|system health)\b", text):
         include("system_health_report", "get_system_stats")
-    if re.search(r"\b(?:file|document|pdf|docx|summari[sz]e)\b", text):
-        include("summarize_document", "open_local_file")
+    if re.search(r"\b(?:folder|directory|file|document|pdf|docx|summari[sz]e)\b", text):
+        include("open_local_file", "summarize_document")
     if re.search(r"\b(?:clipboard|copy|paste)\b", text):
         include("clipboard_get", "clipboard_set")
     if re.search(r"\b(?:screenshot|screen)\b", text):
@@ -401,12 +408,16 @@ LOOKUP_PHRASES = (
 
 def is_lookup_request(user_input: str) -> bool:
     """Return True when a query should browse/search instead of free-guessing."""
+    if "[[HACHI_ATTACHED_PDF]]" in (user_input or "") or "[[HACHI_MEETING_TRANSCRIPT]]" in (user_input or ""):
+        return False
     lower = (user_input or "").lower()
     return any(phrase in lower for phrase in LOOKUP_PHRASES)
 
 
 def should_search_before_answer(user_input: str) -> bool:
     """Identify questions that genuinely need live web evidence."""
+    if "[[HACHI_ATTACHED_PDF]]" in (user_input or "") or "[[HACHI_MEETING_TRANSCRIPT]]" in (user_input or ""):
+        return False
     text = (user_input or "").strip()
     lower = text.lower()
     if not text or _is_memory_request(text) or _is_memory_store_request(text) or _is_action_request(text):
@@ -571,7 +582,7 @@ def _extract_app_batch(user_input: str) -> list[str]:
     if not match:
         return []
     body = match.group(1).strip()
-    if re.search(r"\b(?:search|find|type|write|close|click|download|play)\b", body, flags=re.IGNORECASE):
+    if re.search(r"\b(?:search|find|type|write|close|click|download|play|folder|directory|file|document|desktop|downloads|documents)\b", body, flags=re.IGNORECASE):
         return []
     body = re.sub(r"\b(?:and\s+then|then)\s+(?:open|launch|start|run)\s+", ",", body, flags=re.IGNORECASE)
     body = re.sub(r"\band\s+(?:open|launch|start|run)\s+", ",", body, flags=re.IGNORECASE)
@@ -750,21 +761,24 @@ def _qwen_tool_decide(messages, timeout: float = 6.0, escalate_on_timeout: bool 
     Returns (msg, tool_calls).
     """
     result = {}
+    allow_tools = bool(AVAILABLE_TOOLS if tools is None else tools)
 
     def _decide():
         try:
-            result["resp"] = ollama.chat(
-                model=MODEL_NAME,
-                messages=messages,
-                tools=(AVAILABLE_TOOLS if tools is None else tools),
-                think=False,
-                keep_alive="10m",
-                options={
-                    "num_predict": 180,
+            chat_kwargs = {
+                "model": MODEL_NAME,
+                "messages": messages,
+                "think": False,
+                "keep_alive": "10m",
+                "options": {
+                    "num_predict": 100 if allow_tools else 160,
                     "temperature": 0.1,
                     "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
                 },
-            )
+            }
+            if allow_tools:
+                chat_kwargs["tools"] = (AVAILABLE_TOOLS if tools is None else tools)
+            result["resp"] = ollama.chat(**chat_kwargs)
         except Exception as e:
             result["error"] = e
 
@@ -774,6 +788,13 @@ def _qwen_tool_decide(messages, timeout: float = 6.0, escalate_on_timeout: bool 
 
     if "resp" in result:
         msg = result["resp"].message
+        if not allow_tools:
+            content = getattr(msg, "content", "") or ""
+            content = re.sub(r"<tool_call>.*?(?:</tool_call>|$)", "", content, flags=re.DOTALL).strip()
+            content = re.sub(r"<function=.*?>(?:</function>|$)", "", content, flags=re.DOTALL).strip()
+            if hasattr(msg, "content"):
+                msg.content = content
+            return msg, []
         clean_content, tool_calls = _extract_model_tool_calls(msg)
         if hasattr(msg, "content"):
             msg.content = clean_content
@@ -821,8 +842,12 @@ def _browser_follow_up_required(user_input: str, executed: list[dict]) -> bool:
     browser_steps = [str(row.get("tool") or "") for row in executed if str(row.get("tool", "")).startswith("browser_")]
     if not browser_steps:
         return False
+    if executed:
+        last_out = str(executed[-1].get("output") or "").lower()
+        if "closed" in last_out or "error" in last_out or "could not" in last_out or "failed" in last_out:
+            return False
     lower = (user_input or "").lower()
-    needs_page_interaction = bool(re.search(r"\b(?:open|click|read|summari[sz]e|description|heading|find|best result)\b", lower))
+    needs_page_interaction = bool(re.search(r"\b(?:click|read|summari[sz]e|description|heading|find|best result)\b", lower))
     if not needs_page_interaction:
         return False
     if browser_steps == ["browser_search"]:
@@ -833,11 +858,14 @@ def _browser_follow_up_required(user_input: str, executed: list[dict]) -> bool:
 
 
 def _is_browser_goal_request(user_input: str) -> bool:
-    lower = (user_input or "").lower()
-    if re.search(r"\b(?:browser|website|webpage|web site|youtube)\b", lower):
-        return bool(re.search(r"\b(?:search|find|go to|visit|open|click|read|summari[sz]e)\b", lower))
+    lower = (user_input or "").lower().strip()
+    # Simple desktop app launching/closing is NOT a browser goal
+    if re.match(r"^(?:please\s+|can you\s+)?(?:open|launch|start|run|close|quit|exit|kill)\s+(?:google\s+)?(?:chrome|browser|firefox|edge)(?:\s+(?:for me|please|pls|na|naman|po))?[.?!]?$", lower):
+        return False
+    if re.search(r"\b(?:browser|website|webpage|web site|youtube|wikipedia)\b", lower):
+        return bool(re.search(r"\b(?:search|find|go to|visit|click|read|summari[sz]e)\b", lower))
     if "chrome" in lower:
-        return bool(re.search(r"\b(?:search|find|go to|visit|website|webpage)\b", lower))
+        return bool(re.search(r"\b(?:search|find|go to|visit|website|webpage|url|https?://)\b", lower))
     return "search" in lower and bool(re.search(r"\b(?:open|click|best result|first result)\b", lower))
 
 
@@ -905,6 +933,8 @@ def _weather_location_from_request(user_input: str) -> str | None:
 
 
 def _is_action_request(user_input: str) -> bool:
+    if "[[HACHI_ATTACHED_PDF]]" in (user_input or "") or "[[HACHI_MEETING_TRANSCRIPT]]" in (user_input or ""):
+        return False
     lower = (user_input or "").lower().strip()
     if re.match(r"^(?:what|how|why|where|who|when|which|is there|can you tell me|tell me (?:what|how|why|about))\b", lower):
         if not re.search(r"\b(?:can you\s+)?(?:open|launch|start|close|play|turn on|turn off|set)\s+(?:the\s+)?[a-z0-9_-]+\b", lower):
@@ -926,8 +956,15 @@ def _get_memory_prompt_context(user_input: str) -> str:
         from hachi_db import get_connection
         from contextlib import closing
 
+        # If it's an attached document prompt, only search memory using the user query portion
+        query_text = user_input or ""
+        if "USER REQUEST:\n" in query_text:
+            match = re.search(r"USER REQUEST:\n(.*?)(?:\n\nPDF CONTENT:|\n\nMEETING TRANSCRIPT:|$)", query_text, re.DOTALL)
+            if match:
+                query_text = match.group(1).strip()
+
         # 1. Semantic/lexical matches for current query
-        matched = search_memories(user_input, limit=6, min_score=0.08)
+        matched = search_memories(query_text, limit=6, min_score=0.08)
         facts = []
         for m in matched:
             if m.get("content") and m["content"] not in facts:
@@ -957,9 +994,19 @@ def _get_memory_prompt_context(user_input: str) -> str:
 
 def _is_memory_store_request(user_input: str) -> bool:
     lower = (user_input or "").lower().strip()
-    if re.search(r"\b(?:remember\b|make\s+sure\s+you\s+remember|don't\s+forget|keep\s+in\s+mind|note\s+that|save\s+(?:this\s+)?memory|memorize)\b", lower):
+    if re.search(r"^(?:change|update|set|switch|replace)\b", lower):
+        return True
+    if re.search(r"\b(?:change|update|set|switch|replace)\b.*\b(?:to\s+[0-9a-zA-Z]|new\s+(?:safe\s+code|secret\s+code|code|password|pin|key|passcode))\b", lower):
+        return True
+    if re.search(r"\b(?:remember\b|make\s+sure\s+you\s+remember|don't\s+forget|keep\s+in\s+mind|note\s+that|save\s+(?:this\s+)?memory|memorize|tandaan mo|wag mo kalimutan)\b", lower):
         return True
     if re.search(r"\b(?:tell\s+you\s+something|tell\s+you\s+a\s+secret|ima\s+tell\s+you|im\s+gonna\s+tell\s+you|let\s+me\s+tell\s+you)\b", lower):
+        return True
+    if re.search(r"^(?:i have|i got)\s+(?:a\s+)?(?:secret\s+code|safe\s+code|safe\s+password|code|password|pin|key|secret)\s+(?:is|its|it's|:|=)", lower):
+        return True
+    if re.search(r"^(?:my\s+)?(?:new\s+)?(?:secret\s+code|safe\s+code|safe\s+password|code|password|pin|key|secret)\s+(?:is|its|it's|:|=)", lower):
+        return True
+    if re.search(r"^the\s+(?:code|password|pin|key|passcode)\s+(?:to|for|of)\s+(?:the\s+)?[^.,!?]+?\s+(?:is|its|it's|:|=)", lower):
         return True
     return False
 
@@ -974,16 +1021,21 @@ def _is_memory_request(user_input: str) -> bool:
         "our past conversation", "what did we talk about", "do you remember",
         "recall", "what happened before", "earlier", "tell me about myself",
         "my preferences", "what are my preferences", "tell me my secret",
-        "what is my secret", "what's my secret", "my secret",
-        "what was the code", "what is the code", "what's the code",
-        "what was the password", "what is the password", "what's the password",
-        "code of the safe", "code for the safe", "code to the safe",
-        "password of the safe", "password for the safe",
+        "what is my secret", "what's my secret", "whats my secret", "my secret",
+        "what was the code", "what is the code", "what's the code", "whats the code",
+        "what is my code", "what's my code", "whats my code",
+        "what is my secret code", "what's my secret code", "whats my secret code",
+        "what was the password", "what is the password", "what's the password", "whats the password",
+        "what is my password", "what's my password", "whats my password",
+        "what is my passcode", "what's my passcode", "whats my passcode",
+        "passcode on the safe", "passcode of the safe", "passcode for the safe", "passcode to the safe",
+        "code of the safe", "code for the safe", "code to the safe", "code on the safe",
+        "password of the safe", "password for the safe", "password to the safe", "password on the safe",
+        "safe password", "safe code", "safe passcode",
     )):
         return True
     return bool(re.search(
-        r"\b(?:what(?:'s| is| was) (?:the|my) (?:name|favorite|favourite|secret|code|password|pin|birthday)|what (?:am i allergic to|do i (?:like|love|prefer))|"
-        r"where do i (?:live|work|study)|who am i)\b",
+        r"\b(?:what(?:\'s|s| is| was| are) (?:the|my)?\s*(?:name|favorite|favourite|secret|code|secret code|password|passcode|passphrase|pin|birthday|safe code|safe password|safe passcode)|what (?:am i allergic to|do i (?:like|love|prefer))|where do i (?:live|work|study)|who am i)\b",
         lower,
     ))
 
@@ -1124,6 +1176,10 @@ def _run_qwen_agent_loop(messages, user_input: str, run_tool, checkpoint, max_st
                 messages.append({
                     "role": "tool", "tool_call_id": call["id"], "name": name, "content": str(output)
                 })
+            # Non-browser action tools (launch_app, close_app, launch_mode, etc.) are one-shot completed actions.
+            # Clear routed_tools so the model generates a final conversational answer instead of looping the tool.
+            if not any(c["function"]["name"].startswith("browser_") for c in normalized_calls):
+                routed_tools = []
             continue
         answer = clean_thinking(getattr(msg, "content", "") or "").strip()
         if _browser_follow_up_required(user_input, executed) and step < max_steps - 1:
@@ -1305,6 +1361,8 @@ def detect_intent_tool_call(user_input: str):
     Intent Fallback for small local models or safety checks.
     Ensures tools are executed even if a small model omits the JSON tool_call structure.
     """
+    if "[[HACHI_ATTACHED_PDF]]" in (user_input or "") or "[[HACHI_MEETING_TRANSCRIPT]]" in (user_input or ""):
+        return None, None
     lower = user_input.lower().strip()
 
     # A knowledge lookup can contain words like "game", "movie", or "study".
@@ -1587,11 +1645,18 @@ def check_fast_intent(user_input: str, tool_runner=None) -> Optional[tuple[str, 
         res = runner("summarize_document", args)
         return res, [{"tool": "summarize_document", "args": args, "output": res}]
 
-    open_file_match = re.search(r"\bopen\s+(?:the\s+)?file\s+(.+)$", user_input, re.IGNORECASE)
-    if open_file_match:
-        args = {"path": open_file_match.group(1).strip().strip('"')}
-        res = runner("open_local_file", args)
-        return res, [{"tool": "open_local_file", "args": args, "output": res}]
+    if re.search(r"\b(?:folder|directory|file|doc|document)\b", lower):
+        open_folder_file = re.search(
+            r"\b(?:open|launch)\s+(?:the\s+)?(?:folder\s+|directory\s+|file\s+|doc\s+|document\s+)?(.+?)(?:\s+(?:folder|directory|file|doc|document))?(?:\s+(?:in|on|from)\s+(?:my\s+)?(?:desktop|documents|downloads))?(?:\s+(?:for me|please|pls|po))?[.?!]?$",
+            user_input, re.IGNORECASE
+        )
+        if open_folder_file:
+            raw_target = open_folder_file.group(1).strip().strip('"\'')
+            clean_target = re.sub(r"\s+(?:in|on|from)\s+(?:my\s+)?(?:desktop|documents|downloads)\b", "", raw_target, flags=re.IGNORECASE).strip()
+            clean_target = re.sub(r"\s+(?:folder|directory|file|doc|document)\b", "", clean_target, flags=re.IGNORECASE).strip()
+            args = {"path": clean_target or raw_target}
+            res = runner("open_local_file", args)
+            return res, [{"tool": "open_local_file", "args": args, "output": res}]
 
     app_batch = _extract_app_batch(user_input)
     if app_batch:
@@ -1713,6 +1778,8 @@ def classify_intent(user_input: str) -> str:
     Classify user input into routing tiers (~1ms, pure keyword matching).
     Returns: GREETING, SIMPLE_CHAT, TOOL_NEEDED, or COMPLEX
     """
+    if "[[HACHI_ATTACHED_PDF]]" in user_input or "[[HACHI_MEETING_TRANSCRIPT]]" in user_input:
+        return "SIMPLE_CHAT"
     lower = user_input.lower().strip()
     words = lower.split()
     word_count = len(words)
@@ -1868,6 +1935,8 @@ def process_agent_request(user_input: str, current_mode: str = "default", conver
                 "temperature": 0.4,
                 "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
             }
+            if "[[HACHI_ATTACHED_PDF]]" in user_input or "[[HACHI_MEETING_TRANSCRIPT]]" in user_input:
+                fast_opts["num_ctx"] = 8192
             response = ollama.chat(model=MODEL_NAME, messages=messages, think=False, keep_alive="10m", options=fast_opts)
             final_text = strip_control_tokens(clean_thinking(response.message.content or ""))
             _update_history(user_input, final_text, conversation_id=conversation_id)
@@ -2154,7 +2223,16 @@ def process_agent_request_stream(
     saved_memory = capture_explicit_memory(user_input)
     if saved_memory:
         status = saved_memory.get("status")
-        spoken = "I'll remember that." if status in ("saved", "duplicate") else "I couldn't save that memory."
+        content = saved_memory.get("content", "")
+        if status in ("saved", "duplicate"):
+            if content.lower().startswith("my "):
+                spoken = f"I'll remember that your {content[3:].rstrip('.')}."
+            elif content.lower().startswith("the "):
+                spoken = f"I'll remember that the {content[4:].rstrip('.')}."
+            else:
+                spoken = f"I'll remember that: {content}"
+        else:
+            spoken = "I couldn't save that memory."
         add_message("user", user_input, current_mode, conversation_id)
         add_message("assistant", spoken, current_mode, conversation_id)
         _update_history(user_input, spoken, cap=16, conversation_id=conversation_id)
@@ -2162,7 +2240,7 @@ def process_agent_request_stream(
         yield {
             "done": True,
             "full": spoken,
-            "tools": [{"tool": "remember_fact", "args": {"content": saved_memory.get("content", "")}, "output": status}],
+            "tools": [{"tool": "remember_fact", "args": {"content": content}, "output": status}],
             "engine": "qwen",
             "pomo": None,
         }
@@ -2258,35 +2336,48 @@ def process_agent_request_stream(
                     if durable_list:
                         break
 
-            mem_terms = _memory_search_terms(user_input, limit=5)
-            found = ""
-            for term in mem_terms:
-                hit = search_history(query=term, limit=4, conversation_id=conversation_id)
-                if hit and "No history" not in hit:
-                    found = hit
-                    break
-
-            if durable_list or found:
-                clean_lines = []
-                for line in found.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    m = re.match(r"\[[^\]]*\]\s*\([^)]*\)\s*(User|Assistant):\s*(.*)", line)
-                    if m:
-                        role, content = m.group(1), m.group(2)
-                        speaker = "You" if role == "User" else "I"
-                        clean_lines.append(f"{speaker}: {content}")
-                    elif "Task:" in line:
-                        t = re.search(r"Task:\s*([^|]*)", line)
-                        if t and "Web Search" not in t.group(1):
-                            clean_lines.append(f"• {t.group(1).strip()}")
-                history_body = "\n".join(clean_lines).strip() if clean_lines else ""
-                durable_body = "\n".join(f"• {row['content']}" for row in durable_list) if durable_list else ""
-                body = "\n".join(part for part in (durable_body, history_body) if part).strip()
-                final = ("Here's what I remember:\n\n" + body) if body else "I don't have any past conversation about that in my memory."
+            if durable_list:
+                top = durable_list[0]["content"].strip()
+                # Direct natural answer for specific question queries
+                if len(durable_list) == 1 or any(k in user_input.lower() for k in ("secret", "code", "password", "pin", "birthday", "favorite", "favourite", "name", "live", "work", "allergy", "allergic")):
+                    if top.lower().startswith("my "):
+                        final = "Your " + top[3:].rstrip(".") + "."
+                    elif top.lower().startswith("i "):
+                        final = "You " + top[2:].rstrip(".") + "."
+                    elif top.lower().startswith("the "):
+                        final = top.rstrip(".") + "."
+                    else:
+                        final = f"Here's what I remember: {top}"
+                else:
+                    final = "Here's what I remember:\n\n" + "\n".join(f"• {row['content']}" for row in durable_list)
             else:
-                final = "I don't have any past conversation about that in my memory."
+                mem_terms = _memory_search_terms(user_input, limit=5)
+                found = ""
+                for term in mem_terms:
+                    hit = search_history(query=term, limit=4, conversation_id=conversation_id)
+                    if hit and "No history" not in hit:
+                        found = hit
+                        break
+
+                if found:
+                    clean_lines = []
+                    for line in found.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        m = re.match(r"\[[^\]]*\]\s*\([^)]*\)\s*(User|Assistant):\s*(.*)", line)
+                        if m:
+                            role, content = m.group(1), m.group(2)
+                            speaker = "You" if role == "User" else "I"
+                            clean_lines.append(f"{speaker}: {content}")
+                        elif "Task:" in line:
+                            t = re.search(r"Task:\s*([^|]*)", line)
+                            if t and "Web Search" not in t.group(1):
+                                clean_lines.append(f"• {t.group(1).strip()}")
+                    history_body = "\n".join(clean_lines).strip() if clean_lines else ""
+                    final = ("Here's what I remember from our conversations:\n\n" + history_body) if history_body else "I don't have any past conversation about that in my memory."
+                else:
+                    final = "I don't have any past conversation about that in my memory."
 
             _update_history(user_input, final, cap=16, conversation_id=conversation_id)
             add_message("assistant", final, current_mode, conversation_id)
@@ -2550,17 +2641,20 @@ def process_agent_request_stream(
 
             # Speed safeguard: stream Qwen tokens as they arrive
             accumulated = ""
+            qwen_stream_opts = {
+                "num_predict": 1500,
+                "temperature": 0.4,
+                "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+            }
+            if "[[HACHI_ATTACHED_PDF]]" in user_input or "[[HACHI_MEETING_TRANSCRIPT]]" in user_input:
+                qwen_stream_opts["num_ctx"] = 8192
             for chunk in ollama.chat(
                 model=MODEL_NAME,
                 messages=messages,
                 stream=True,
                 think=False,
                 keep_alive="10m",
-                options={
-                    "num_predict": 1500,
-                    "temperature": 0.4,
-                    "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
-                },
+                options=qwen_stream_opts,
             ):
                 checkpoint()
                 token = chunk.message.content or ""
@@ -2708,17 +2802,20 @@ def process_agent_request_stream(
                 messages.append({"role": "tool", "name": fn, "content": str(result)})
 
         accumulated = ""
+        fallback_stream_opts = {
+            "num_predict": 1500,
+            "temperature": 0.4,
+            "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+        }
+        if "[[HACHI_ATTACHED_PDF]]" in user_input or "[[HACHI_MEETING_TRANSCRIPT]]" in user_input:
+            fallback_stream_opts["num_ctx"] = 8192
         for chunk in ollama.chat(
             model=MODEL_NAME,
             messages=messages,
             stream=True,
             think=False,
             keep_alive="10m",
-            options={
-                "num_predict": 1500,
-                "temperature": 0.4,
-                "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
-            },
+            options=fallback_stream_opts,
         ):
             checkpoint()
             token = chunk.message.content or ""

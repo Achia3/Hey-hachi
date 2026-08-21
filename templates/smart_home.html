@@ -51,14 +51,38 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { min-height: 100%; font-family: var(--font-body); color: var(--text); background: var(--bg); }
-    body { padding: 24px; transition: background .3s ease, color .3s ease; }
+    body {
+      padding: 24px;
+      overflow-x: hidden;
+      position: relative;
+      transition: background .3s ease, color .3s ease;
+    }
+
+    /* Ambient animated background grid */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .25;
+      background-image:
+        linear-gradient(30deg, rgba(200, 146, 46, 0.12) 12%, transparent 12.5%, transparent 87%, rgba(200, 146, 46, 0.12) 87.5%),
+        linear-gradient(150deg, rgba(200, 146, 46, 0.12) 12%, transparent 12.5%, transparent 87%, rgba(200, 146, 46, 0.12) 87.5%);
+      background-size: 70px 122px;
+      animation: gridDrift 20s linear infinite;
+    }
+    @keyframes gridDrift {
+      to { background-position: 140px 122px; }
+    }
 
     .shell {
+      position: relative;
       max-width: 1080px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
       gap: 20px;
+      z-index: 1;
     }
 
     /* Topbar Header */
@@ -71,6 +95,11 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-sm);
+      animation: dropIn .45s ease both;
+    }
+    @keyframes dropIn {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: none; }
     }
 
     .brand {
@@ -85,7 +114,14 @@
       border: 1px solid rgba(200, 146, 46, 0.3);
       display: flex; align-items: center; justify-content: center;
       font-size: 20px;
+      box-shadow: 0 4px 12px rgba(200, 146, 46, 0.15);
+      animation: brandFloat 3.5s ease-in-out infinite;
     }
+    @keyframes brandFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(3deg); }
+    }
+
     .brand-title {
       font-family: var(--font-display);
       font-size: 18px;
@@ -107,8 +143,8 @@
     .live-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
+      gap: 7px;
+      padding: 6px 14px;
       border-radius: 20px;
       background: var(--green-soft);
       border: 1px solid rgba(34, 197, 94, 0.3);
@@ -118,12 +154,16 @@
       font-weight: 600;
     }
     .live-dot {
-      width: 7px; height: 7px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       background: var(--green);
-      animation: pulse 1.8s infinite;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+      animation: pingGlow 1.8s infinite cubic-bezier(0, 0, 0.2, 1);
     }
-    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } }
+    @keyframes pingGlow {
+      60% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
 
     .btn {
       display: inline-flex;
@@ -141,7 +181,7 @@
       box-shadow: var(--shadow-sm);
       transition: all .2s ease;
     }
-    .btn:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
     /* Device Grid */
     .grid {
@@ -165,20 +205,61 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 220px;
+      min-height: 228px;
       position: relative;
-      transition: all .25s ease;
+      overflow: hidden;
+      transition: transform .35s ease, border-color .35s ease, box-shadow .35s ease;
+      animation: riseIn .5s ease both;
     }
+    .device-card:nth-child(2) { animation-delay: .05s; }
+    .device-card:nth-child(3) { animation-delay: .1s; }
+    .device-card:nth-child(4) { animation-delay: .15s; }
+    .device-card:nth-child(5) { animation-delay: .2s; }
+
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: none; }
+    }
+
     .device-card:hover {
       border-color: var(--accent);
       box-shadow: var(--shadow-md);
       transform: translateY(-2px);
     }
 
+    /* Widget Gold Glow & Pulse on State Change */
+    .device-card::after {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(circle, rgba(200, 146, 46, 0.32), transparent 50%);
+      opacity: 0;
+      transform: scale(.3);
+      pointer-events: none;
+      border-radius: 50%;
+    }
+    .device-card.changed {
+      border-color: var(--accent);
+      box-shadow: 0 18px 50px -20px rgba(200, 146, 46, 0.95), 0 0 35px rgba(200, 146, 46, 0.5);
+      animation: cardConfirm .9s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+    .device-card.changed::after {
+      animation: flashGlow .9s ease;
+    }
+    @keyframes flashGlow {
+      45% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.4); }
+    }
+    @keyframes cardConfirm {
+      30% { transform: translateY(-8px) scale(1.025); }
+      60% { transform: translateY(1px) scale(.995); }
+    }
+
     .card-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      z-index: 2;
     }
     .card-title {
       font-size: 14px;
@@ -188,11 +269,13 @@
     .card-badge {
       font-family: var(--font-mono);
       font-size: 10px;
+      font-weight: 600;
       padding: 3px 8px;
       border-radius: 20px;
       background: var(--bg-subtle);
       border: 1px solid var(--border);
       color: var(--text-dim);
+      transition: all .25s ease;
     }
 
     .card-value {
@@ -201,76 +284,188 @@
       font-weight: 700;
       margin: 12px 0 6px;
       color: var(--text);
-      transition: color .2s ease;
+      transition: color .25s ease;
+      z-index: 2;
+    }
+    .device-card.changed .card-value {
+      animation: valuePop .75s ease;
+    }
+    @keyframes valuePop {
+      40% {
+        color: var(--accent);
+        transform: scale(1.12);
+        transform-origin: left;
+        text-shadow: 0 0 16px rgba(200, 146, 46, 0.6);
+      }
     }
 
     .visual-stage {
-      height: 50px;
+      height: 52px;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 6px 0 16px;
+      position: relative;
+      z-index: 2;
     }
 
+    /* Light Bulb & Ray Animation */
+    .bulb-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      height: 50px;
+    }
     .bulb-icon {
-      font-size: 32px;
+      font-size: 34px;
       filter: grayscale(1);
-      opacity: 0.4;
-      transition: all .3s ease;
+      opacity: 0.38;
+      transition: all .4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     .device-card.light-on .bulb-icon {
       filter: none;
       opacity: 1;
       transform: scale(1.15);
-      filter: drop-shadow(0 0 12px rgba(234, 179, 8, 0.6));
+      animation: bulbGlow 1.8s infinite alternate ease-in-out;
+    }
+    @keyframes bulbGlow {
+      0% { filter: drop-shadow(0 0 8px rgba(245, 180, 0, 0.6)) drop-shadow(0 0 20px rgba(245, 180, 0, 0.3)); transform: scale(1.12); }
+      100% { filter: drop-shadow(0 0 18px rgba(245, 180, 0, 0.9)) drop-shadow(0 0 35px rgba(245, 180, 0, 0.55)); transform: scale(1.18); }
+    }
+    .ray {
+      position: absolute;
+      width: 3.5px;
+      height: 10px;
+      background: #eab308;
+      border-radius: 3px;
+      opacity: 0;
+      transform-origin: 1.75px 36px;
+      pointer-events: none;
+    }
+    .device-card.light-on .ray {
+      opacity: 0.85;
+      animation: rayPulse 1.5s infinite alternate ease-in-out;
+    }
+    .ray.r1 { transform: rotate(-55deg) translateY(-28px); }
+    .ray.r2 { transform: rotate(0deg) translateY(-32px); }
+    .ray.r3 { transform: rotate(55deg) translateY(-28px); }
+    @keyframes rayPulse {
+      0% { opacity: 0.35; height: 8px; }
+      100% { opacity: 0.95; height: 16px; box-shadow: 0 0 10px #eab308; }
     }
 
-    .thermo-bar {
-      width: 80%;
-      height: 10px;
+    /* Thermostat Track & Glow Dot */
+    .thermo-track {
+      position: relative;
+      width: 82%;
+      height: 12px;
       background: var(--bg-subtle);
       border-radius: 20px;
-      overflow: hidden;
-      position: relative;
+      border: 1px solid var(--border);
+      overflow: visible;
     }
     .thermo-progress {
       height: 100%;
-      width: 50%;
-      background: linear-gradient(90deg, #3b82f6, #eab308, #ef4444);
       border-radius: 20px;
-      transition: width .5s ease;
+      background: linear-gradient(90deg, #3b82f6 0%, #eab308 50%, #ef4444 100%);
+      transition: width .7s cubic-bezier(.2, .9, .2, 1);
+    }
+    .thermo-dot {
+      position: absolute;
+      top: 50%;
+      left: 45%;
+      width: 22px;
+      height: 22px;
+      border: 3.5px solid var(--bg-card);
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 2px 10px rgba(200, 146, 46, 0.65);
+      transform: translate(-50%, -50%);
+      transition: left .7s cubic-bezier(.2, .9, .2, 1);
     }
 
-    .lock-icon {
-      font-size: 30px;
-      transition: transform .2s ease;
+    /* Door Lock Mechanical Padlock Animation */
+    .lock-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 50px;
+    }
+    .lock-shape {
+      position: relative;
+      width: 44px;
+      height: 38px;
+      border-radius: 9px;
+      background: var(--red);
+      transition: all .5s cubic-bezier(.34, 1.56, .64, 1);
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+    }
+    .lock-shape::before {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 5px solid var(--red);
+      border-bottom: 0;
+      border-radius: 18px 18px 0 0;
+      left: 5px;
+      top: -22px;
+      transform: translateX(10px) rotate(28deg);
+      transform-origin: left bottom;
+      transition: all .5s cubic-bezier(.34, 1.56, .64, 1);
+    }
+    .lock-shape .keyhole {
+      position: absolute;
+      width: 6px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 3px 3px 2px 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .device-card.locked .lock-shape {
+      background: var(--green);
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+    }
+    .device-card.locked .lock-shape::before {
+      border-color: var(--green);
+      transform: none;
     }
 
+    /* Equalizer Wave Animation */
     .equalizer {
       display: flex;
-      gap: 4px;
+      gap: 5px;
       align-items: flex-end;
-      height: 30px;
+      height: 36px;
     }
     .eq-bar {
       width: 6px;
       height: 6px;
       background: var(--text-faint);
       border-radius: 3px;
-      transition: height .2s ease, background .2s ease;
+      transition: height .25s ease, background .25s ease;
     }
     .device-card.playing .eq-bar {
       background: var(--accent);
-      animation: eqBounce .6s infinite alternate ease-in-out;
+      box-shadow: 0 0 10px rgba(200, 146, 46, 0.6);
+      animation: eqBounce .65s infinite alternate ease-in-out;
     }
-    .device-card.playing .eq-bar:nth-child(2) { animation-delay: .15s; }
-    .device-card.playing .eq-bar:nth-child(3) { animation-delay: .3s; }
-    .device-card.playing .eq-bar:nth-child(4) { animation-delay: .45s; }
-    @keyframes eqBounce { from { height: 6px; } to { height: 28px; } }
+    .device-card.playing .eq-bar:nth-child(2) { animation-delay: .16s; }
+    .device-card.playing .eq-bar:nth-child(3) { animation-delay: .32s; }
+    .device-card.playing .eq-bar:nth-child(4) { animation-delay: .48s; }
+    @keyframes eqBounce {
+      from { height: 6px; }
+      to { height: 32px; }
+    }
 
     .card-actions {
       display: flex;
       gap: 8px;
+      z-index: 2;
     }
     .action-btn {
       flex: 1;
@@ -283,19 +478,63 @@
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      transition: all .15s ease;
+      transition: all .18s ease;
     }
     .action-btn:hover {
       background: var(--accent-soft);
       border-color: var(--accent);
       color: var(--accent);
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(200, 146, 46, 0.15);
+    }
+
+    /* Screen Edge Flash on State Update */
+    .screen-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99;
+      border: 0 solid rgba(200, 146, 46, 0.85);
+    }
+    .screen-flash.go {
+      animation: screenConfirm .75s ease;
+    }
+    @keyframes screenConfirm {
+      35% { border-width: 8px; box-shadow: inset 0 0 35px rgba(200, 146, 46, 0.45); }
+      100% { border-width: 0; }
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 100px);
+      opacity: 0;
+      z-index: 100;
+      background: var(--text);
+      color: var(--bg);
+      border-radius: 999px;
+      padding: 10px 22px;
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      box-shadow: var(--shadow-md), 0 0 20px rgba(200, 146, 46, 0.3);
+      transition: all .35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+    }
+    .toast.show {
+      transform: translate(-50%, 0);
+      opacity: 1;
     }
   </style>
 </head>
 <body>
 
-<div class="shell">
+<div class="screen-flash" id="screenFlash"></div>
+<div class="toast" id="toast">State changed & verified</div>
+
+<div class="shell" id="shell">
   <!-- Top Header -->
   <header class="topbar">
     <div class="brand">
@@ -325,7 +564,12 @@
       </div>
       <div class="card-value" id="livingValue">OFF</div>
       <div class="visual-stage">
-        <span class="bulb-icon">💡</span>
+        <div class="bulb-wrap">
+          <span class="ray r1"></span>
+          <span class="ray r2"></span>
+          <span class="ray r3"></span>
+          <span class="bulb-icon">💡</span>
+        </div>
       </div>
       <div class="card-actions">
         <button class="action-btn" onclick="sendAction('turn_on', 'living_room_light')">Turn On</button>
@@ -341,7 +585,12 @@
       </div>
       <div class="card-value" id="kitchenValue">ON</div>
       <div class="visual-stage">
-        <span class="bulb-icon">💡</span>
+        <div class="bulb-wrap">
+          <span class="ray r1"></span>
+          <span class="ray r2"></span>
+          <span class="ray r3"></span>
+          <span class="bulb-icon">💡</span>
+        </div>
       </div>
       <div class="card-actions">
         <button class="action-btn" onclick="sendAction('turn_on', 'kitchen_light')">Turn On</button>
@@ -353,12 +602,13 @@
     <article class="device-card" id="card-living_room_thermostat">
       <div class="card-top">
         <div class="card-title">Thermostat</div>
-        <span class="card-badge">20 °C</span>
+        <span class="card-badge" id="thermoBadge">20 °C</span>
       </div>
       <div class="card-value" id="temperatureValue">20 °C</div>
       <div class="visual-stage">
-        <div class="thermo-bar">
+        <div class="thermo-track">
           <div class="thermo-progress" id="thermoProgress" style="width: 45%;"></div>
+          <div class="thermo-dot" id="thermoDot" style="left: 45%;"></div>
         </div>
       </div>
       <div class="card-actions">
@@ -368,14 +618,18 @@
     </article>
 
     <!-- Front Door Lock -->
-    <article class="device-card" id="card-front_door_lock" style="grid-column: span 1.5;">
+    <article class="device-card card-wide" id="card-front_door_lock">
       <div class="card-top">
         <div class="card-title">Front Door Lock</div>
         <span class="card-badge" id="lockBadge">UNLOCKED</span>
       </div>
       <div class="card-value" id="lockValue">UNLOCKED</div>
       <div class="visual-stage">
-        <span class="lock-icon" id="lockIcon">🔓</span>
+        <div class="lock-wrap">
+          <div class="lock-shape" id="lockShape">
+            <div class="keyhole"></div>
+          </div>
+        </div>
       </div>
       <div class="card-actions">
         <button class="action-btn" onclick="sendAction('lock', 'front_door_lock')">Lock Door</button>
@@ -384,7 +638,7 @@
     </article>
 
     <!-- Entertainment -->
-    <article class="device-card" id="card-entertainment" style="grid-column: span 1.5;">
+    <article class="device-card card-wide" id="card-entertainment">
       <div class="card-top">
         <div class="card-title">Entertainment & Audio</div>
         <span class="card-badge" id="mediaBadge">STOPPED</span>
@@ -421,6 +675,36 @@ function toggleTheme() {
 }
 initTheme();
 
+let previousDevices = null;
+let toastTimer = null;
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function triggerScreenFlash() {
+  const flash = document.getElementById('screenFlash');
+  if (flash) {
+    flash.classList.remove('go');
+    void flash.offsetWidth;
+    flash.classList.add('go');
+  }
+}
+
+function animateTarget(target) {
+  const card = document.getElementById(`card-${target}`);
+  if (!card) return;
+  card.classList.remove('changed');
+  void card.offsetWidth;
+  card.classList.add('changed');
+  setTimeout(() => card.classList.remove('changed'), 1000);
+}
+
 // Device state sync
 async function pollState() {
   try {
@@ -432,7 +716,9 @@ async function pollState() {
 }
 
 function updateUI(dev) {
-  // Living room
+  let anyChanged = false;
+
+  // Living room light
   const living = dev.living_room_light;
   if (living) {
     const on = living.on === true || living.state === 'on';
@@ -440,7 +726,8 @@ function updateUI(dev) {
     document.getElementById('livingBadge').textContent = on ? 'ON' : 'OFF';
     document.getElementById('card-living_room_light').classList.toggle('light-on', on);
   }
-  // Kitchen
+
+  // Kitchen light
   const kitchen = dev.kitchen_light;
   if (kitchen) {
     const on = kitchen.on === true || kitchen.state === 'on';
@@ -448,23 +735,30 @@ function updateUI(dev) {
     document.getElementById('kitchenBadge').textContent = on ? 'ON' : 'OFF';
     document.getElementById('card-kitchen_light').classList.toggle('light-on', on);
   }
+
   // Thermostat
   const thermo = dev.living_room_thermostat;
   if (thermo) {
     const temp = thermo.temperature_c !== undefined ? thermo.temperature_c : (thermo.temperature || 20);
     document.getElementById('temperatureValue').textContent = `${temp} °C`;
-    const pct = Math.min(100, Math.max(10, ((temp - 10) / 25) * 100));
+    const thermoBadge = document.getElementById('thermoBadge');
+    if (thermoBadge) thermoBadge.textContent = `${temp} °C`;
+    const pct = Math.min(100, Math.max(0, ((temp - 16) / 14) * 100));
     document.getElementById('thermoProgress').style.width = `${pct}%`;
+    const dot = document.getElementById('thermoDot');
+    if (dot) dot.style.left = `${pct}%`;
   }
-  // Lock
+
+  // Front Door Lock
   const lock = dev.front_door_lock;
   if (lock) {
     const locked = Boolean(lock.locked);
     document.getElementById('lockValue').textContent = locked ? 'LOCKED' : 'UNLOCKED';
     document.getElementById('lockBadge').textContent = locked ? 'LOCKED' : 'UNLOCKED';
-    document.getElementById('lockIcon').textContent = locked ? '🔒' : '🔓';
+    document.getElementById('card-front_door_lock').classList.toggle('locked', locked);
   }
-  // Media
+
+  // Entertainment
   const ent = dev.entertainment;
   if (ent) {
     const st = (ent.status || ent.state || 'stopped').toLowerCase();
@@ -473,6 +767,22 @@ function updateUI(dev) {
     document.getElementById('mediaBadge').textContent = isPlaying ? 'PLAYING' : st.toUpperCase();
     document.getElementById('card-entertainment').classList.toggle('playing', isPlaying);
   }
+
+  // Detect which devices changed state to trigger animations
+  if (previousDevices) {
+    ['living_room_light', 'kitchen_light', 'living_room_thermostat', 'front_door_lock', 'entertainment'].forEach(key => {
+      if (dev[key] && previousDevices[key] && JSON.stringify(dev[key]) !== JSON.stringify(previousDevices[key])) {
+        animateTarget(key);
+        anyChanged = true;
+      }
+    });
+    if (anyChanged) {
+      triggerScreenFlash();
+      showToast('State updated & verified');
+    }
+  }
+
+  previousDevices = JSON.parse(JSON.stringify(dev));
 }
 
 async function sendAction(action, device, value = null) {
@@ -495,7 +805,7 @@ async function sendAction(action, device, value = null) {
 }
 
 pollState();
-setInterval(pollState, 2000);
+setInterval(pollState, 1500);
 </script>
 </body>
 </html>

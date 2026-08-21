@@ -1982,20 +1982,10 @@ AVAILABLE_TOOLS = [
         "function": {
             "name": "launch_mode",
             "description": (
-                "Launch a desktop mode based on user intent. "
-                "Call this tool whenever the user IMPLIES they want to game, study, watch something, or focus/concentrate — "
-                "even if they don't use the word 'mode'.\n"
-                "Mode triggers and examples:\n"
-                "  gaming: 'I wanna play', 'let's game', 'game time', 'i feel like playing', "
-                "'boot up steam', 'let me play some games', 'ayaw ko mag-aral gusto ko mag-laro', "
-                "'pag-laruin natin', 'start gaming', 'open steam', 'discord and steam'\n"
-                "  study: 'time to study', 'let me study', 'I need to focus on school', "
-                "'open vscode', 'mag-aral tayo', 'i need to do homework', 'study mode'\n"
-                "  movie: 'watch a movie', 'movie time', 'let's watch something', 'i want to chill and watch', "
-                "'movie night', 'manood tayo', 'stream something'\n"
-                "  focus: 'start a timer', 'pomodoro', 'I need to concentrate', 'deep work', "
-                "'25 minute timer', 'help me focus', 'focus mode', 'mag-focus tayo', 'work session'\n"
-                "ALWAYS call this tool when intent is clear. Do not ask for confirmation."
+                "Launch a multi-app preset environment mode: 'gaming' (opens Steam and Discord), 'study' (opens VS Code and Notion), "
+                "'movie' (opens Netflix / media), or 'focus' (starts a Pomodoro focus timer). "
+                "Use ONLY when the user explicitly asks for a mode, gaming session, study session, movie session, or focus timer. "
+                "Do NOT use this tool for normal single application launches like Chrome, Notepad, Spotify, Calculator (use launch_app instead)."
             ),
             "parameters": {
                 "type": "object",

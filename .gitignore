@@ -1,48 +1,132 @@
-# Local secrets and environments
+# ==============================================================================
+# Hachi Assistant — Git Ignore Configuration
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python & Environment
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyd
+
 .env
 .env.*
 !.env.example
 .venv/
 venv/
 env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Python-generated files
-__pycache__/
-*.py[cod]
+# ------------------------------------------------------------------------------
+# Testing & Code Quality Cache
+# ------------------------------------------------------------------------------
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
 
-# Hachi runtime data
+# ------------------------------------------------------------------------------
+# Hachi Runtime Databases, State, and Logs
+# ------------------------------------------------------------------------------
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
 hachi_memory.db
 hachi_memory.db-wal
 hachi_memory.db-shm
-*.sqlite-wal
-*.sqlite-shm
 *.log
+*.log.*
+assistant_execution.log
+hachi.log
 uploads/
-
-# Embedded browser profile, cache, cookies, and session data
 .webview_profile/
 
-# Graphify-generated analysis artifacts
+# ------------------------------------------------------------------------------
+# Project Planning, Audits, Roadmaps & Internal Documents
+# ------------------------------------------------------------------------------
+.planning/
+*PLAN*.md
+*ROADMAP*.md
+*AUDIT*.md
+*GUIDELINES*.md
+AGENTIC_FEATURES_IMPLEMENTED.md
+MODEL_V5_MASTER_INSTALLATION_GUIDE.md
+Prelim_Project_Report.md
+Prelim_Project_Report.pdf
+generate_pdf_report.py
 graphify-out/
 .graphify_*.json
 .graphify_*.txt
 
-# Local/cloud model-training artifacts and intermediate materials
+# ------------------------------------------------------------------------------
+# Archive, Reference Materials, & Model Dumps
+# ------------------------------------------------------------------------------
+old_version/
+references/
+MODEL/
+gguf/
+training/
+training_v*/
+training_master_*/
+llama_cpp_converter/
+convert_hf_to_gguf_latest.py
+
 *.gguf
 *.safetensors
 *.bin
 *.tar.gz
-llama_cpp_converter/
-convert_hf_to_gguf_latest.py
+*.rar
+*.zip
 
-training/
-training_v*/
-training_master_*/
+# ------------------------------------------------------------------------------
+# Scratch Scripts & Temporary Files
+# ------------------------------------------------------------------------------
+scratch/
+scratch_*.py
+temp/
+tmp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
 
-# Downloaded model exports and evaluation bundles
-gguf/
+# ------------------------------------------------------------------------------
+# IDE & System Files
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+.claude/
+.gemini/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
