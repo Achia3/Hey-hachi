@@ -1,0 +1,8 @@
+transformers==5.17.0
+peft>=0.18,<1
+accelerate>=1.10,<2
+datasets>=4,<6
+gguf>=0.17
+sentencepiece>=0.2,<0.3
+protobuf>=4.21,<5
+# Use Kaggle's CUDA-enabled torch >=2.6. Exact versions are locked on first run.

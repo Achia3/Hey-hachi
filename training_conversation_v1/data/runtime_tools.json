@@ -1,0 +1,425 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "control_smart_home",
+      "description": "Apply validated actions to smart home devices (lights, thermostat, front door lock, entertainment). Supports relative temperature adjustments like 'I am cold' or 'I am hot'.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "description": "Short summary of the user's intended goal."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "turn_on",
+                    "turn_off",
+                    "set_temperature",
+                    "increase_temperature",
+                    "decrease_temperature",
+                    "lock",
+                    "unlock",
+                    "play_media",
+                    "pause_media",
+                    "stop_media"
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "living_room_light",
+                    "kitchen_light",
+                    "living_room_thermostat",
+                    "front_door_lock",
+                    "entertainment"
+                  ]
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Temperature in Celsius (16-30 C) or relative adjustment."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Media title if playing media."
+                }
+              },
+              "required": [
+                "action",
+                "target"
+              ]
+            }
+          }
+        },
+        "required": [
+          "actions"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_smart_home_state",
+      "description": "Inspect and retrieve the current live state of all smart home devices in the house.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "manage_app",
+      "description": "Launch, close, or check status of desktop applications by name (e.g. Discord, VS Code, Chrome, Steam, Spotify, Terminal, Settings, Calculator, Obsidian).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "launch",
+              "close",
+              "status",
+              "list_recent"
+            ],
+            "description": "Launch/close an app or list recently opened apps."
+          },
+          "app_name": {
+            "type": "string",
+            "description": "Name of the application or process."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "manage_mode",
+      "description": "Manage assistant desktop modes: gaming, study, movie, or focus (pomodoro timer).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "status"
+            ],
+            "description": "Action: start, stop, or status."
+          },
+          "mode_name": {
+            "type": "string",
+            "enum": [
+              "gaming",
+              "study",
+              "movie",
+              "focus"
+            ],
+            "description": "Mode name."
+          }
+        },
+        "required": [
+          "action",
+          "mode_name"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "media",
+      "description": "Control playback for music, videos, and system media across Spotify, YouTube, or system media.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "play",
+              "pause",
+              "resume",
+              "search",
+              "stop",
+              "next",
+              "previous",
+              "volume_up",
+              "volume_down"
+            ],
+            "description": "Media action."
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "spotify",
+              "youtube",
+              "system"
+            ],
+            "description": "Target platform or system player."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query or song/artist name to play."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "manage_productivity",
+      "description": "Create/list/search notes, todos, deadlines, reminders, and memories. Complete a todo by exact title or todo_id. Deletion and completion of other item types are not supported.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "set",
+              "list",
+              "search",
+              "complete"
+            ],
+            "description": "Action to perform."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "note",
+              "todo",
+              "deadline",
+              "reminder",
+              "memory",
+              "focus_cycle"
+            ],
+            "description": "Item type."
+          },
+          "todo_id": {
+            "type": "integer",
+            "description": "Exact todo ID for completion, especially when titles repeat."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of note, task, deadline, or reminder subject."
+          },
+          "content": {
+            "type": "string",
+            "description": "Body, note content, or memory fact to save."
+          },
+          "due_time": {
+            "type": "string",
+            "description": "Due date, deadline, or time expression."
+          },
+          "course": {
+            "type": "string",
+            "description": "Course code e.g. CS402."
+          }
+        },
+        "required": [
+          "type",
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_research",
+      "description": "Search the live web or scrape webpage content for current information, news, or articles.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "research_brief",
+              "fetch_url",
+              "scrape"
+            ],
+            "description": "Search, research with sources, or read a URL."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query or URL to scrape."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL for fetch_url or scrape."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "system_control",
+      "description": "Read system stats, adjust volume with media keys, capture screenshots, use clipboard, or toggle dictation. Absolute volume, brightness and PC locking are not supported.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get_stats",
+              "screenshot",
+              "clipboard_get",
+              "clipboard_set",
+              "toggle_dictation",
+              "volume_up",
+              "volume_down",
+              "mute"
+            ],
+            "description": "System action."
+          },
+          "text": {
+            "type": "string",
+            "description": "Text to copy for clipboard_set."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_routine",
+      "description": "Run one configured named Hachi routine. Use only when the user explicitly asks to run, start, or execute that named routine. A routine performs a bounded sequence of existing Hachi tools; it cannot run arbitrary commands. Use routine_input for the topic required by a research routine.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "routine_name": {
+            "type": "string",
+            "description": "Configured routine name, such as study_sprint or daily_briefing."
+          },
+          "input_text": {
+            "type": "string",
+            "description": "Optional topic for a routine that needs it, such as a research question."
+          }
+        },
+        "required": [
+          "routine_name"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weather",
+      "description": "Get current live weather forecast and temperature",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "City or country name, default Manila"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_smart_home_state",
+      "description": "Read the current simulated lights, thermostat, front-door lock, entertainment state, and recent verified actions.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "control_smart_home",
+      "description": "Apply one or more validated actions to Hachi's simulated smart home. Infer useful actions from indirect needs such as being cold or a dark room, but ask for clarification if the target or desired result is genuinely unclear.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "description": "Short statement of the user's intended outcome."
+          },
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "turn_on",
+                    "turn_off",
+                    "set_temperature",
+                    "increase_temperature",
+                    "decrease_temperature",
+                    "lock",
+                    "unlock",
+                    "play_media",
+                    "pause_media",
+                    "stop_media"
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "living_room_light",
+                    "kitchen_light",
+                    "living_room_thermostat",
+                    "front_door_lock",
+                    "entertainment"
+                  ]
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Required for temperature actions only."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Optional media title for play_media."
+                }
+              },
+              "required": [
+                "action",
+                "target"
+              ]
+            }
+          }
+        },
+        "required": [
+          "actions"
+        ]
+      }
+    }
+  }
+]

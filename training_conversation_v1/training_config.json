@@ -1,0 +1,17 @@
+{
+  "schema": "hachi-conversation-train-v1",
+  "seed": 1057,
+  "epochs": 2,
+  "learning_rate": 0.00002,
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "max_sequence_length": 3072,
+  "save_steps": 5,
+  "warmup_steps": 2,
+  "max_grad_norm": 1.0,
+  "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+  "transformers_version": "5.17.0"
+}

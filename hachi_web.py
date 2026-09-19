@@ -16,6 +16,9 @@ from hachi_speech import speak, interrupt_speech, generate_tts_audio, _is_stop_p
 from hachi_runtime import TurnCancelled, cancel_turn, create_turn, finish_turn
 
 app = Flask(__name__)
+from hachi_academic import LazyAcademicService, create_academic_blueprint
+app.extensions["academic_service"] = LazyAcademicService(Path(__file__).resolve().parent / "data" / "academic" / "runs")
+app.register_blueprint(create_academic_blueprint(app.extensions["academic_service"]))
 FLASK_PORT = 5000
 PROJECT_ROOT = Path(__file__).resolve().parent
 PDF_UPLOAD_DIR = PROJECT_ROOT / "uploads" / "pdfs"

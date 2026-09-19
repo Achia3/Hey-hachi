@@ -82,7 +82,7 @@ class CapabilityLayerTests(unittest.TestCase):
         names = [tool["function"]["name"] for tool in select_tools_for_request(
             "Research the latest Qwen release from official sources"
         )]
-        self.assertEqual(names, ["research_web", "search_web"])
+        self.assertEqual(names, ["web_research"])
         self.assertNotIn("fetch_url", names)
         self.assertLessEqual(len(names), 8)
 

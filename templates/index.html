@@ -1080,6 +1080,7 @@
           <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Clear</span>
         </button>
+        <button class="topbar-btn" id="academicBtn" type="button" title="Open Academic Studio" onclick="openAcademicStudio()">Academic Studio</button>
         <button class="topbar-btn primary" id="smartHomeBtn" type="button" title="Open Smart Home Simulator" onclick="openSmartHomeSimulator()">
           <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Smart Home</span>
@@ -1280,6 +1281,20 @@ function removeChat(chatId) {
 function toggleSidebar() {
   const collapsed = appEl.classList.toggle('sidebar-collapsed');
   try { localStorage.setItem('hachi.sidebarCollapsed', collapsed ? '1' : '0'); } catch (_) {}
+}
+
+let academicBrowserPopup = null;
+async function openAcademicStudio() {
+  try {
+    if (window.pywebview?.api?.open_academic) {
+      const result = await window.pywebview.api.open_academic();
+      if (result?.opened === false) throw new Error(result.error);
+      return;
+    }
+    if (academicBrowserPopup && !academicBrowserPopup.closed) { academicBrowserPopup.focus(); return; }
+    academicBrowserPopup = window.open('/academic', 'hachi-academic-studio', 'popup=yes,width=1280,height=860,resizable=yes');
+    if (!academicBrowserPopup) throw new Error('Allow popups for Hachi to open Academic Studio.');
+  } catch (error) { alert(error.message || 'Could not open Academic Studio.'); }
 }
 
 async function openSmartHomeSimulator() {

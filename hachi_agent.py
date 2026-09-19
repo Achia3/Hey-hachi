@@ -332,47 +332,59 @@ def select_tools_for_request(user_input: str, limit: int = 8, force_home: bool =
     if should_search_before_answer(user_input):
         # ``research_web`` owns source reading; raw URL fetching is deliberately
         # internal so a page cannot steer the agent into arbitrary navigation.
-        include("research_web", "search_web")
+        include("web_research")
     if _is_memory_request(user_input) or re.search(r"\bremember\b", text):
-        include("search_memory", "remember_fact")
-    browser_task_request = bool(re.search(r"\b(?:browser|chrome|website|webpage|web site)\b", text) or (
+        include("manage_productivity")
+    if re.search(r"\b(?:mode|gaming|study|movie|focus|pomodoro|mag-aral|maglaro|manood)\b", text):
+        include("manage_mode")
+    if re.search(r"\b(?:routine|briefing|sprint|setup)\b", text):
+        include("run_routine")
+    if re.search(r"\b(?:buksan|isara|ilunsad|i-open|i-close|i-launch)\b", text) and not home_request:
+        include("manage_app")
+    if re.search(r"\b(?:tandaan|paalala|ipaalala|gawain|tala|alala)\b", text):
+        include("manage_productivity")
+    if re.search(r"\b(?:hanapin|magsaliksik|research|search|look up)\b", text):
+        include("web_research")
+    browser_task_request = bool(re.search(r"\b(?:browser|website|webpage|web site)\b", text) or (
         "search" in text and re.search(r"\b(?:open|go to|visit)\b", text)
     ))
-    if re.search(r"\b(?:open|launch|start)\b.*\b(?:app|discord|spotify|chrome|vscode|steam)\b", text) and not (
-        browser_task_request and "chrome" in text
+    if re.search(r"\b(?:open|launch|start)\b.*\b(?:app|discord|spotify|chrome|vscode|vs code|steam|blender|notepad|calculator|obs|vlc|figma|terminal|explorer)\b", text) and not (
+        browser_task_request
     ):
-        include("launch_app", "launch_mode", "close_mode")
+        include("manage_app")
     if browser_task_request:
         include("browser_search", "browser_navigate", "browser_open_best_result", "browser_read", "browser_action")
-    if re.search(r"\b(?:close|quit|exit|stop)\b.*\b(?:app|discord|spotify|chrome|vscode|steam)\b", text):
-        include("close_app", "close_recent_apps", "close_mode")
-    if re.search(r"\b(?:play|pause|resume|skip|volume|spotify|youtube)\b", text):
-        include("play_spotify", "play_youtube", "media_control")
+    if re.search(r"\b(?:close|quit|exit|stop)\b.*\b(?:app|discord|spotify|chrome|vscode|vs code|steam|blender|notepad|calculator|obs|vlc|figma|terminal|explorer)\b", text):
+        include("manage_app")
+    if re.search(r"\b(?:play|pause|resume|skip|volume|spotify|youtube|patugtog|ipatugtog)\b", text):
+        include("media")
     if re.search(r"\b(?:remind|reminder|alarm)\b", text):
-        include("set_reminder", "list_reminders")
+        include("manage_productivity")
     if re.search(r"\b(?:todo|to-do|task)\b", text):
-        include("add_todo", "list_todos")
+        include("manage_productivity")
     if re.search(r"\b(?:note|notes)\b", text):
-        include("save_note", "list_notes", "daily_recap")
+        include("manage_productivity")
     if re.search(r"\b(?:assignment|deadline|exam)\b", text):
-        include("add_assignment_deadline", "list_assignment_deadlines")
-    if re.search(r"\b(?:weather|forecast)\b", text):
+        include("manage_productivity")
+    if re.search(r"\b(?:weather|forecast|panahon)\b", text):
         include("get_weather")
     if re.search(r"\b(?:cpu|ram|battery|disk|system health)\b", text):
-        include("system_health_report", "get_system_stats")
+        include("system_control")
+    if re.search(r"\b(?:volume|brightness|mute|dictation)\b", text):
+        include("system_control")
     if re.search(r"\b(?:file|document|pdf|docx|summari[sz]e)\b", text):
         include("summarize_document", "open_local_file")
     if re.search(r"\b(?:clipboard|copy|paste)\b", text):
-        include("clipboard_get", "clipboard_set")
+        include("system_control")
     if re.search(r"\b(?:screenshot|screen)\b", text):
-        include("capture_screenshot")
+        include("system_control")
     if re.search(r"\b(?:focus|pomodoro|timer)\b", text):
         include("set_focus_cycle")
 
     # A direct command can still be ambiguous; give the model a tiny, safe
     # productivity fallback rather than the legacy all-tools catalog.
     if not names and _is_action_request(user_input):
-        include("save_note", "add_todo", "set_reminder", "launch_app")
+        include("manage_productivity", "manage_app")
 
     catalog = {tool.get("function", {}).get("name"): tool for tool in AVAILABLE_TOOLS}
     selected = [catalog[name] for name in names if name in catalog][:max(1, min(int(limit), 8))]
@@ -546,6 +558,9 @@ def _validate_tool_args(tool_name: str, arguments: dict) -> tuple[bool, str]:
     if not isinstance(arguments, dict):
         return False, "Arguments must be a JSON object."
     schema = _tool_schema(tool_name)
+    # Accept saved routines that predate the trained Master tool contract.
+    if tool_name == "run_routine" and "routine_name" not in arguments and arguments.get("name"):
+        arguments = {**arguments, "routine_name": arguments["name"]}
     properties = schema.get("properties", {})
     for required in schema.get("required", []):
         if arguments.get(required) in (None, ""):
@@ -558,6 +573,13 @@ def _validate_tool_args(tool_name: str, arguments: dict) -> tuple[bool, str]:
             return False, f"Field '{key}' must be an array."
         if expected == "object" and not isinstance(value, dict):
             return False, f"Field '{key}' must be an object."
+        if expected == "integer" and (isinstance(value, bool) or not isinstance(value, int)):
+            return False, f"Field '{key}' must be an integer."
+        if expected == "number" and (isinstance(value, bool) or not isinstance(value, (int, float))):
+            return False, f"Field '{key}' must be a number."
+        allowed = properties.get(key, {}).get("enum")
+        if allowed is not None and value not in allowed:
+            return False, f"Unsupported value for '{key}': {value}."
     return True, ""
 
 

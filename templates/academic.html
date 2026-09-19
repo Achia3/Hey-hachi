@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Academic Studio · Hachi</title>
+  <link rel="stylesheet" href="/static/academic.css">
+  <script src="/static/academic.js" defer></script>
+</head>
+<body>
+  <!-- THESIS: A course form beside a saved academic document, with independent generations.
+  OWN-WORLD: Inherit Hachi's cream, ink and gold; Fraunces titles, Inter controls, mono identifiers and ruled rows.
+  STORY: Enter course metadata, follow two validated stages, review alignment, then export JSON.
+  FIRST VIEWPORT: A 345px form sidebar and flexible document area; Generate remains with the inputs. Mobile stacks them.
+  FORM: Local extension of Hachi's existing workspace, no replacement world or generated imagery.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance -->
+  <header class="studio-header">
+    <div class="identity"><a href="/" class="brand">Hachi</a><span class="identity-divider" aria-hidden="true">/</span><h1>Academic Studio</h1></div>
+    <div class="header-actions"><span id="connection" role="status">Checking local model…</span><button id="theme" type="button" class="quiet">Dark mode</button></div>
+  </header>
+  <main class="studio-layout">
+    <aside class="workspace-controls" aria-label="Course details and saved generations">
+      <form id="course-form">
+        <div class="section-heading"><h2>Build a syllabus</h2><button type="button" id="example" class="text-button">Use DSA example</button></div>
+        <p class="intro">Course outcomes, a 14-week plan, and assessment alignment.</p>
+        <label for="course-code">Course code</label><input id="course-code" name="course_code" required maxlength="40" placeholder="e.g. CS201">
+        <label for="course-title">Course title</label><input id="course-title" name="course_title" required maxlength="200" placeholder="e.g. Data Structures and Algorithms">
+        <label for="course-description">Course description</label><textarea id="course-description" name="course_description" rows="4" required minlength="10" maxlength="6000" placeholder="Scope, key topics, and the skills students will practice."></textarea>
+        <label for="target-pos">Target Program Outcomes</label><input id="target-pos" required placeholder="1, 2, 3" aria-describedby="po-help" inputmode="numeric"><p class="field-help" id="po-help">PO numbers, separated by commas. Use your course’s target POs.</p>
+        <details class="optional"><summary>PO descriptions <span>optional</span></summary><label for="po-descriptions">One PO per line: number: description</label><textarea id="po-descriptions" rows="3" placeholder="1: Your official PO description"></textarea></details>
+        <label for="model">Local model</label><div class="model-row"><select id="model" required><option value="hachi-master:latest">hachi-master:latest</option></select><button type="button" id="refresh-models" class="quiet" aria-label="Refresh local models">Refresh</button></div>
+        <details class="optional grading-settings"><summary>Grading &amp; generation settings</summary>
+          <p class="field-help">Editable defaults from LAB_3. Confirm your instructor’s policy.</p>
+          <div class="grade-inputs"><label>Quizzes %<input id="quizzes" type="number" min="0" max="100" value="30" required step="0.1"></label><label>Research %<input id="research" type="number" min="0" max="100" value="20" required step="0.1"></label><label>Labs %<input id="labs" type="number" min="0" max="100" value="50" required step="0.1"></label></div>
+          <div class="grade-inputs"><label>Class standing %<input id="standing" type="number" min="0" max="100" value="70" required step="0.1"></label><label>Major exam %<input id="exam" type="number" min="0" max="100" value="30" required step="0.1"></label></div>
+          <label for="attempts">Maximum attempts per stage</label><select id="attempts"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+        </details>
+        <button type="submit" id="generate" class="primary">Generate syllabus</button>
+        <p class="field-help">Every generation is saved separately. Closing this window keeps the job running while Hachi is open.</p>
+        <p id="form-error" class="error" role="alert" hidden></p>
+      </form>
+      <section class="history-section"><div class="section-heading"><h2>Saved generations</h2><span id="run-count" class="count">0</span></div><p id="history-empty" class="field-help">Your first generation will appear here.</p><div id="history" class="history"></div></section>
+    </aside>
+    <section class="document-workspace" aria-label="Selected syllabus">
+      <div id="empty-view" class="empty-view"><div class="document-symbol" aria-hidden="true"><span>CO → PO</span><hr><span>14 weeks</span><hr><span>Assessments</span></div><h2>From course idea<br>to an aligned plan.</h2><p>Add your course details to begin. Each saved generation becomes its own document, ready to review and export.</p><button type="button" id="empty-example" class="quiet">Start with Data Structures</button><div class="empty-rules">4–5 measurable outcomes · Midterm in Week 7 · Finals in Week 14</div></div>
+      <article id="run-view" hidden>
+        <div class="document-toolbar"><div><span id="run-status" class="status"></span><span id="run-reference" class="reference"></span></div><div class="document-actions"><button id="reuse" type="button" class="quiet">Use inputs</button><button id="continue" type="button" class="quiet" hidden>Continue saved outcomes</button><button id="cancel" type="button" class="quiet" hidden>Cancel generation</button><button id="export-co" type="button" class="quiet" hidden>Export COs</button><button id="export" type="button" class="primary" hidden>Export syllabus JSON</button></div></div>
+        <div class="document-heading"><h2 id="document-title"></h2><p id="document-code" class="course-code"></p><p id="document-description"></p></div>
+        <div id="progress" class="generation-progress" role="status" aria-live="polite"><ol><li id="step-outcomes">Course outcomes</li><li id="step-schedule">Weekly plan</li><li id="step-save">Validated &amp; saved</li></ol><p id="progress-message"></p><span id="progress-detail"></span></div>
+        <p id="run-error" class="error" role="alert" hidden></p>
+        <div id="result-tabs" class="result-tabs" role="tablist" aria-label="Result format" hidden><button type="button" id="preview-tab" role="tab" aria-selected="true" aria-controls="preview-panel">Syllabus preview</button><button type="button" id="json-tab" role="tab" aria-selected="false" aria-controls="json-panel">Validated JSON</button></div>
+        <div id="preview-panel" role="tabpanel" aria-labelledby="preview-tab"><section id="outcomes-section" hidden><div class="section-heading"><h3>Course outcomes</h3><span id="outcome-count"></span></div><div id="outcomes"></div></section><section id="schedule-section" hidden><h3>14-week course plan</h3><div id="schedule"></div></section><section id="grading-section" hidden><h3>Assessment &amp; grading matrix</h3><p class="field-help">Each assessment references the course outcome shown in its week. Weights below apply within each grading period.</p><div id="grading"></div><div id="assessment-matrix"></div></section><p id="review-note" class="review-note" hidden>Structural checks passed. Review topic depth, assessment quality, and PO alignment before submission. PO numbers alone do not establish alignment with official PO descriptions.</p></div>
+        <div id="json-panel" role="tabpanel" aria-labelledby="json-tab" hidden><pre id="json-output"></pre></div>
+      </article>
+      <p id="workspace-message" class="workspace-message" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+</body>
+</html>

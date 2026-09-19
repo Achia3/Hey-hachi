@@ -84,7 +84,50 @@ class DesktopApi:
 
     def __init__(self):
         self._smart_home_window = None
+        self._academic_window = None
         self._window_lock = threading.Lock()
+
+    def _clear_academic_window(self):
+        with self._window_lock:
+            self._academic_window = None
+
+    def open_academic(self):
+        """Open or focus Academic Studio without interrupting the chat window."""
+        with self._window_lock:
+            existing = self._academic_window
+            if existing is not None and not existing.events.closed.is_set():
+                try:
+                    existing.restore()
+                    existing.show()
+                    return {"opened": True, "reused": True}
+                except Exception:
+                    self._academic_window = None
+            window = webview.create_window(
+                title="Hachi — Academic Studio", url=f"http://127.0.0.1:{FLASK_PORT}/academic",
+                width=1280, height=860, min_size=(840, 620), background_color="#f8f6f0",
+                text_select=True, js_api=self)
+            if window is None:
+                return {"opened": False, "error": "Could not open Academic Studio"}
+            window.events.closed += self._clear_academic_window
+            self._academic_window = window
+            return {"opened": True, "reused": False}
+
+    def save_academic_json(self, run_id, kind="syllabus"):
+        """Export one validated run via the user's native Save As dialog."""
+        try:
+            output = app.extensions["academic_service"].export(run_id, kind)
+            if self._academic_window is None:
+                return {"saved": False, "error": "Academic Studio is not open"}
+            paths = self._academic_window.create_file_dialog(
+                webview.FileDialog.SAVE, save_filename=f"{kind}-{run_id[:8]}.json", file_types=("JSON (*.json)",))
+            if not paths:
+                return {"saved": False, "cancelled": True}
+            path = paths if isinstance(paths, str) else paths[0]
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(output)
+            return {"saved": True}
+        except Exception as exc:
+            return {"saved": False, "error": str(exc)}
 
     def _clear_smart_home_window(self):
         with self._window_lock:

@@ -24,6 +24,7 @@ from hachi_voice_dictionary import add_voice_term, get_voice_terms
 from hachi_productivity import (
     add_assignment_deadline,
     add_todo,
+    complete_todo,
     capture_screenshot,
     clipboard_get,
     clipboard_set,
@@ -1566,6 +1567,7 @@ def get_system_stats():
 
 _MEDIA_VIRTUAL_KEYS = {
     "play_pause": 0xB3,
+    "stop": 0xB2,
     "next": 0xB0,
     "previous": 0xB1,
     "volume_up": 0xAF,
@@ -1592,7 +1594,7 @@ def _send_media_key(key_name: str, presses: int = 1) -> bool:
 
 def media_control(action: str) -> str:
     """Control Windows media playback or volume using native multimedia keys."""
-    normalized = re.sub(r"\s+", " ", str(action or "").lower()).strip()
+    normalized = re.sub(r"\s+", " ", str(action or "").lower().replace("_", " ")).strip()
     if any(word in normalized for word in ("next", "skip")):
         key, label, presses = "next", "Skipped to the next track", 1
     elif any(word in normalized for word in ("previous", "prev", "back")):
@@ -1603,6 +1605,8 @@ def media_control(action: str) -> str:
         key, label, presses = "volume_down", "Lowered system volume", 5
     elif "mute" in normalized:
         key, label, presses = "mute", "Toggled system mute", 1
+    elif normalized == "stop":
+        key, label, presses = "stop", "Sent media stop command", 1
     elif any(word in normalized for word in ("play", "pause", "resume", "toggle")):
         key, label, presses = "play_pause", "Toggled media playback", 1
     else:
@@ -1843,10 +1847,10 @@ AVAILABLE_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["launch", "close", "status"], "description": "Action to perform: launch, close, or status."},
+                    "action": {"type": "string", "enum": ["launch", "close", "status", "list_recent"], "description": "Launch/close an app or list recently opened apps."},
                     "app_name": {"type": "string", "description": "Name of the application or process."}
                 },
-                "required": ["action", "app_name"]
+                "required": ["action"]
             }
         }
     },
@@ -1873,7 +1877,7 @@ AVAILABLE_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["play", "pause", "stop", "next", "previous", "volume_up", "volume_down"], "description": "Media action."},
+                    "action": {"type": "string", "enum": ["play", "pause", "resume", "search", "stop", "next", "previous", "volume_up", "volume_down"], "description": "Media action."},
                     "target": {"type": "string", "enum": ["spotify", "youtube", "system"], "description": "Target platform or system player."},
                     "query": {"type": "string", "description": "Search query or song/artist name to play."}
                 },
@@ -1885,18 +1889,19 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "manage_productivity",
-            "description": "Manage notes, todo tasks, school deadlines, reminders, and long-term user memories in SQLite database.",
+            "description": "Create/list/search notes, todos, deadlines, reminders, and memories. Complete a todo by exact title or todo_id. Deletion and completion of other item types are not supported.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["create", "set", "list", "search", "complete", "delete"], "description": "Action to perform."},
-                    "type": {"type": "string", "enum": ["note", "todo", "deadline", "reminder", "memory"], "description": "Item type."},
+                    "action": {"type": "string", "enum": ["create", "set", "list", "search", "complete"], "description": "Action to perform."},
+                    "type": {"type": "string", "enum": ["note", "todo", "deadline", "reminder", "memory", "focus_cycle"], "description": "Item type."},
+                    "todo_id": {"type": "integer", "description": "Exact todo ID for completion, especially when titles repeat."},
                     "title": {"type": "string", "description": "Title of note, task, deadline, or reminder subject."},
                     "content": {"type": "string", "description": "Body, note content, or memory fact to save."},
                     "due_time": {"type": "string", "description": "Due date, deadline, or time expression."},
                     "course": {"type": "string", "description": "Course code e.g. CS402."}
                 },
-                "required": ["action"]
+                "required": ["type", "action"]
             }
         }
     },
@@ -1908,10 +1913,11 @@ AVAILABLE_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["search", "scrape"], "description": "search query or scrape URL."},
-                    "query": {"type": "string", "description": "Search query or URL to scrape."}
+                    "action": {"type": "string", "enum": ["search", "research_brief", "fetch_url", "scrape"], "description": "Search, research with sources, or read a URL."},
+                    "query": {"type": "string", "description": "Search query or URL to scrape."},
+                    "url": {"type": "string", "description": "URL for fetch_url or scrape."}
                 },
-                "required": ["action", "query"]
+                "required": ["query"]
             }
         }
     },
@@ -1919,11 +1925,12 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "system_control",
-            "description": "System settings and desktop utilities: volume, brightness, screenshot, clipboard, and dictation toggle.",
+            "description": "Read system stats, adjust volume with media keys, capture screenshots, use clipboard, or toggle dictation. Absolute volume, brightness and PC locking are not supported.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["screenshot", "clipboard_get", "clipboard_set", "toggle_dictation", "volume_up", "volume_down", "mute", "brightness_up", "brightness_down"], "description": "System action."}
+                    "action": {"type": "string", "enum": ["get_stats", "screenshot", "clipboard_get", "clipboard_set", "toggle_dictation", "volume_up", "volume_down", "mute"], "description": "System action."},
+                    "text": {"type": "string", "description": "Text to copy for clipboard_set."}
                 },
                 "required": ["action"]
             }
@@ -1970,10 +1977,10 @@ AVAILABLE_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Configured routine name, such as study_sprint or daily_briefing."},
-                    "routine_input": {"type": "string", "description": "Optional topic for a routine that needs it, such as a research question."}
+                    "routine_name": {"type": "string", "description": "Configured routine name, such as study_sprint or daily_briefing."},
+                    "input_text": {"type": "string", "description": "Optional topic for a routine that needs it, such as a research question."}
                 },
-                "required": ["name"]
+                "required": ["routine_name"]
             }
         }
     },
@@ -2498,62 +2505,97 @@ def execute_tool_call(tool_name: str, arguments: dict):
 
     # ── Master V2 Core Tool Handlers ──
     if tool_name == "manage_app":
-        action = str(arguments.get("action", "launch")).lower()
+        action = str(arguments.get("action", "")).lower()
         app_name = str(arguments.get("app_name", "")).strip()
+        if action in ("launch", "close") and not app_name:
+            return "Tool manage_app needs a non-empty app_name."
         if action == "close":
             return close_app(app_name)
-        elif action == "status":
+        elif action in ("status", "list_recent"):
             return "Recently opened apps: " + ", ".join(get_recently_opened_apps())
-        else:
+        elif action == "launch":
             return launch_app(app_name)
+        return f"Unsupported app action: {action}. No action was taken."
     elif tool_name == "manage_mode":
-        action = str(arguments.get("action", "start")).lower()
-        mode_name = str(arguments.get("mode_name", "gaming")).lower()
+        action = str(arguments.get("action", "")).lower()
+        mode_name = str(arguments.get("mode_name", "")).lower()
+        if mode_name not in ("gaming", "study", "movie", "focus"):
+            return "Choose a mode: gaming, study, movie, or focus."
         if action in ("stop", "close", "end", "exit"):
             return close_mode(mode_name)
         elif action == "status":
-            return f"Mode {mode_name} requested."
-        else:
+            return f"Live status for {mode_name} mode is unavailable; no action was taken."
+        elif action == "start":
             return launch_mode(mode_name)
+        return f"Unsupported mode action: {action}. No action was taken."
     elif tool_name == "media":
-        action = str(arguments.get("action", "play")).lower()
+        action = str(arguments.get("action", "")).lower()
         target = str(arguments.get("target", "spotify")).lower()
         query = str(arguments.get("query", "")).strip()
+        if target not in ("spotify", "youtube", "system"):
+            return f"Unsupported media target: {target}. No action was taken."
+        if action == "search" and not query:
+            return "Media search needs a query."
+        if action == "search":
+            try:
+                if target == "spotify":
+                    os.startfile(f"spotify:search:{quote(query)}")
+                elif target == "youtube":
+                    if not webbrowser.open(f"https://www.youtube.com/results?search_query={quote(query)}"):
+                        return "Could not open YouTube search."
+                else:
+                    return "Choose Spotify or YouTube for media search."
+            except Exception as exc:
+                return f"Could not open media search: {exc}"
+            return f"Sent {target} search request for: {query}. Playback was not requested."
         if action == "play":
+            if target == "system" and query:
+                return "Choose Spotify or YouTube to play a named track or video."
             if target == "youtube" and query:
                 return play_youtube(query)
             elif query:
                 return play_spotify(query)
             else:
                 return media_control("play")
-        elif action in ("pause", "stop", "next", "previous", "volume_up", "volume_down"):
+        elif action in ("pause", "resume", "stop", "next", "previous", "volume_up", "volume_down"):
             return media_control(action)
-        return media_control("play")
+        return f"Unsupported media action: {action}. No action was taken."
     elif tool_name == "manage_productivity":
-        action = str(arguments.get("action", "create")).lower()
-        item_type = str(arguments.get("type", "note")).lower()
+        action = str(arguments.get("action", "")).lower()
+        item_type = str(arguments.get("type", "")).lower()
         title = str(arguments.get("title", "")).strip()
         content = str(arguments.get("content", "")).strip()
         due_time = str(arguments.get("due_time", "")).strip()
         course = str(arguments.get("course", "")).strip()
 
+        if item_type not in ("memory", "todo", "task", "deadline", "reminder", "note", "focus_cycle"):
+            return f"Unsupported productivity type: {item_type}. No action was taken."
+        if action == "complete" and item_type in ("todo", "task"):
+            return complete_todo(title or content, arguments.get("todo_id"))
+        if action not in ("create", "set", "save", "add", "list", "search"):
+            return f"Unsupported productivity action '{action}' for {item_type}. No action was taken."
+        if item_type == "focus_cycle":
+            if action in ("create", "set"):
+                return set_focus_cycle()
+            return f"Unsupported productivity action '{action}' for focus_cycle. No action was taken."
+
         if item_type == "memory":
             if action in ("create", "set", "save", "add"):
                 saved = save_memory(content or title, category="memory", subject=title or "user")
-                return f"Saved to memory: {content or title}"
+                if saved.get("status") in ("saved", "duplicate"):
+                    return f"Saved to memory: {saved['content']}"
+                return f"Could not save memory: {saved.get('reason', 'storage did not confirm success')}."
             else:
                 durable = format_memory_search(content or title, limit=5)
                 return f"Memory recall:\n{durable}"
         elif item_type in ("todo", "task"):
             if action in ("create", "set", "add"):
                 return add_todo(title or content, due_time)
-            elif action == "complete":
-                return f"Completed todo: {title or content}"
             else:
                 return list_todos()
         elif item_type == "deadline":
             if action in ("create", "set", "add"):
-                return add_assignment_deadline(title or content, due_time or "next week", course)
+                return add_assignment_deadline(title or content, due_time, course)
             else:
                 return list_assignment_deadlines()
         elif item_type == "reminder":
@@ -2569,13 +2611,18 @@ def execute_tool_call(tool_name: str, arguments: dict):
     elif tool_name == "web_research":
         action = str(arguments.get("action", "search")).lower()
         query = str(arguments.get("query", "")).strip()
-        if action == "scrape" or query.startswith("http"):
-            return fetch_url(query)
-        else:
+        if action in ("fetch_url", "scrape"):
+            return fetch_url(arguments.get("url") or query)
+        elif action == "research_brief":
+            return research_web(query)
+        elif action == "search":
             return search_web(query)
+        return f"Unsupported web action: {action}. No action was taken."
     elif tool_name == "system_control":
         action = str(arguments.get("action", "")).lower()
-        if action == "screenshot":
+        if action == "get_stats":
+            return get_system_stats()
+        elif action == "screenshot":
             return capture_screenshot()
         elif action == "clipboard_get":
             return clipboard_get()
@@ -2584,11 +2631,10 @@ def execute_tool_call(tool_name: str, arguments: dict):
         elif action == "toggle_dictation":
             from hachi_dictation import set_global_dictation, is_dictation_enabled
             new_state = not is_dictation_enabled()
-            set_global_dictation(new_state)
-            return f"Global dictation is now {'enabled' if new_state else 'disabled'}."
-        elif action in ("volume_up", "volume_down", "mute", "brightness_up", "brightness_down"):
+            return set_global_dictation(new_state)
+        elif action in ("volume_up", "volume_down", "mute"):
             return media_control(action)
-        return f"System action {action} completed."
+        return f"Unsupported system action: {action}. No action was taken."
 
     # ── Legacy & Component Tools ──
     elif tool_name == "add_voice_dictionary_term":
@@ -2605,7 +2651,7 @@ def execute_tool_call(tool_name: str, arguments: dict):
         return list_routines()
     elif tool_name == "run_routine":
         r_name = arguments.get("routine_name") or arguments.get("name", "")
-        return run_routine(r_name, arguments.get("routine_input", ""))
+        return run_routine(r_name, arguments.get("input_text") or arguments.get("routine_input", ""))
     elif tool_name == "launch_mode":
         return launch_mode(arguments.get("mode_name", "gaming"))
     elif tool_name == "close_mode":

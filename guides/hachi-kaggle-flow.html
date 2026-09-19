@@ -1,0 +1,81 @@
+<div id="hachi-kaggle-flow">
+  <style>
+    #hachi-kaggle-flow .flow {display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:16px; align-items:start; margin:24px 0;}
+    #hachi-kaggle-flow .stage {min-width:0;}
+    #hachi-kaggle-flow .stage-label {font-weight:500; margin-bottom:12px;}
+    #hachi-kaggle-flow .file {display:flex; align-items:flex-start; gap:8px; margin:10px 0; overflow-wrap:anywhere;}
+    #hachi-kaggle-flow .file i {flex-shrink:0;}
+    #hachi-kaggle-flow .arrow {align-self:center; color:var(--muted-foreground);}
+    #hachi-kaggle-flow .settings {display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 16px; margin:0;}
+    #hachi-kaggle-flow .settings dt {overflow-wrap:anywhere;}
+    #hachi-kaggle-flow .settings dd {margin:0;}
+    #hachi-kaggle-flow .step-line {display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px;}
+    #hachi-kaggle-flow .step-mark {height:8px; width:36px; background:var(--viz-series-1);}
+    #hachi-kaggle-flow .common {display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:16px;}
+    @media(max-width:580px){#hachi-kaggle-flow .flow{grid-template-columns:minmax(0,1fr); gap:12px;} #hachi-kaggle-flow .arrow{transform:rotate(90deg); justify-self:center;}}
+  </style>
+  <div class="viz-controls">
+    <label class="form-label" for="hachi-run-phase">Run stage
+      <select class="form-select" id="hachi-run-phase">
+        <option value="pilot">1 · First pilot</option>
+        <option value="resume">2 · Resume test</option>
+        <option value="full">3 · Remaining training</option>
+        <option value="export">4 · Retry export, if needed</option>
+      </select>
+    </label>
+  </div>
+  <div class="flow" aria-label="Files entering Kaggle, run settings, and downloadable output">
+    <div class="stage">
+      <div class="stage-label">Attach to Kaggle</div>
+      <div id="hachi-inputs">
+        <div class="file"><i data-lucide="file-box" aria-hidden="true"></i><span>Original Hachi GGUF<br><span class="text-small">2.08 GB · same file every run</span></span></div>
+        <div class="file"><i data-lucide="file-archive" aria-hidden="true"></i><span>Initial input ZIP<br><span class="text-small">Dataset + training code</span></span></div>
+      </div>
+    </div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="stage">
+      <div class="stage-label">Kaggle session</div>
+      <div class="step-line"><span class="step-mark" aria-hidden="true"></span><span id="hachi-steps">Optimizer steps 0 → 2</span></div>
+      <dl class="settings">
+        <dt><code>START_NEW_RUN</code></dt><dd id="hachi-fresh">True</dd>
+        <dt><code>PILOT_STEPS</code></dt><dd id="hachi-pilot">2</dd>
+        <dt><code>EXPORT_ONLY</code></dt><dd id="hachi-export">False</dd>
+        <dt><code>EXPORT_RESULT</code></dt><dd>True</dd>
+      </dl>
+    </div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="stage">
+      <div class="stage-label">Download from saved output</div>
+      <div id="hachi-outputs">
+        <div class="file"><i data-lucide="archive-restore" aria-hidden="true"></i><span>Recovery ZIP<br><span class="text-small">Checkpoint at step 2</span></span></div>
+      </div>
+    </div>
+  </div>
+  <div id="hachi-state" aria-live="polite" class="text-small">Expected run status: paused · step 2</div>
+  <hr>
+  <div class="common text-small"><span>GPU + Internet enabled</span><span>Save Version → Save &amp; Run All</span><span>Model + recovery = resume</span></div>
+  <script>
+    (() => {
+      const root = document.getElementById('hachi-kaggle-flow');
+      const select = root.querySelector('#hachi-run-phase');
+      const stages = {
+        pilot: {fresh:'True', pilot:'2', exportOnly:'False', steps:'Optimizer steps 0 → 2', input:'Initial input ZIP', inputNote:'Dataset + training code', output:'Checkpoint at step 2', result:false, status:'Expected run status: paused · step 2'},
+        resume: {fresh:'False', pilot:'2', exportOnly:'False', steps:'Optimizer steps 2 → 4', input:'Recovery ZIP from step 2', inputNote:'Frozen package + full training state', output:'New checkpoint at step 4', result:false, status:'Expected run status: paused · step 4'},
+        full: {fresh:'False', pilot:'0', exportOnly:'False', steps:'Latest checkpoint → schedule end', input:'Newest recovery ZIP', inputNote:'Frozen package + full training state', output:'Newest complete checkpoint', result:true, status:'Expected: training_complete + RESULT READY, or paused at the session budget'},
+        export: {fresh:'False', pilot:'0', exportOnly:'True', steps:'Completed training → GGUF export', input:'Completed recovery ZIP', inputNote:'All scheduled training steps finished', output:'Completed training backup', result:true, status:'Expected export log: RESULT READY'}
+      };
+      function update() {
+        const state = stages[select.value];
+        root.querySelector('#hachi-fresh').textContent = state.fresh;
+        root.querySelector('#hachi-pilot').textContent = state.pilot;
+        root.querySelector('#hachi-export').textContent = state.exportOnly;
+        root.querySelector('#hachi-steps').textContent = state.steps;
+        root.querySelector('#hachi-state').textContent = state.status;
+        root.querySelector('#hachi-inputs').innerHTML = '<div class="file"><i data-lucide="file-box" aria-hidden="true"></i><span>Original Hachi GGUF<br><span class="text-small">2.08 GB · same file every run</span></span></div><div class="file"><i data-lucide="file-archive" aria-hidden="true"></i><span>' + state.input + '<br><span class="text-small">' + state.inputNote + '</span></span></div>';
+        root.querySelector('#hachi-outputs').innerHTML = '<div class="file"><i data-lucide="archive-restore" aria-hidden="true"></i><span>Recovery ZIP<br><span class="text-small">' + state.output + '</span></span></div>' + (state.result ? '<div class="file"><i data-lucide="package-check" aria-hidden="true"></i><span>Result ZIP<br><span class="text-small">After successful GGUF export</span></span></div>' : '');
+        if (typeof lucide !== 'undefined') lucide.createIcons({attrs:{width:16,height:16}});
+      }
+      select.addEventListener('change', update);
+    })();
+  </script>
+</div>

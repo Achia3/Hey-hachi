@@ -1,0 +1,24 @@
+{
+  "schema": "hachi-conversation-package-v1",
+  "files": {
+    "build_package.py": "a8dea7494bad447b288c5051a07b4603e89e340a030b22c184d03b02f6f72a39",
+    "export.py": "f87864267ceef6cb5a37b1cfab5714e0ad07b19e289441380f24205585fb0234",
+    "make_notebook.py": "fef424d820781d7331330c69ba294466d68158084bea97280679adc83b3e05b2",
+    "recovery.py": "b59f1068dc12b70ff3acf48ae1be269d224c71a015123b218a95f5f5b05f733c",
+    "requirements.txt": "a1b32cd74802abd92e71795793eca1080466007b40d550f3a5edfc5cd5ce66e2",
+    "seeds.py": "4187a9ddd1153b9d4c3ec7c3e3b0258b875106e2e7e06249f6696031393da0f8",
+    "session.py": "a4250ed2dee2ec41671d4a75f7f7b93f41f4df77f7166559f87396e7fd1c8d52",
+    "source_model.json": "3810e2afa872f836ce638c9f169f18388343cc437e44663e931dcea33683d15f",
+    "START_HERE.md": "f545ae17fd7d4a59a8ce739a76a94eeb5c9299cb45021c8695f28e0886ca80cb",
+    "tokenization.py": "dfd24243e90e7e74092f73a818e467fa729d54e915c4228fec443946fd36ffb7",
+    "train.py": "5991eeb9c6a47d47cf16751e91acb10423d4b2692ae6bba1e111bb2cd225b2e3",
+    "training_config.json": "db77c66f7d12c6b16ce219079987a4707b24efc7c648234d2f3c8fcbad4f98bc",
+    "__init__.py": "e29effb87c6afb2a48f147f526c50013410185fdecbaaec16fdf953837641bcb",
+    "data/legacy_test.jsonl": "7ccf7d0f83c92e34218503a995eda6f7f0a1f1792fbf778ecc0f8a140517f947",
+    "data/manifest.json": "ae7a0bf40eb082761170e75d34dbb6a042f54141c049da49ff37ba3f5f9b764a",
+    "data/runtime_tools.json": "accd478ee1b91b7fd113d44ededfe7142e7ef576d5011079a382b7aa1d00eff6",
+    "data/test.jsonl": "93dbcfaf087a4234b71d8653c7cfec8a904427eda07bb41d49060f7dc7266252",
+    "data/train.jsonl": "5402f3b2a7222bd66b9012b7ce9babb6be66240c36f6660a76438452ff6ad357",
+    "data/validation.jsonl": "4d0afa42882e239224f675438761ddbcfe680a80333058700d1956f9961b9002"
+  }
+}

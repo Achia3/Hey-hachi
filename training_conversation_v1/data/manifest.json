@@ -1,0 +1,92 @@
+{
+  "schema": "hachi-conversation-data-v1",
+  "seed": 1057,
+  "creators": "Axeil Escabal and Beomarc Cartoneros",
+  "creator_attribution": "confirmed_by_user",
+  "conversation_records": 161,
+  "replay_records": 53,
+  "splits": {
+    "train": {
+      "records": 159,
+      "families": 70,
+      "languages": {
+        "fil": 30,
+        "taglish": 63,
+        "en": 66
+      },
+      "categories": {
+        "tool_replay": 53,
+        "everyday": 11,
+        "length_control": 26,
+        "honesty": 8,
+        "brief_explanation": 2,
+        "teaching": 26,
+        "uncertainty": 5,
+        "coding": 2,
+        "helpfulness": 2,
+        "context": 7,
+        "brevity": 3,
+        "tool_restraint": 3,
+        "identity": 5,
+        "clarification": 2,
+        "writing": 4
+      },
+      "multi_turn": 86
+    },
+    "validation": {
+      "records": 24,
+      "families": 9,
+      "languages": {
+        "en": 11,
+        "fil": 4,
+        "taglish": 9
+      },
+      "categories": {
+        "identity": 3,
+        "context": 2,
+        "brevity": 3,
+        "clarification": 2,
+        "writing": 2,
+        "grounding": 2,
+        "coding": 2,
+        "teaching": 4,
+        "length_control": 4
+      },
+      "multi_turn": 13
+    },
+    "test": {
+      "records": 31,
+      "families": 12,
+      "languages": {
+        "en": 15,
+        "fil": 6,
+        "taglish": 10
+      },
+      "categories": {
+        "identity": 1,
+        "everyday": 3,
+        "context": 2,
+        "honesty": 2,
+        "writing": 2,
+        "brief_explanation": 2,
+        "grounding": 2,
+        "brevity": 3,
+        "helpfulness": 2,
+        "teaching": 6,
+        "length_control": 6
+      },
+      "multi_turn": 19
+    }
+  },
+  "human_language_review_complete": false,
+  "provenance": "Authored synthetic dialogues; replay from existing Master V2 train only. No private chats.",
+  "replay_filter": "Strip _vN family suffix; exclude old validation/test families and unsupported action enums.",
+  "legacy_test_caveat": "Historical set may contain old cross-split template overlap; it is a regression check, not new generalization evidence.",
+  "files": {
+    "legacy_test.jsonl": "7ccf7d0f83c92e34218503a995eda6f7f0a1f1792fbf778ecc0f8a140517f947",
+    "runtime_tools.json": "accd478ee1b91b7fd113d44ededfe7142e7ef576d5011079a382b7aa1d00eff6",
+    "test.jsonl": "93dbcfaf087a4234b71d8653c7cfec8a904427eda07bb41d49060f7dc7266252",
+    "train.jsonl": "5402f3b2a7222bd66b9012b7ce9babb6be66240c36f6660a76438452ff6ad357",
+    "validation.jsonl": "4d0afa42882e239224f675438761ddbcfe680a80333058700d1956f9961b9002"
+  }
+}

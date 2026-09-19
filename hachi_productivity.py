@@ -268,6 +268,41 @@ def add_todo(title: str, due_at: str = "") -> str:
     return f"Added to-do #{todo_id}: {title}."
 
 
+def complete_todo(title: str = "", todo_id: Optional[int] = None) -> str:
+    """Complete one exact match, requiring an ID when a title is ambiguous."""
+    title = re.sub(r"\s+", " ", (title or "")).strip()
+    if todo_id is not None and (isinstance(todo_id, bool) or not isinstance(todo_id, int) or todo_id < 1):
+        return "A to-do ID must be a positive integer."
+    if todo_id is None and not title:
+        return "Which to-do should I complete? Provide its exact title or ID."
+    init_db()
+    with closing(get_connection()) as conn:
+        # Hold the write lock from selection through update so duplicate titles
+        # cannot be inserted between the ambiguity check and completion.
+        conn.execute("BEGIN IMMEDIATE")
+        if todo_id is not None:
+            rows = conn.execute("SELECT id,title,status FROM todos WHERE id=?", (todo_id,)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id,title,status FROM todos WHERE title = ? COLLATE NOCASE AND status='pending'",
+                (title,),
+            ).fetchall()
+        if not rows:
+            return "No matching to-do found. It may already be completed."
+        if len(rows) != 1:
+            choices = ", ".join(f"#{row['id']}" for row in rows)
+            return f"More than one pending to-do has that title ({choices}). Provide its ID."
+        row = rows[0]
+        if row["status"] == "completed":
+            return f"To-do #{row['id']} is already completed: {row['title']}."
+        conn.execute("UPDATE todos SET status='completed',completed_at=? WHERE id=?", (_now_text(), row["id"]))
+        conn.commit()
+        verified = conn.execute("SELECT status,completed_at FROM todos WHERE id=?", (row["id"],)).fetchone()
+        if verified["status"] != "completed" or not verified["completed_at"]:
+            return "Could not verify to-do completion."
+    return f"Completed to-do #{row['id']}: {row['title']}."
+
+
 def list_todos(include_completed: bool = False) -> str:
     init_db()
     where = "" if include_completed else "WHERE status='pending'"

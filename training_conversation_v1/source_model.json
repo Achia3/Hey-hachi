@@ -1,0 +1,10 @@
+{
+  "mode": "gguf",
+  "filename": "hachi-master-current.gguf",
+  "bytes": 2076674432,
+  "sha256": "f5f5293ccae2b0b10da72cddd04cb9859080003a5c9b57f5549bfc983d5d2d4e",
+  "base_family": "Qwen3.5-2B",
+  "tokenizer_repo": "Qwen/Qwen3.5-2B",
+  "ollama_model": "hachi-master:latest",
+  "weights_are_current_hachi": true
+}
